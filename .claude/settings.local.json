@@ -9,15 +9,10 @@
       "Bash(git remote:*)",
       "Bash(git branch:*)",
       "Bash(git push:*)",
-      "Bash(git pull:*)",
-      "Bash(gh api:*)",
-      "Bash(where gh:*)",
-      "Bash(winget install:*)",
-      "Read(//c/Users/BMS/Downloads/**)"
+      "Bash(git pull:*)"
     ],
     "additionalDirectories": [
-      "C:\\Users\\BMS\\Desktop\\backoffice-teams\\public",
-      "c:\\Users\\BMS\\Downloads"
+      "C:\\Users\\BMS\\Desktop\\backoffice-teams\\public"
     ]
   }
 }
