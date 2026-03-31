@@ -180,6 +180,7 @@ html,body{height:100%;background:var(--bg);color:var(--txt);overflow:hidden;}
 .view#view-lodging.on{display:block;overflow-y:auto;}
 .view#view-holidays.on{display:block;overflow-y:auto;}
       .view#view-advance.on{display:block;overflow-y:auto;}
+.view#view-leave.on{display:block;overflow-y:auto;}
 
 .toolbar{
   display:flex;align-items:center;gap:10px;padding:14px 24px;
@@ -670,6 +671,10 @@ select.f-input{appearance:none;cursor:pointer;}
       <div class="nav-btn ce-only" style="display:none" onclick="window.goView('holidays',this)">
         <span class="ni">🎌</span><span class="nl">วันหยุด</span>
       </div>
+      <div class="nav-btn" onclick="window.goView('leave',this)">
+        <span class="ni">🏖</span><span class="nl">การลางาน</span>
+        <span class="nb" id="leave-nb" style="display:none">0</span>
+      </div>
       <div class="sb-sec admin-only" style="display:none">ระบบ</div>
       <div class="nav-btn admin-only" style="display:none" onclick="window.openAdminModal()">
         <span class="ni">⚙️</span><span class="nl">Admin Panel</span>
@@ -925,6 +930,35 @@ select.f-input{appearance:none;cursor:pointer;}
         <div id="hol-list" style="padding:0 24px 28px;"></div>
       </div>
 
+      <!-- LEAVE -->
+      <div class="view" id="view-leave">
+        <div style="padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+          <div style="font-size:18px;font-weight:800;color:var(--txt);">🏖 การลางาน</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <select class="t-sel" id="leave-filter-staff" onchange="window.renderLeave()">
+              <option value="">พนักงานทั้งหมด</option>
+            </select>
+            <select class="t-sel" id="leave-filter-type" onchange="window.renderLeave()">
+              <option value="">ประเภทการลาทั้งหมด</option>
+              <option value="sick">🤒 ลาป่วย</option>
+              <option value="vacation">🏖 ลาพักร้อน</option>
+              <option value="personal">📋 ลากิจ</option>
+              <option value="maternity">🤱 ลาคลอด</option>
+              <option value="ordain">🙏 ลาบวช</option>
+              <option value="other">📝 อื่นๆ</option>
+            </select>
+            <select class="t-sel" id="leave-filter-status" onchange="window.renderLeave()">
+              <option value="">สถานะทั้งหมด</option>
+              <option value="pending">⏳ รออนุมัติ</option>
+              <option value="approved">✅ อนุมัติ</option>
+              <option value="rejected">❌ ไม่อนุมัติ</option>
+            </select>
+            <button class="btn btn-pri btn-sm" onclick="window.openLeaveForm(null)">+ เพิ่มการลางาน</button>
+          </div>
+        </div>
+        <div id="leave-list" style="padding:16px 24px 28px;"></div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -989,7 +1023,8 @@ select.f-input{appearance:none;cursor:pointer;}
           <div class="adm-nav-item" id="at-types" onclick="window.admTab('types')"><span class="adm-nav-icon">🏷️</span> ประเภทงาน</div>
           <div class="adm-nav-item" id="at-positions" onclick="window.admTab('positions')"><span class="adm-nav-icon">💼</span> ตำแหน่ง</div>
           <div class="adm-nav-item" id="at-stages" onclick="window.admTab('stages')"><span class="adm-nav-icon">⚡</span> PM Stages</div>
-          <div class="adm-nav-item admin-only" id="at-users" onclick="window.admTab('users')" style="display:none; margin-top:auto; border-top:1px dashed var(--border); border-radius:0; padding-top:16px;"><span class="adm-nav-icon">🔑</span> ผู้ใช้งานระบบ</div>
+          <div class="adm-nav-item" id="at-notify" onclick="window.admTab('notify')" style="margin-top:auto; border-top:1px dashed var(--border); border-radius:0; padding-top:16px;"><span class="adm-nav-icon">🔔</span> การแจ้งเตือน</div>
+          <div class="adm-nav-item admin-only" id="at-users" onclick="window.admTab('users')" style="display:none;"><span class="adm-nav-icon">🔑</span> ผู้ใช้งานระบบ</div>
         </div>
       </div>
       <div class="adm-main">
@@ -1132,6 +1167,66 @@ select.f-input{appearance:none;cursor:pointer;}
     <div class="m-foot">
       <button class="btn btn-ghost" onclick="window.closeM('m-holiday')">ยกเลิก</button>
       <button class="btn btn-pri" onclick="window.saveHoliday()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- LEAVE FORM MODAL -->
+<div class="overlay" id="m-leave">
+  <div class="modal md" style="max-width:480px">
+    <div class="m-head">
+      <div class="m-icon" style="background:rgba(255,107,107,.12)">🏖</div>
+      <div class="m-title" id="m-leave-title">เพิ่มการลางาน</div>
+      <button class="m-x" onclick="window.closeM('m-leave')">✕</button>
+    </div>
+    <div class="m-body">
+      <input type="hidden" id="leave-edit-id">
+      <div class="f-grid">
+        <div class="f-group">
+          <label class="f-label">ประเภทการลางาน *</label>
+          <select class="f-input" id="leavef-type">
+            <option value="sick">🤒 ลาป่วย</option>
+            <option value="vacation">🏖 ลาพักร้อน</option>
+            <option value="personal">📋 ลากิจ</option>
+            <option value="maternity">🤱 ลาคลอด</option>
+            <option value="ordain">🙏 ลาบวช</option>
+            <option value="other">📝 อื่นๆ</option>
+          </select>
+        </div>
+        <div class="f-group">
+          <label class="f-label">พนักงาน *</label>
+          <select class="f-input" id="leavef-staff"></select>
+        </div>
+        <div class="f-group">
+          <label class="f-label">วันที่เริ่ม *</label>
+          <input type="date" class="f-input" id="leavef-start">
+        </div>
+        <div class="f-group">
+          <label class="f-label">วันที่สิ้นสุด *</label>
+          <input type="date" class="f-input" id="leavef-end">
+        </div>
+        <div class="f-group" style="grid-column:span 2">
+          <label class="f-label" id="leavef-sub-label">ผู้ทำงานแทน</label>
+          <select class="f-input" id="leavef-sub">
+            <option value="">-- ไม่มี --</option>
+          </select>
+        </div>
+        <div class="f-group" style="grid-column:span 2" id="leavef-status-group">
+          <label class="f-label">สถานะ</label>
+          <select class="f-input" id="leavef-status">
+            <option value="pending">⏳ รออนุมัติ</option>
+            <option value="rejected">❌ ไม่อนุมัติ</option>
+          </select>
+        </div>
+        <div class="f-group" style="grid-column:span 2">
+          <label class="f-label">รายละเอียดการลา *</label>
+          <textarea class="f-input" id="leavef-note" rows="3" placeholder="ระบุรายละเอียดการลา..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-ghost" onclick="window.closeM('m-leave')">ยกเลิก</button>
+      <button class="btn btn-pri" onclick="window.saveLeave()">💾 บันทึก</button>
     </div>
   </div>
 </div>
@@ -1378,6 +1473,8 @@ window.POSITIONS = [];
 window.PGROUPS = [];
 window.LODGINGS = [];
 window.HOLIDAYS = [];
+window.LEAVES = [];
+window.NOTIFY_TOKEN = '';
 
 window.AFLW=[
   {id:'draft',label:'Draft',color:'#9ba3b8'},
@@ -1477,6 +1574,25 @@ function overlapWarnText(overlaps){
   }).join('<br>');
 }
 
+function getStaffLeaveConflicts(sid, startStr, endStr) {
+  if(!startStr||!endStr||!window.LEAVES) return [];
+  var sDate=pd(startStr);
+  var eDate=pd(endStr);eDate.setHours(23,59,59);
+  var LEAVE_EMOJI={sick:'🤒',vacation:'🏖',personal:'📋',maternity:'🤱',ordain:'🙏',other:'📝'};
+  var LEAVE_LABEL={sick:'ลาป่วย',vacation:'ลาพักร้อน',personal:'ลากิจ',maternity:'ลาคลอด',ordain:'ลาบวช',other:'อื่นๆ'};
+  return window.LEAVES.filter(function(lv){
+    if(lv.staffId!==sid)return false;
+    if(lv.status==='rejected')return false;
+    if(!lv.startDate||!lv.endDate)return false;
+    var ls=pd(lv.startDate),le=pd(lv.endDate);le.setHours(23,59,59);
+    return ls<=eDate&&le>=sDate;
+  }).map(function(lv){
+    var emoji=LEAVE_EMOJI[lv.leaveType]||'📝';
+    var label=LEAVE_LABEL[lv.leaveType]||lv.leaveType;
+    return{leave:lv,emoji:emoji,label:label};
+  });
+}
+
 window.showLoader = function(txt){
   document.getElementById('sys-loader-text').innerHTML = txt || 'กำลังโหลดข้อมูล...';
   var pulse = document.querySelector('#sys-loader .pulse');
@@ -1552,7 +1668,7 @@ async function seedDatabaseIfEmpty(){
 
 function setupRealtimeListeners(){
   if(!auth.currentUser) return;
-  const colls = ['STAGES','PTYPES','PGROUPS','STAFF','USERS','PROJECTS','ADVANCES','LODGINGS','POSITIONS','HOLIDAYS'];
+  const colls = ['STAGES','PTYPES','PGROUPS','STAFF','USERS','PROJECTS','ADVANCES','LODGINGS','POSITIONS','HOLIDAYS','LEAVES'];
   let loadCount = 0;
 
   const checkLoaded = () => {
@@ -1657,6 +1773,13 @@ function setupRealtimeListeners(){
     if(window.cu&&document.getElementById('view-holidays')&&document.getElementById('view-holidays').classList.contains('on'))window.renderHolidays();
     if(window.cu&&window.calTime==='month')window.renderCalendar();
   }, e=>window.showDbError(e));
+
+  onSnapshot(getColRef('LEAVES'), s => {
+    window.LEAVES = s.docs.map(doc=>{let d=doc.data();return{id:d.leave_id||d.id,staffId:d.staff_id||'',leaveType:d.leave_type||'other',startDate:d.start_date||'',endDate:d.end_date||'',substituteId:d.substitute_id||'',note:d.note||'',status:d.status||'pending'};});
+    checkLoaded();
+    if(window.cu&&document.getElementById('view-leave')&&document.getElementById('view-leave').classList.contains('on'))window.renderLeave();
+    if(window.cu&&document.getElementById('view-calendar')&&document.getElementById('view-calendar').classList.contains('on'))window.renderCalendar();
+  }, e=>window.showDbError(e));
 }
 
 onAuthStateChanged(auth, async (user) => {
@@ -1664,6 +1787,11 @@ onAuthStateChanged(auth, async (user) => {
     try {
       await seedDatabaseIfEmpty();
       setupRealtimeListeners();
+      // โหลด SETTINGS แยก (ไม่บล็อก app load)
+      onSnapshot(getDocRef('SETTINGS','app'), function(snap){
+        var d=snap.exists()?snap.data():{};
+        window.NOTIFY_TOKEN=d.notify_token||'';
+      });
     } catch(err){
       window.showDbError(err);
     }
@@ -1769,7 +1897,7 @@ window.goView = function(id,el){
   document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on');});
   var v=document.getElementById('view-'+id);
   if(v){v.style.display='';v.classList.add('on');}
-  var labels={overview:'Overview',kanban:'Delivery Board',projects:'โครงการทั้งหมด',advance:'Advance',lodging:'ระบบจัดหาที่พัก',workload:'สรุปภาระงาน',calendar:'ปฏิทินทีม',holidays:'วันหยุด'};
+  var labels={overview:'Overview',kanban:'Delivery Board',projects:'โครงการทั้งหมด',advance:'Advance',lodging:'ระบบจัดหาที่พัก',workload:'สรุปภาระงาน',calendar:'ปฏิทินทีม',holidays:'วันหยุด',leave:'การลางาน'};
   document.getElementById('tp-title').textContent=labels[id]||id;
   var actions={};
   document.getElementById('tp-actions').innerHTML=actions[id]||'';
@@ -1781,6 +1909,7 @@ window.goView = function(id,el){
   if(id==='workload') window.renderWorkload();
   if(id==='calendar') window.renderCalendar();
   if(id==='holidays') window.renderHolidays();
+  if(id==='leave') window.renderLeave();
 }
 
 window.toggleSB = function(){
@@ -2314,6 +2443,46 @@ window.showProjHolidaysPopup=function(pid){
   ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
   document.body.appendChild(ov);
 };
+window.showAlert=function(msg,type){
+  var cfg={
+    error:{icon:'❌',title:'ข้อผิดพลาด',color:'var(--coral)'},
+    warn: {icon:'⚠️',title:'คำเตือน',   color:'var(--amber)'},
+    info: {icon:'ℹ️',title:'แจ้งเตือน',  color:'var(--violet)'},
+    success:{icon:'✅',title:'สำเร็จ',   color:'var(--teal)'},
+  }[type||'error']||{icon:'❌',title:'ข้อผิดพลาด',color:'var(--coral)'};
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;animation:fadeIn .15s ease;';
+  ov.setAttribute('data-salert','1');
+  ov.innerHTML='<div style="background:var(--surface);border-radius:16px;padding:28px 32px;max-width:360px;width:90%;box-shadow:0 12px 48px rgba(0,0,0,.3);border:1px solid var(--border);text-align:center;">'
+    +'<div style="font-size:36px;margin-bottom:12px;">'+cfg.icon+'</div>'
+    +'<div style="font-size:15px;font-weight:700;color:'+cfg.color+';margin-bottom:8px;">'+cfg.title+'</div>'
+    +'<div style="font-size:13px;color:var(--txt2);line-height:1.7;margin-bottom:20px;">'+esc(msg)+'</div>'
+    +'<button onclick="this.closest(\'[data-salert]\').remove()" style="padding:9px 32px;background:'+cfg.color+';color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">ตกลง</button>'
+    +'</div>';
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
+  document.body.appendChild(ov);
+};
+
+window.showConfirm=function(msg,onOk,opts){
+  var cfg=opts||{};
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;';
+  ov.setAttribute('data-sconfirm','1');
+  var icon=cfg.icon||'🗑';var title=cfg.title||'ยืนยันการดำเนินการ';var okColor=cfg.okColor||'var(--coral)';var okText=cfg.okText||'ตกลง';
+  ov.innerHTML='<div style="background:var(--surface);border-radius:16px;padding:28px 32px;max-width:360px;width:90%;box-shadow:0 12px 48px rgba(0,0,0,.3);border:1px solid var(--border);text-align:center;">'
+    +'<div style="font-size:36px;margin-bottom:12px;">'+icon+'</div>'
+    +'<div style="font-size:15px;font-weight:700;color:var(--txt);margin-bottom:8px;">'+title+'</div>'
+    +'<div style="font-size:13px;color:var(--txt2);line-height:1.7;margin-bottom:22px;">'+esc(msg)+'</div>'
+    +'<div style="display:flex;gap:10px;justify-content:center;">'
+    +'<button id="sc-cancel" style="flex:1;padding:9px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">ยกเลิก</button>'
+    +'<button id="sc-ok" style="flex:1;padding:9px;background:'+okColor+';color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">'+okText+'</button>'
+    +'</div></div>';
+  ov.querySelector('#sc-cancel').onclick=function(){ov.remove();};
+  ov.querySelector('#sc-ok').onclick=function(){ov.remove();if(onOk)onOk();};
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
+  document.body.appendChild(ov);
+};
+
 window.showOverlapPopup=function(htmlMsg){
   var ov=document.createElement('div');
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
@@ -2330,8 +2499,11 @@ window.checkMemOverlap=function(mid){
   var sidEl=document.getElementById('msid-'+mid);var msEl=document.getElementById('ms-'+mid);var meEl=document.getElementById('me-'+mid);var warnEl=document.getElementById('mwarn-'+mid);
   if(!sidEl||!msEl||!meEl||!warnEl)return;
   var overlaps=getStaffOverlaps(sidEl.value,msEl.value,meEl.value,window.editPid);
-  if(overlaps.length>0){warnEl.innerHTML=overlapWarnText(overlaps);warnEl.style.display='block';}
-  else warnEl.style.display='none';
+  var leaveC=getStaffLeaveConflicts(sidEl.value,msEl.value,meEl.value);
+  var html='';
+  if(overlaps.length>0)html+='<span style="color:var(--coral)">'+overlapWarnText(overlaps)+'</span>';
+  if(leaveC.length>0){if(html)html+='<br>';html+='<span style="color:var(--amber)">'+leaveC.map(function(c){return c.emoji+' มีการลา'+c.label+' ('+fd(c.leave.startDate)+' – '+fd(c.leave.endDate)+')';}).join('<br>')+'</span>';}
+  if(html){warnEl.innerHTML=html;warnEl.style.display='block';}else warnEl.style.display='none';
 }
 
 window.updateAllMemDates=function(){
@@ -2449,6 +2621,9 @@ window.pkuSelect=function(sid){
   var s=gSt(sid);var j=window.STAFF.findIndex(function(x){return x.id===sid;});
   var mid='M'+uid();var sdt=(document.getElementById('pf-start')||{}).value||'';var edt=(document.getElementById('pf-end')||{}).value||'';
   var overlaps=getStaffOverlaps(sid,sdt,edt,window.editPid);var warnText=overlaps.length>0?overlapWarnText(overlaps):'';
+  var leaveC=getStaffLeaveConflicts(sid,sdt,edt);
+  var leaveWarnText=leaveC.length>0?leaveC.map(function(c){return c.emoji+' มีการลา'+c.label+' ('+fd(c.leave.startDate)+' – '+fd(c.leave.endDate)+')';}).join('<br>'):'';
+  var combinedWarn=(warnText?'<span style="color:var(--coral)">'+warnText+'</span>':'')+(warnText&&leaveWarnText?'<br>':'')+(leaveWarnText?'<span style="color:var(--amber)">'+leaveWarnText+'</span>':'');
   // Add compact member row to right panel
   var list=document.getElementById('mem-list');if(!list)return;
   var div=document.createElement('div');div.className='m-row';div.id='mr-'+mid;div.setAttribute('data-sid',sid);
@@ -2463,7 +2638,7 @@ window.pkuSelect=function(sid){
     +'<input type="date" class="f-input" style="padding:4px 6px;font-size:10px;" id="ms-'+mid+'" value="'+sdt+'" onchange="window.checkMemOverlap(\''+mid+'\')">'
     +'<input type="date" class="f-input" style="padding:4px 6px;font-size:10px;" id="me-'+mid+'" value="'+edt+'" onchange="window.checkMemOverlap(\''+mid+'\')">'
     +'</div>'
-    +'<div id="mwarn-'+mid+'" style="font-size:10px;color:var(--coral);margin-top:3px;padding-left:33px;display:'+(warnText?'block':'none')+'">'+warnText+'</div>';
+    +'<div id="mwarn-'+mid+'" style="font-size:10px;margin-top:3px;padding-left:33px;display:'+(combinedWarn?'block':'none')+'">'+combinedWarn+'</div>';
   list.appendChild(div);
   // Dim item in left panel
   var avItem=document.querySelector('#pku-avail .pku-avail-item[data-sid="'+sid+'"]');
@@ -2471,6 +2646,7 @@ window.pkuSelect=function(sid){
   // Update selected count
   var cnt=document.getElementById('pku-sel-cnt');if(cnt){var n=document.querySelectorAll('#mem-list .m-row').length;cnt.textContent=n>0?'('+n+')':('')}
   if(overlaps.length>0)window.showOverlapPopup(warnText);
+  if(leaveC.length>0)window.showOverlapPopup('<span style="color:var(--amber)">'+leaveWarnText+'</span>');
 };
 window.pkuDeselect=function(mid){
   if(!window.ce())return;
@@ -3628,6 +3804,13 @@ window.renderCalendar=function(){
       } else {
         let mems=p.members&&p.members.length>0?p.members:p.team.map(id=>({sid:id,s:p.start,e:p.end}));let mbList=mems.filter(m=>m.sid===r.id);let validMems=mbList.filter(mb=>mb.s&&mb.e&&!isNaN(pd(mb.s).getTime())&&!isNaN(pd(mb.e).getTime()));if(validMems.length>0){let ms=new Date(Math.min(...validMems.map(mb=>pd(mb.s).getTime())));let me=new Date(Math.max(...validMems.map(mb=>{let d=pd(mb.e);d.setHours(23,59,59);return d.getTime();})));let idxs=getColIndices(ms,me,tCols);if(idxs)rawEvents.push({sIdx:idxs.sIdx,eIdx:idxs.eIdx,text:p.name,color:gC(window.PROJECTS.indexOf(p)),p:p});}
       }
+    });
+    var _LEAVE_EMOJI_CAL={sick:'🤒',vacation:'🏖',personal:'📋',maternity:'🤱',ordain:'🙏',other:'📝'};
+    var _LEAVE_LABEL_CAL={sick:'ลาป่วย',vacation:'ลาพักร้อน',personal:'ลากิจ',maternity:'ลาคลอด',ordain:'ลาบวช',other:'อื่นๆ'};
+    (window.LEAVES||[]).filter(lv=>lv.staffId===r.id&&lv.startDate&&lv.endDate&&lv.status!=='rejected').forEach(lv=>{
+      let ls=pd(lv.startDate),le=pd(lv.endDate);le.setHours(23,59,59);
+      let idxs=getColIndices(ls,le,tCols);
+      if(idxs){let emoji=_LEAVE_EMOJI_CAL[lv.leaveType]||'📝';let label=_LEAVE_LABEL_CAL[lv.leaveType]||lv.leaveType;rawEvents.push({sIdx:idxs.sIdx,eIdx:idxs.eIdx,text:emoji+' '+label,color:'rgba(255,107,107,0.75)',isLeave:true,lv:lv,p:null});}
     });}
     else if(window.calView==='project'){let p=r.obj;if(p.status!=='cancelled'&&p.status!=='completed'){
       // ถ้ามี visits → แสดงแต่ละรอบแยกกัน
@@ -3695,7 +3878,7 @@ window.renderCalendar=function(){
     let workloadText=r.type==='staff'?`${rowData.eventCount} โครงการ`:(r.type==='project'?`${rowData.eventCount} ทีมงาน`:`${rowData.eventCount} โครงการ`);
     html+=`<div class="tl-row" style="height:${rh}px"><div class="tl-left" style="width:${LEFT_WIDTH}px;height:${rh}px">${avatar}<div style="min-width:0;flex:1;display:flex;flex-direction:column;justify-content:center;padding-top:2px;"><div style="font-size:12px;font-weight:600;word-break:break-word;line-height:1.4;">${esc(r.name)}</div><div style="font-size:10px;color:var(--txt3);margin-top:4px;"><div>${esc(r.sub)}</div><div style="color:var(--violet);font-weight:700;">${workloadText}</div></div></div></div><div class="tl-right" style="width:${totalGridWidth}px;height:${rh}px">`;
     tCols.forEach(tc=>{html+=`<div class="tl-bg-cell ${tc.isWk?'wk':''} ${tc.isHol?'hol':''}" style="min-width:${DAY_WIDTH}px;width:${DAY_WIDTH}px"></div>`;});
-    rowData.events.forEach(ev=>{let leftPx=ev.sIdx*DAY_WIDTH+2;let widthPx=((ev.eIdx-ev.sIdx)+1)*DAY_WIDTH-4;let topPx=ROW_PAD+(ev.lane*(BAR_HEIGHT+BAR_GAP));html+=`<div class="tl-bar" onclick="window.openProjModal('${ev.p.id}')" style="left:${leftPx}px;width:${widthPx}px;top:${topPx}px;background:${ev.color};height:${BAR_HEIGHT}px" title="${esc(ev.text)}">${esc(ev.text)}</div>`;});
+    rowData.events.forEach(ev=>{let leftPx=ev.sIdx*DAY_WIDTH+2;let widthPx=((ev.eIdx-ev.sIdx)+1)*DAY_WIDTH-4;let topPx=ROW_PAD+(ev.lane*(BAR_HEIGHT+BAR_GAP));if(ev.isLeave){html+=`<div class="tl-bar" style="left:${leftPx}px;width:${widthPx}px;top:${topPx}px;background:rgba(255,107,107,0.15);height:${BAR_HEIGHT}px;border:2px dashed #ff6b6b;color:#c0392b;cursor:default;font-weight:600;" title="${esc(ev.text)}">${esc(ev.text)}</div>`;}else{html+=`<div class="tl-bar" onclick="window.openProjModal('${ev.p.id}')" style="left:${leftPx}px;width:${widthPx}px;top:${topPx}px;background:${ev.color};height:${BAR_HEIGHT}px" title="${esc(ev.text)}">${esc(ev.text)}</div>`;}});
     html+=`</div></div>`;
   });
   html+=`</div>`;document.getElementById('cal-grid').innerHTML=html;
@@ -3764,6 +3947,167 @@ window.renderHolidays=function(){
   listEl.innerHTML=html;
 };
 
+// ── LEAVE ──
+var LEAVE_TYPE_LABEL={sick:'🤒 ลาป่วย',vacation:'🏖 ลาพักร้อน',personal:'📋 ลากิจ',maternity:'🤱 ลาคลอด',ordain:'🙏 ลาบวช',other:'📝 อื่นๆ'};
+var LEAVE_STATUS_LABEL={pending:'⏳ รออนุมัติ',approved:'✅ อนุมัติ',rejected:'❌ ไม่อนุมัติ'};
+var LEAVE_STATUS_COLOR={pending:'var(--amber)',approved:'var(--teal)',rejected:'var(--coral)'};
+
+window.renderLeave=function(){
+  var fStaff=(document.getElementById('leave-filter-staff')||{}).value||'';
+  var fType=(document.getElementById('leave-filter-type')||{}).value||'';
+  var fStatus=(document.getElementById('leave-filter-status')||{}).value||'';
+  var sfEl=document.getElementById('leave-filter-staff');
+  if(sfEl&&sfEl.options.length<=1){sfEl.innerHTML='<option value="">พนักงานทั้งหมด</option>';window.STAFF.filter(s=>s.active).forEach(s=>{sfEl.insertAdjacentHTML('beforeend',`<option value="${s.id}">${esc(s.name)}</option>`);});}
+  var list=(window.LEAVES||[]).filter(function(lv){
+    if(fStaff&&lv.staffId!==fStaff)return false;
+    if(fType&&lv.leaveType!==fType)return false;
+    if(fStatus&&lv.status!==fStatus)return false;
+    return true;
+  }).slice().sort(function(a,b){return(b.startDate||'').localeCompare(a.startDate||'');});
+  var el=document.getElementById('leave-list');if(!el)return;
+  if(list.length===0){el.innerHTML='<div style="text-align:center;padding:48px;color:var(--txt3);font-size:14px;">ยังไม่มีรายการลางาน — กด <b>+ เพิ่มการลางาน</b></div>';return;}
+  var html='<div style="display:flex;flex-direction:column;gap:8px;">';
+  list.forEach(function(lv){
+    var st=window.STAFF.find(function(s){return s.id===lv.staffId;})||{name:'ไม่ระบุ'};
+    var sub=lv.substituteId?window.STAFF.find(function(s){return s.id===lv.substituteId;}):null;
+    var statusColor=LEAVE_STATUS_COLOR[lv.status]||'var(--amber)';
+    var days=Math.ceil((pd(lv.endDate)-pd(lv.startDate))/(1000*60*60*24))+1;
+    html+='<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;border-left:4px solid '+statusColor+';" onmouseover="this.style.boxShadow=\'var(--sh-sm)\'" onmouseout="this.style.boxShadow=\'none\'">'
+      +'<div style="font-size:24px;flex-shrink:0;">'+(LEAVE_TYPE_LABEL[lv.leaveType]||'📝').split(' ')[0]+'</div>'
+      +'<div style="flex:1;min-width:0;">'
+      +'<div style="font-size:13px;font-weight:700;color:var(--txt);">'+esc(st.name)+'</div>'
+      +'<div style="font-size:11px;color:var(--txt2);margin-top:2px;">'+(LEAVE_TYPE_LABEL[lv.leaveType]||lv.leaveType)+' · '+fd(lv.startDate)+' – '+fd(lv.endDate)+'<span style="margin-left:6px;font-weight:600;color:var(--violet);">('+days+' วัน)</span>'+(sub?' · <span style="color:var(--txt3)">แทนโดย: '+esc(sub.name)+'</span>':'')+'</div>'
+      +(lv.note?'<div style="font-size:10px;color:var(--txt3);margin-top:3px;">'+esc(lv.note)+'</div>':'')
+      +'</div>'
+      +'<div style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:rgba(0,0,0,.04);color:'+statusColor+';">'+(LEAVE_STATUS_LABEL[lv.status]||lv.status)+'</div>'
+      +(function(){
+        var st=lv.status;
+        var isAdmin=window.isAdmin(),isPM=window.ce(),isViewer=!isPM;
+        // approved: Admin full, others lock
+        if(st==='approved'){
+          if(!isAdmin) return '<div style="font-size:12px;color:var(--txt3);padding:4px 8px;display:flex;align-items:center;gap:4px;">🔒 <span>ล็อก</span></div>';
+          var btns='<div style="display:flex;gap:6px;flex-shrink:0;">';
+          btns+='<button class="btn btn-sm" style="background:rgba(6,214,160,.12);color:var(--teal);border:1px solid rgba(6,214,160,.3);padding:3px 10px;font-size:11px;font-weight:600;border-radius:8px;cursor:pointer;" onclick="window.approveLeave(\''+lv.id+'\')">✅ อนุมัติ</button>';
+          btns+='<button class="btn btn-ghost btn-sm" onclick="window.openLeaveForm(\''+lv.id+'\')">✏️</button>';
+          btns+='<button class="btn btn-red btn-sm" onclick="window.deleteLeave(\''+lv.id+'\')">🗑</button>';
+          return btns+'</div>';
+        }
+        // pending: PM/Admin → approve+edit+delete, Viewer → edit+delete
+        if(st==='pending'){
+          var btns='<div style="display:flex;gap:6px;flex-shrink:0;">';
+          if(isPM) btns+='<button class="btn btn-sm" style="background:rgba(6,214,160,.12);color:var(--teal);border:1px solid rgba(6,214,160,.3);padding:3px 10px;font-size:11px;font-weight:600;border-radius:8px;cursor:pointer;" onclick="window.approveLeave(\''+lv.id+'\')">✅ อนุมัติ</button>';
+          btns+='<button class="btn btn-ghost btn-sm" onclick="window.openLeaveForm(\''+lv.id+'\')">✏️</button>';
+          btns+='<button class="btn btn-red btn-sm" onclick="window.deleteLeave(\''+lv.id+'\')">🗑</button>';
+          return btns+'</div>';
+        }
+        // rejected: PM/Admin → edit+delete, Viewer → read only
+        if(st==='rejected'){
+          if(!isPM) return '';
+          return '<div style="display:flex;gap:6px;flex-shrink:0;">'
+            +'<button class="btn btn-ghost btn-sm" onclick="window.openLeaveForm(\''+lv.id+'\')">✏️</button>'
+            +'<button class="btn btn-red btn-sm" onclick="window.deleteLeave(\''+lv.id+'\')">🗑</button>'
+            +'</div>';
+        }
+        return '';
+      })()
+      +'</div>';
+  });
+  html+='</div>';
+  el.innerHTML=html;
+};
+
+window.openLeaveForm=function(id){
+  var lv=id?window.LEAVES.find(function(x){return x.id===id;}):null;
+  if(lv){
+    if(lv.status==='approved'&&!window.isAdmin()){window.showAlert('ไม่สามารถแก้ไขการลาที่อนุมัติแล้วได้','warn');return;}
+    if(lv.status==='rejected'&&!window.ce()){window.showAlert('คุณไม่มีสิทธิ์แก้ไขรายการที่ไม่อนุมัติ','warn');return;}
+  }
+  document.getElementById('leave-edit-id').value=lv?lv.id:'';
+  var staffOpts='<option value="">-- เลือกพนักงาน --</option>'+window.STAFF.filter(s=>s.active).map(s=>`<option value="${s.id}"${lv&&lv.staffId===s.id?' selected':''}>${esc(s.name)}</option>`).join('');
+  document.getElementById('leavef-staff').innerHTML=staffOpts;
+  var subOpts='<option value="">-- ไม่มี --</option>'+window.STAFF.filter(s=>s.active).map(s=>`<option value="${s.id}"${lv&&lv.substituteId===s.id?' selected':''}>${esc(s.name)}</option>`).join('');
+  document.getElementById('leavef-sub').innerHTML=subOpts;
+  var leaveType=lv?lv.leaveType:'sick';
+  document.getElementById('leavef-type').value=leaveType;
+  document.getElementById('leavef-type').onchange=function(){window._updateLeaveSubLabel(this.value);};
+  // วันที่เริ่ม: แสดงวันปัจจุบันถ้าเป็นรายการใหม่
+  var today=new Date();var todayStr=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+  document.getElementById('leavef-start').value=lv?lv.startDate:todayStr;
+  document.getElementById('leavef-end').value=lv?lv.endDate:'';
+  // สถานะ: Viewer เห็นแค่รออนุมัติ
+  var stSel=document.getElementById('leavef-status');
+  var stGroup=document.getElementById('leavef-status-group');
+  if(!window.ce()){
+    stSel.innerHTML='<option value="pending">⏳ รออนุมัติ</option>';
+    stSel.value='pending';
+    stGroup.style.display='none';
+  } else {
+    stSel.innerHTML='<option value="pending">⏳ รออนุมัติ</option><option value="rejected">❌ ไม่อนุมัติ</option>';
+    stSel.value=(lv&&lv.status!=='approved')?lv.status:'pending';
+    stGroup.style.display='';
+  }
+  document.getElementById('leavef-note').value=lv?lv.note:'';
+  document.getElementById('m-leave-title').textContent=lv?'แก้ไขการลางาน':'เพิ่มการลางาน';
+  window._updateLeaveSubLabel(leaveType);
+  window.openM('m-leave');
+};
+
+window._updateLeaveSubLabel=function(leaveType){
+  var lbl=document.getElementById('leavef-sub-label');
+  if(!lbl)return;
+  lbl.textContent=leaveType==='vacation'?'ผู้ทำงานแทน *':'ผู้ทำงานแทน';
+};
+
+window.approveLeave=function(id){
+  if(!window.ce()){window.showAlert('เฉพาะ PM เท่านั้นที่อนุมัติได้','warn');return;}
+  var lv=window.LEAVES.find(function(x){return x.id===id;});
+  if(!lv){return;}
+  var stName=(window.STAFF.find(s=>s.id===lv.staffId)||{name:'?'}).name;
+  window.showConfirm('อนุมัติการลาของ '+stName+' ?',async function(){
+    try{
+      var rec={leave_id:lv.id,staff_id:lv.staffId,leave_type:lv.leaveType,start_date:lv.startDate,end_date:lv.endDate,substitute_id:lv.substituteId||'',note:lv.note||'',status:'approved'};
+      await setDoc(getDocRef('LEAVES',lv.id),rec);
+      window.sendLeaveNotify('approved',rec);
+    }catch(e){window.showDbError(e);}
+  },{icon:'✅',title:'ยืนยันอนุมัติ',okColor:'var(--teal)',okText:'อนุมัติ'});
+};
+
+window.saveLeave=async function(){
+  var staffId=document.getElementById('leavef-staff').value;
+  var start=document.getElementById('leavef-start').value;
+  var end=document.getElementById('leavef-end').value;
+  var leaveType=document.getElementById('leavef-type').value;
+  var subId=document.getElementById('leavef-sub').value||'';
+  var note=document.getElementById('leavef-note').value.trim();
+  if(!staffId){window.showAlert('กรุณาเลือกพนักงาน','error');return;}
+  if(!start){window.showAlert('กรุณาระบุวันที่เริ่ม','error');return;}
+  if(!end){window.showAlert('กรุณาระบุวันที่สิ้นสุด','error');return;}
+  if(end<start){window.showAlert('วันที่สิ้นสุดต้องไม่น้อยกว่าวันที่เริ่ม','error');return;}
+  if(leaveType==='vacation'&&!subId){window.showAlert('กรณีลาพักร้อนต้องระบุผู้ทำงานแทน','warn');return;}
+  if(!note){window.showAlert('กรุณาระบุรายละเอียดการลา','error');return;}
+  var eid=document.getElementById('leave-edit-id').value;
+  var id=eid||('LV'+Date.now());
+  var statusVal=document.getElementById('leavef-status').value||'pending';
+  if(statusVal==='approved') statusVal='pending'; // อนุมัติได้เฉพาะผ่านปุ่มอนุมัติเท่านั้น
+  var rec={leave_id:id,staff_id:staffId,leave_type:leaveType,start_date:start,end_date:end,substitute_id:subId,note:note,status:statusVal};
+  try{
+    await setDoc(getDocRef('LEAVES',id),rec);
+    window.closeM('m-leave');
+    var notifyType=eid?'edit':'new';
+    if(statusVal==='rejected') notifyType='rejected';
+    window.sendLeaveNotify(notifyType,rec);
+  }catch(e){window.showDbError(e);}
+};
+
+window.deleteLeave=function(id){
+  var lv=window.LEAVES.find(function(x){return x.id===id;});
+  if(lv&&lv.status==='approved'&&!window.isAdmin()){window.showAlert('ไม่สามารถลบการลาที่อนุมัติแล้วได้','warn');return;}
+  if(lv&&lv.status==='rejected'&&!window.ce()){window.showAlert('คุณไม่มีสิทธิ์ลบรายการที่ไม่อนุมัติ','warn');return;}
+  window.showConfirm('ลบรายการลางานนี้?',function(){
+    deleteDoc(getDocRef('LEAVES',id)).catch(function(e){window.showDbError(e);});
+  },{icon:'🗑',title:'ยืนยันการลบ',okColor:'var(--coral)',okText:'ลบ'});
+};
+
 window.openHolForm=function(id){
   var h=id?window.HOLIDAYS.find(function(x){return x.id===id;}):null;
   document.getElementById('hol-edit-id').value=h?h.id:'';
@@ -3777,8 +4121,8 @@ window.openHolForm=function(id){
 window.saveHoliday=async function(){
   var name=document.getElementById('holf-name').value.trim();
   var date=document.getElementById('holf-date').value;
-  if(!name){alert('กรุณาระบุชื่อวันหยุด');return;}
-  if(!date){alert('กรุณาระบุวันที่');return;}
+  if(!name){window.showAlert('กรุณาระบุชื่อวันหยุด','error');return;}
+  if(!date){window.showAlert('กรุณาระบุวันที่','error');return;}
   var eid=document.getElementById('hol-edit-id').value;
   var id=eid||('H'+Date.now());
   var rec={holiday_id:id,name:name,date:date,type:document.getElementById('holf-type').value||'national'};
@@ -3787,8 +4131,9 @@ window.saveHoliday=async function(){
 };
 
 window.deleteHoliday=function(id,name){
-  if(!confirm('ลบวันหยุด "'+name+'" ?'))return;
-  deleteDoc(getDocRef('HOLIDAYS',id)).catch(function(e){window.showDbError(e);});
+  window.showConfirm('ลบวันหยุด "'+name+'" ?',function(){
+    deleteDoc(getDocRef('HOLIDAYS',id)).catch(function(e){window.showDbError(e);});
+  },{icon:'🗑',title:'ยืนยันการลบ',okColor:'var(--coral)',okText:'ลบ'});
 };
 
 window._holParsedRows=[];
@@ -3994,7 +4339,7 @@ window.doHolImport=async function(){
     // Priority 2: manual CSV textarea
     var raw=(document.getElementById('hol-import-txt')||{}).value||'';
     var lines=raw.split('\n').map(function(l){return l.trim();}).filter(Boolean);
-    if(!lines.length){alert('ไม่มีข้อมูล — อัปโหลดไฟล์หรือวาง CSV ในช่องด้านล่าง');return;}
+    if(!lines.length){window.showAlert('ไม่มีข้อมูล — อัปโหลดไฟล์หรือวาง CSV ในช่องด้านล่าง','warn');return;}
     lines.forEach(function(line){
       var parts=line.split(',').map(function(p){return p.trim();});
       var name=parts[0];var date=parts[1];var type=parts[2]||'national';
@@ -4002,7 +4347,7 @@ window.doHolImport=async function(){
       if(!['national','company','custom'].includes(type))type='national';
       records.push({holiday_id:'H'+Date.now()+Math.random().toString(36).slice(2,5),name:name,date:date,type:type});
     });
-    if(!records.length){alert('ไม่พบข้อมูลที่ถูกต้อง\nรูปแบบ: ชื่อวันหยุด,YYYY-MM-DD,national|company|custom');return;}
+    if(!records.length){window.showAlert('ไม่พบข้อมูลที่ถูกต้อง — รูปแบบ: ชื่อวันหยุด,YYYY-MM-DD,national|company|custom','warn');return;}
   }
   var btn=document.getElementById('btn-hol-import');if(btn){btn.disabled=true;btn.textContent='⏳ กำลังบันทึก...';}
   var prev=document.getElementById('hol-import-preview');
@@ -4031,6 +4376,7 @@ window.admTab=function(t){window.admCur=t;document.querySelectorAll('.adm-nav-it
 
 function renderAdm(){
   var c=document.getElementById('adm-body');if(!c)return;var titleEl=document.getElementById('adm-head-title');
+  if(window.admCur==='notify'){window.renderNotifySettings();return;}
   if(window.admCur==='staff'){
     if(titleEl)titleEl.innerHTML=`👥 จัดการพนักงาน <span class="tag" style="background:var(--surface2);color:var(--txt3);margin-left:10px;font-size:11px;">${window.STAFF.length} คน</span>`;
     var activeStaff=window.STAFF.filter(function(s){return s.active!==false;});
@@ -4266,6 +4612,81 @@ window.saveAdmUser=async function(){
   setDoc(getDocRef('USERS',uid2),dbUsr).catch(e=>window.showDbError(e));
 }
 
+// ── NOTIFY SETTINGS ──
+window.renderNotifySettings=function(){
+    var c=document.getElementById('adm-body');if(!c)return;
+    var titleEl=document.getElementById('adm-head-title');
+    if(titleEl)titleEl.innerHTML='🔔 ตั้งค่าการแจ้งเตือน';
+    c.innerHTML='<div style="max-width:560px;padding:8px 4px;">'
+      +'<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:20px 24px;margin-bottom:20px;">'
+      +'<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:6px;">🔔 Notify API Token</div>'
+      +'<div style="font-size:12px;color:var(--txt3);margin-bottom:14px;line-height:1.6;">ใส่ Token สำหรับส่งแจ้งเตือนเมื่อมีการลางาน อนุมัติ หรือไม่อนุมัติ<br>Token จะถูกเก็บใน Firestore และใช้งานร่วมกันทุก session</div>'
+      +'<div class="f-group" style="margin-bottom:12px;">'
+      +'<label class="f-label">API Token</label>'
+      +'<div style="display:flex;gap:8px;">'
+      +'<input class="f-input" id="notify-token-input" type="password" placeholder="ใส่ Token ที่นี่..." value="'+esc(window.NOTIFY_TOKEN||'')+'" style="flex:1;font-family:monospace;font-size:12px;">'
+      +'<button onclick="document.getElementById(\'notify-token-input\').type=document.getElementById(\'notify-token-input\').type===\'password\'?\'text\':\'password\'" style="padding:8px 12px;background:var(--surface3);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;" title="แสดง/ซ่อน Token">👁</button>'
+      +'</div>'
+      +'</div>'
+      +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+      +'<button onclick="window.saveNotifyToken()" style="padding:8px 20px;background:var(--violet);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">💾 บันทึก Token</button>'
+      +'<button onclick="window.testNotify()" style="padding:8px 20px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">🧪 ทดสอบส่ง</button>'
+      +'<span id="notify-save-msg" style="font-size:12px;color:var(--teal);"></span>'
+      +'</div>'
+      +'</div>'
+      +'<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px 20px;">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--txt2);margin-bottom:8px;">เหตุการณ์ที่แจ้งเตือน</div>'
+      +'<div style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--txt2);">'
+      +'<div style="display:flex;align-items:center;gap:8px;"><span style="width:20px;text-align:center;">📋</span> บันทึกการลางานใหม่</div>'
+      +'<div style="display:flex;align-items:center;gap:8px;"><span style="width:20px;text-align:center;">✅</span> อนุมัติการลา</div>'
+      +'<div style="display:flex;align-items:center;gap:8px;"><span style="width:20px;text-align:center;">❌</span> ไม่อนุมัติการลา</div>'
+      +'</div>'
+      +'</div>'
+      +'</div>';
+};
+
+window.saveNotifyToken=async function(){
+  var val=(document.getElementById('notify-token-input')||{}).value||'';
+  var msg=document.getElementById('notify-save-msg');
+  try{
+    await setDoc(getDocRef('SETTINGS','app'),{notify_token:val},{merge:true});
+    window.NOTIFY_TOKEN=val;
+    if(msg){msg.textContent='✅ บันทึกแล้ว';setTimeout(function(){msg.textContent='';},2500);}
+  }catch(e){window.showDbError(e);}
+};
+
+window.testNotify=function(){
+  window.sendLeaveNotify('test',null);
+};
+
+window.sendLeaveNotify=async function(eventType,lv){
+  var token=window.NOTIFY_TOKEN||'';
+  if(!token)return;
+  var LEAVE_LABEL={sick:'ลาป่วย',vacation:'ลาพักร้อน',personal:'ลากิจ',maternity:'ลาคลอด',ordain:'ลาบวช',other:'อื่นๆ'};
+  var LEAVE_EMOJI={sick:'🤒',vacation:'🏖',personal:'📋',maternity:'🤱',ordain:'🙏',other:'📝'};
+  var content='';
+  if(eventType==='test'){
+    content='🔔 **ทดสอบระบบแจ้งเตือน**\nการแจ้งเตือนทำงานปกติ ✅';
+  } else if(lv){
+    var staffName=(window.STAFF.find(s=>s.id===lv.staffId)||{name:'?'}).name;
+    var subName=lv.substituteId?(window.STAFF.find(s=>s.id===lv.substituteId)||{name:''}).name:'';
+    var typeLabel=(LEAVE_EMOJI[lv.leaveType]||'📝')+' '+(LEAVE_LABEL[lv.leaveType]||lv.leaveType);
+    var dateRange=fd(lv.startDate)+' – '+fd(lv.endDate);
+    if(eventType==='new')     content='📋 **แจ้งการลางานใหม่**\n👤 พนักงาน: **'+staffName+'**\n'+typeLabel+'\n📅 '+dateRange+(subName?'\n🔄 ผู้ทำงานแทน: '+subName:'')+(lv.note?'\n📝 '+lv.note:'');
+    else if(eventType==='edit')content='✏️ **แก้ไขการลางาน**\n👤 พนักงาน: **'+staffName+'**\n'+typeLabel+'\n📅 '+dateRange;
+    else if(eventType==='approved')content='✅ **อนุมัติการลา**\n👤 พนักงาน: **'+staffName+'**\n'+typeLabel+'\n📅 '+dateRange;
+    else if(eventType==='rejected')content='❌ **ไม่อนุมัติการลา**\n👤 พนักงาน: **'+staffName+'**\n'+typeLabel+'\n📅 '+dateRange;
+  }
+  if(!content)return;
+  try{
+    await fetch('https://api.notify.bmscloud.in.th/api/v1/push-notify',{
+      method:'POST',
+      headers:{'Token':token,'Content-Type':'application/json'},
+      body:JSON.stringify({content:content,receiver:null})
+    });
+  }catch(e){console.warn('Notify API error:',e);}
+};
+
 // ── DELETE ──
 window.askDel=function(type,id,label){window.delTarget={type:type,id:id};document.getElementById('del-label').textContent=label;window.openM('m-del');}
 window.execDelete=async function(){
@@ -4308,7 +4729,7 @@ window.execImport=async function(){
       if(isClearFirst){const existingDocs=await getDocs(getColRef(selType));for(let docSnap of existingDocs.docs){batch.delete(docSnap.ref);opCount++;await commitBatchIfNeeded();}}
       for(let i=1;i<lines.length;i++){const values=lines[i].map(v=>v.trim());let rowObj={};const newId=schema.prefix+Date.now()+i;rowObj[schema.idField]=newId;if(selType==='PROJECTS'){rowObj.status='active';rowObj.team=[];rowObj.members=[];}headers.forEach((h,index)=>{if(values[index]!==undefined&&schema.headers.includes(h)){let val=values[index];if(['budget','progress_pct','amount_requested','amount_cleared'].includes(h))val=Number(val)||0;if(['is_active'].includes(h))val=(val.toUpperCase()==='TRUE');rowObj[h]=val;}});batch.set(getDocRef(selType,newId),rowObj);opCount++;await commitBatchIfNeeded();}
       if(opCount>0)await batch.commit();
-      window.closeM('m-import');alert(`✅ นำเข้าข้อมูล ${selType} สำเร็จ ${lines.length-1} รายการ`);
+      window.closeM('m-import');window.showAlert(`นำเข้าข้อมูล ${selType} สำเร็จ ${lines.length-1} รายการ`,'success');
     }catch(err){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">❌ เกิดข้อผิดพลาด: '+err.message+'</span>';}
   };reader.readAsText(file);
 }
