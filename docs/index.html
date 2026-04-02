@@ -4220,14 +4220,12 @@ window.renderLeave=function(){
   var fStaff=(document.getElementById('leave-filter-staff')||{}).value||'';
   var fType=(document.getElementById('leave-filter-type')||{}).value||'';
   var fStatus=(document.getElementById('leave-filter-status')||{}).value||'';
-  // VIEWER: force own-staff filter + hide dept/staff/add controls
+  // VIEWER: force own-staff filter + hide dept/staff filter controls (but keep add button)
   var _isViewer=window.cu&&window.cu.role==='viewer';
   var _deptPar=document.getElementById('reg-dept')?document.getElementById('reg-dept').parentElement:null;
   var _staffPar=document.getElementById('leave-filter-staff')?document.getElementById('leave-filter-staff').parentElement:null;
-  var _leaveAddBtn=document.getElementById('leave-add-btn');
   if(_deptPar)_deptPar.style.display=_isViewer?'none':'';
   if(_staffPar)_staffPar.style.display=_isViewer?'none':'';
-  if(_leaveAddBtn)_leaveAddBtn.style.display=_isViewer?'none':'';
   if(_isViewer&&window.cu.staffId)fStaff=window.cu.staffId;
   var list=(window.LEAVES||[]).filter(function(lv){
     if(fStaff&&lv.staffId!==fStaff)return false;
@@ -4417,8 +4415,15 @@ window.openLeaveForm=function(id){
     if(lv.status==='rejected'&&!window.ce()){window.showAlert('คุณไม่มีสิทธิ์แก้ไขรายการที่ไม่อนุมัติ','warn');return;}
   }
   document.getElementById('leave-edit-id').value=lv?lv.id:'';
-  var staffOpts='<option value="">-- เลือกพนักงาน --</option>'+window.STAFF.filter(s=>s.active).map(s=>`<option value="${s.id}"${lv&&lv.staffId===s.id?' selected':''}>${esc(s.name)}</option>`).join('');
-  document.getElementById('leavef-staff').innerHTML=staffOpts;
+  var _isViewerForm=window.cu&&window.cu.role==='viewer';
+  var _viewerStaffId=_isViewerForm?window.cu.staffId:'';
+  var _autoStaff=lv?lv.staffId:(_viewerStaffId||'');
+  var staffOpts='<option value="">-- เลือกพนักงาน --</option>'+window.STAFF.filter(s=>s.active).map(s=>`<option value="${s.id}"${s.id===_autoStaff?' selected':''}>${esc(s.name)}</option>`).join('');
+  var staffEl=document.getElementById('leavef-staff');
+  staffEl.innerHTML=staffOpts;
+  if(_isViewerForm){staffEl.disabled=!!_viewerStaffId;staffEl.parentElement.style.opacity=_viewerStaffId?'.7':'1';}
+  else{staffEl.disabled=false;staffEl.parentElement.style.opacity='';}
+
   var subOpts='<option value="">-- ไม่มี --</option>'+window.STAFF.filter(s=>s.active).map(s=>`<option value="${s.id}"${lv&&lv.substituteId===s.id?' selected':''}>${esc(s.name)}</option>`).join('');
   document.getElementById('leavef-sub').innerHTML=subOpts;
   var leaveType=lv?lv.leaveType:'sick';
@@ -4993,7 +4998,7 @@ window.admUserForm=function(id){
   var stfSel=document.getElementById('auf-staff');
   if(stfSel){
     stfSel.innerHTML='<option value="">-- ไม่ผูก --</option>';
-    window.STAFF.filter(function(s){return s.active!==false;}).sort(function(a,b){return(a.dept||'').localeCompare(b.dept||'','th')||a.name.localeCompare(b.name,'th');}).forEach(function(s){stfSel.insertAdjacentHTML('beforeend','<option value="'+s.id+'"'+(u&&u.staffId===s.id?' selected':'')+'>'+esc((s.dept?'['+s.dept+'] ':'')+s.name)+'</option>');});
+    window.STAFF.filter(function(s){return s.active!==false;}).sort(function(a,b){return(a.name||'').localeCompare(b.name||'','th');}).forEach(function(s){stfSel.insertAdjacentHTML('beforeend','<option value="'+s.id+'"'+(u&&u.staffId===s.id?' selected':'')+'>'+esc(s.name)+'</option>');});
   }
   window.openM('m-user');
 }
@@ -5206,7 +5211,6 @@ window.execImport=async function(){
 // ── MODALS ──
 window.openM=function(id){document.getElementById(id).classList.add('on');}
 window.closeM=function(id){document.getElementById(id).classList.remove('on');}
-document.querySelectorAll('.overlay').forEach(function(el){el.addEventListener('click',function(e){if(e.target===el&&el.id!=='sys-loader')el.classList.remove('on');});});
 document.addEventListener('keydown',function(e){if(e.key==='Escape')document.querySelectorAll('.overlay.on').forEach(function(m){if(m.id!=='sys-loader')m.classList.remove('on');});});
 
 // START
