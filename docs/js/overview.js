@@ -1,0 +1,189 @@
+const { esc, fd, fc, fca, pd, gS, gT, gG, gSt, gC, avC, uid, getFY, getYearBE, getStaffOverlaps, overlapWarnText, getStaffLeaveConflicts, getColRef, getDocRef } = window;
+// ── OVERVIEW ──
+window.renderOverview = function(){
+  var yf=document.getElementById('ov-yr');
+  if(yf&&yf.options.length<=1){var yrs=[...new Set(window.PROJECTS.map(p=>getYearBE(p.start)).filter(Boolean))].sort((a,b)=>b-a);yrs.forEach(function(y){var o=document.createElement('option');o.value=y;o.textContent='ปี พ.ศ. '+y;yf.appendChild(o);});var _cbe=(new Date().getFullYear()+543).toString();if(!yf.value||yf.value==='')yf.value=_cbe;}
+  var gf=document.getElementById('ov-grp');
+  if(gf&&gf.options.length<=1){window.PGROUPS.forEach(function(g){var o=document.createElement('option');o.value=g.id;o.textContent=g.label;gf.appendChild(o);});}
+  var tf_ov=document.getElementById('ov-type');
+  if(tf_ov&&tf_ov.options.length<=1){window.PTYPES.forEach(function(t){var o=document.createElement('option');o.value=t.id;o.textContent=t.label;tf_ov.appendChild(o);});}
+  var yr=(yf||{}).value||'';var grp=(gf||{}).value||'';var ovTyp=(tf_ov||{}).value||'';
+  var fProjs=window.PROJECTS.filter(function(p){return(!yr||getYearBE(p.start)==yr)&&(!grp||p.groupId===grp)&&(!ovTyp||p.typeId===ovTyp);});
+  var fPids=fProjs.map(p=>p.id);
+  var fAdvs=window.ADVANCES.filter(function(a){return fPids.includes(a.pid);});
+  var totalBudget=fProjs.reduce(function(s,p){return s+p.cost;},0);
+  var aPnd=fAdvs.filter(function(a){return a.status!=='cleared';});
+  var aOv=fAdvs.filter(function(a){return a.ddate&&pd(a.ddate)<new Date()&&a.status!=='cleared';});
+  var totalAdvancePending=aPnd.reduce(function(s,a){return s+a.amount;},0);
+  var now=new Date();now.setHours(0,0,0,0);
+  // ── health ──
+  var health={onTrack:0,atRisk:0,delayed:0,completed:0};
+  var activeStaff=new Set();
+  fProjs.forEach(p=>{
+    if(p.progress===100||p.stage==='close'||p.status==='completed'){health.completed++;return;}
+    if(!p.end){health.onTrack++;return;}
+    var diffDays=Math.ceil((pd(p.end)-now)/(1000*60*60*24));
+    if(diffDays<0)health.delayed++;else if(diffDays<=15&&p.progress<80)health.atRisk++;else health.onTrack++;
+    (p.members&&p.members.length>0?p.members:p.team.map(id=>({sid:id}))).forEach(m=>{if(m.sid)activeStaff.add(m.sid);});
+  });
+  var totalStaff=window.STAFF.filter(s=>s.active).length;
+  var totalActive=fProjs.length-health.completed;var issueCount=health.delayed+health.atRisk;
+  var resourceEff=totalStaff>0?Math.round((activeStaff.size/totalStaff)*100):0;
+  var critCount=fProjs.filter(p=>{if(p.progress===100||p.stage==='close'||!p.end)return false;var d=Math.ceil((pd(p.end)-now)/(1000*60*60*24));return d<=30;}).length;
+  // ── KPI cards ──
+  var stats=[
+    {k:'Budget Health',v:fc(totalBudget),s:'Total Budget '+(yr||'ทุกปี'),sub:totalBudget>0?'<span style="color:#06d6a0;font-size:11px;font-weight:700;">↑ On Target</span>':'',icon:'💵',g1:'#06d6a0',g2:'#4cc9f0'},
+    {k:'Project Velocity',v:`${totalActive} / ${fProjs.length}`,s:'Active Projects Now',sub:`<span style="color:#4361ee;font-size:11px;font-weight:700;">↑ ${health.completed} Completed</span>`,icon:'⚡',g1:'#4361ee',g2:'#7209b7'},
+    {k:'Resource Efficiency',v:`${resourceEff}%`,s:`${activeStaff.size} of ${totalStaff} Members Active`,sub:`<span style="font-size:11px;font-weight:700;color:${resourceEff===100?'#06d6a0':'#ffa62b'};">${resourceEff===100?'Full Utilization':'Partial Utilization'}</span>`,icon:'👥',g1:'#7209b7',g2:'#f72585'},
+    {k:'Critical Alerts',v:critCount,s:`Projects Ending < 30 Days`,sub:`<span style="color:${issueCount>0?'var(--coral)':'#06d6a0'};font-size:11px;font-weight:700;">${issueCount>0?'⚠ Action Required':'✓ All on track'}</span>`,icon:'🚨',g1:critCount>0?'#ff6b6b':'#06d6a0',g2:critCount>0?'#ffa62b':'#4cc9f0'},
+  ];
+  document.getElementById('stat-row').innerHTML=stats.map(function(s,i){
+    return `<div class="stat-c fade" style="animation-delay:${i*60}ms;display:flex;flex-direction:column;gap:2px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;">
+        <div class="stat-k">${s.k}</div>
+        <div class="stat-icon" style="background:linear-gradient(135deg,${s.g1}18,${s.g2}18);width:36px;height:36px;flex-shrink:0;">${s.icon}</div>
+      </div>
+      <div class="stat-v" style="background:linear-gradient(135deg,${s.g1},${s.g2});-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-size:26px;">${s.v}</div>
+      <div class="stat-s">${s.s}</div>
+      <div style="margin-top:4px;">${s.sub}</div>
+    </div>`;
+  }).join('');
+  Chart.defaults.font.family='Plus Jakarta Sans';Chart.defaults.color='#9ba3b8';
+  // ── Monthly Workload Trend ──
+  if(window.cWLTrend)window.cWLTrend.destroy();
+  var ctxWL=document.getElementById('chart-workload-trend');
+  if(ctxWL){
+    var months=[];for(var mi=0;mi<12;mi++)months.push(new Date(yr?Number(yr)-543:now.getFullYear(),mi,1));
+    var typeColors=window.PTYPES.map(t=>t.color);
+    var typeDatasets=window.PTYPES.map(function(t,ti){
+      return{label:t.label,data:months.map(function(mDate){
+        return fProjs.filter(function(p){
+          if(p.typeId!==t.id)return false;
+          var ps=p.start?pd(p.start):null,pe=p.end?pd(p.end):null;
+          if(!ps||!pe)return false;
+          var mEnd=new Date(mDate.getFullYear(),mDate.getMonth()+1,0,23,59,59);
+          return ps<=mEnd&&pe>=mDate;
+        }).length;
+      }),backgroundColor:t.color+'cc',stack:'s'};
+    });
+    window.cWLTrend=new Chart(ctxWL,{type:'bar',data:{labels:window.THMON.map(m=>m.slice(0,3)),datasets:typeDatasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:10,usePointStyle:true}}},scales:{x:{grid:{display:false},stacked:true,ticks:{font:{size:10}}},y:{stacked:true,grid:{color:'rgba(0,0,0,.06)'},ticks:{font:{size:10},stepSize:1}}}}});
+  }
+  // ── Resource Status ring ──
+  if(window.cResource)window.cResource.destroy();
+  var ctxRes=document.getElementById('chart-resource');
+  var wlNow=new Date();
+  var ovLoad=[],actStaff=[],availStaff=[];
+  window.STAFF.filter(s=>s.active).forEach(s=>{
+    var cnt=fProjs.filter(p=>{
+      if(p.status==='cancelled'||p.status==='completed')return false;
+      var mems=p.members&&p.members.length>0?p.members:p.team.map(id=>({sid:id,s:p.start,e:p.end}));
+      return mems.some(m=>m.sid===s.id);
+    }).length;
+    if(cnt===0)availStaff.push(s);else if(cnt>3)ovLoad.push(s);else actStaff.push(s);
+  });
+  if(ctxRes){window.cResource=new Chart(ctxRes,{type:'doughnut',data:{labels:['Overload (>3)','Active (1-3)',`Available (${availStaff.length})`],datasets:[{data:[ovLoad.length,actStaff.length,availStaff.length],backgroundColor:['#ff6b6b','#4361ee','#06d6a0'],borderWidth:3,borderColor:'var(--surface)'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'70%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+c.label+': '+c.parsed+' คน'}}}}});}
+  var leg=document.getElementById('ov-resource-legend');
+  if(leg){leg.innerHTML=`<span style="color:#ff6b6b;font-weight:700;">● Overload (>${3}) ${ovLoad.length}</span><span style="color:#4361ee;font-weight:700;">● Active (1-3) ${actStaff.length}</span><span style="color:#06d6a0;font-weight:700;">● Available ${availStaff.length}</span>`;}
+  // chart center label total
+  // ── Budget bar ──
+  if(window.cBudgetBar)window.cBudgetBar.destroy();
+  var tps=window.PTYPES.filter(function(t){return fProjs.some(function(p){return p.typeId===t.id;});});
+  var ctxBB=document.getElementById('chart-budget-bar');
+  if(ctxBB){window.cBudgetBar=new Chart(ctxBB,{type:'bar',data:{labels:tps.map(t=>t.label),datasets:[{data:tps.map(function(t){return fProjs.filter(p=>p.typeId===t.id).reduce((s,p)=>s+p.cost,0);}),backgroundColor:tps.map(t=>t.color+'cc'),borderColor:tps.map(t=>t.color),borderWidth:1.5,borderRadius:6,barThickness:22}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+fc(c.parsed)}}},scales:{x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{font:{size:10},callback:v=>v>=1000000?'฿'+(v/1000000).toFixed(1)+'M':v>=1000?'฿'+(v/1000).toFixed(0)+'K':'฿'+v}},y:{grid:{display:false},ticks:{font:{size:11,weight:'600'}}}}}});}
+  // ── Health donut ──
+  if(window.cHealth)window.cHealth.destroy();
+  var ctxH=document.getElementById('chart-health');
+  if(ctxH){window.cHealth=new Chart(ctxH,{type:'doughnut',data:{labels:['ปกติ','เสี่ยง','ล่าช้า','เสร็จ'],datasets:[{data:[health.onTrack,health.atRisk,health.delayed,health.completed],backgroundColor:['#06d6a0','#ffa62b','#ff6b6b','#9ba3b8'],borderWidth:2,borderColor:'var(--surface)'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'right',labels:{font:{size:10,weight:'600'},boxWidth:10,usePointStyle:true}}}}});}
+  // ── Stage bar ──
+  if(window.cStage)window.cStage.destroy();
+  var ctxSt=document.getElementById('chart-stage');
+  if(ctxSt){window.cStage=new Chart(ctxSt,{type:'bar',data:{labels:window.STAGES.map(s=>s.label),datasets:[{data:window.STAGES.map(s=>fProjs.filter(p=>p.stage===s.id).length),backgroundColor:window.STAGES.map(s=>s.color+'44'),borderColor:window.STAGES.map(s=>s.color),borderWidth:2,borderRadius:6,barThickness:18}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:40,minRotation:30}},y:{grid:{color:'rgba(0,0,0,.06)'},ticks:{font:{size:10},stepSize:1}}}}});}
+  // ── Critical timeline ──
+  var critProjs=fProjs.filter(function(p){if(p.progress===100||p.stage==='close'||p.status==='completed'||!p.end)return false;return Math.ceil((pd(p.end)-now)/(1000*60*60*24))<=30;}).sort((a,b)=>pd(a.end)-pd(b.end));
+  var cntEl=document.getElementById('ov-crit-count');if(cntEl)cntEl.textContent=critProjs.length+' โครงการ';
+  var ovCrit=document.getElementById('ov-critical');
+  if(ovCrit){ovCrit.innerHTML=critProjs.map(function(p){
+    var diffDays=Math.ceil((pd(p.end)-now)/(1000*60*60*24));
+    var color=diffDays<0?'var(--coral)':'var(--amber)';
+    var dayText=diffDays<0?`ล่าช้า ${Math.abs(diffDays)} วัน`:diffDays===0?'วันนี้':`${diffDays} วัน`;
+    var pt=gT(p.typeId);
+    var mems=(p.members&&p.members.length>0?p.members:p.team.map(id=>({sid:id}))).map(m=>{var s=window.STAFF.find(x=>x.id===m.sid);return s?s.nickname||s.name.split(' ')[0]:'';}).filter(Boolean);
+    return`<div onclick="window.openProjModal('${p.id}')" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:.15s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(p.name)}</div>
+        <div style="font-size:10px;color:var(--txt3);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;">
+          <span style="background:${pt.color}18;color:${pt.color};padding:1px 6px;border-radius:8px;font-weight:600;">${esc(pt.label)}</span>
+          ${mems.length>0?`<span>👥 ${mems.slice(0,3).join(', ')}${mems.length>3?'+'+(mems.length-3):''}</span>`:''}
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:11px;font-weight:800;color:${color};background:${color}15;padding:2px 8px;border-radius:6px;">${dayText}</div>
+        <div style="font-size:10px;color:var(--txt3);margin-top:3px;">End: ${fd(p.end)}</div>
+      </div>
+    </div>`;
+  }).join('')||'<div style="font-size:12px;color:var(--txt3);text-align:center;padding:30px;">🎉 ไม่มีโครงการใกล้สิ้นสุด</div>';}
+  // ── Advance alerts ──
+  var advAlerts=[...aPnd].sort((a,b)=>pd(a.ddate)-pd(b.ddate)).slice(0,8);
+  var ovAdv=document.getElementById('ov-adv-alerts');
+  if(ovAdv){ovAdv.innerHTML=advAlerts.map(function(a){var p=window.PROJECTS.find(x=>x.id===a.pid);var isOv=a.ddate&&pd(a.ddate)<now;var color=isOv?'var(--coral)':'var(--amber)';return`<div onclick="window.goView('advance')" style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px dashed var(--border);cursor:pointer;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''"><div style="width:28px;height:28px;border-radius:8px;background:${color}15;color:${color};display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${isOv?'⚠':'💳'}</div><div style="flex:1;min-width:0;"><div style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p?esc(p.name):'—'}</div><div style="font-size:10px;color:var(--txt3);">${fd(a.ddate)} · <span style="color:${color};font-weight:600;">${isOv?'เกินกำหนด':'รอเคลียร์'}</span></div></div><div style="font-size:12px;font-weight:800;">${fc(a.amount)}</div></div>`;}).join('')||'<div style="font-size:12px;color:var(--txt3);text-align:center;padding:20px;">ไม่มีรายการค้าง</div>';}
+  // ── render project table ──
+  window.renderOvTable();
+}
+window.renderOvTable = function() {
+  // Populate stage filter
+  var sf=document.getElementById('ov-tbl-stg');
+  if(sf&&sf.options.length<=1){window.STAGES.forEach(function(s){var o=document.createElement('option');o.value=s.id;o.textContent=s.label;sf.appendChild(o);});}
+  // Populate year filter (default current BE year)
+  var yf=document.getElementById('ov-tbl-yr');
+  if(yf&&yf.options.length<=1){var yrs=[...new Set(window.PROJECTS.map(function(p){return getYearBE(p.start);}).filter(Boolean))].sort(function(a,b){return b-a;});yrs.forEach(function(y){var o=document.createElement('option');o.value=y;o.textContent='ปี พ.ศ. '+y;yf.appendChild(o);});var curBE=(new Date().getFullYear()+543).toString();if(yrs.map(String).includes(curBE))yf.value=curBE;}
+  // Populate type filter
+  var tf2=document.getElementById('ov-tbl-type');
+  if(tf2&&tf2.options.length<=1){window.PTYPES.forEach(function(t){var o=document.createElement('option');o.value=t.id;o.textContent=t.label;tf2.appendChild(o);});}
+  var yr=(document.getElementById('ov-tbl-yr')||{}).value||(document.getElementById('ov-yr')||{}).value||'';
+  var grp=(document.getElementById('ov-grp')||{}).value||'';
+  var typeF=(document.getElementById('ov-tbl-type')||{}).value||'';
+  var q=((document.getElementById('ov-tbl-q')||{}).value||'').toLowerCase();
+  var stg=(document.getElementById('ov-tbl-stg')||{}).value||'';
+  var sort=(document.getElementById('ov-tbl-sort')||{}).value||'end_asc';
+  var rows=window.PROJECTS.filter(function(p){
+    return (!yr||getYearBE(p.start)==yr)&&(!grp||p.groupId===grp)&&(!typeF||p.typeId===typeF)&&(!stg||p.stage===stg)&&(!q||p.name.toLowerCase().includes(q));
+  });
+  rows.sort(function(a,b){
+    if(sort==='end_asc'){var ad=a.end?pd(a.end):new Date(9e12);var bd=b.end?pd(b.end):new Date(9e12);return ad-bd;}
+    if(sort==='start_desc'){return (b.start?pd(b.start):new Date(0))-(a.start?pd(a.start):new Date(0));}
+    if(sort==='progress_asc')return a.progress-b.progress;
+    if(sort==='name_asc')return a.name.localeCompare(b.name,'th');
+    return 0;
+  });
+  var now=new Date();now.setHours(0,0,0,0);
+  var tb=document.getElementById('ov-tbl-rows');if(!tb)return;
+  tb.innerHTML=rows.map(function(p){
+    var sg=gS(p.stage);var pt=gT(p.typeId);var pg=gG(p.groupId);
+    var endDate=p.end?pd(p.end):null;
+    var diffDays=endDate?Math.ceil((endDate-now)/(1000*60*60*24)):null;
+    var urgColor=diffDays===null?'':diffDays<0?'var(--coral)':diffDays<=15?'var(--amber)':'';
+    var mems=(p.members&&p.members.length>0?p.members:p.team.map(function(id){return{sid:id};}));
+    var nicknames=mems.map(function(m){var s=window.STAFF.find(function(x){return x.id===m.sid;});return s?s.nickname||s.name.split(' ')[0]:'';}).filter(Boolean);
+    var teamStr=nicknames.length>0?nicknames.join(', '):'<span style="color:var(--txt3)">—</span>';
+    var pbarW=Math.max(4,p.progress);
+    return `<tr class="fade" onclick="window.openProjModal('${p.id}')" style="cursor:pointer;">
+      <td><div style="font-weight:600;font-size:12px;">${esc(p.name)}</div>${p.siteOwner?`<div style="font-size:10px;color:var(--txt3);">🏢 ${esc(p.siteOwner)}</div>`:''}</td>
+      <td><div style="display:flex;flex-direction:column;gap:3px;">
+        <span class="tag" style="background:${pt.color}18;color:${pt.color};font-size:9px;">${esc(pt.label)}</span>
+        ${pg?`<span class="tag" style="background:${pg.color}18;color:${pg.color};font-size:9px;">${esc(pg.label)}</span>`:''}
+      </div></td>
+      <td><span class="tag" style="background:${sg.color}18;color:${sg.color};font-size:10px;">${sg.label}</span></td>
+      <td style="font-size:11px;color:var(--txt2);white-space:nowrap;">${p.start?fd(p.start):'<span style="color:var(--txt3)">—</span>'}</td>
+      <td style="font-size:11px;white-space:nowrap;${urgColor?'color:'+urgColor+';font-weight:700':''}">${p.end?fd(p.end):'<span style="color:var(--txt3)">—</span>'}${diffDays!==null&&diffDays>=0&&diffDays<=15?'<br><span style="font-size:10px;">เหลือ '+diffDays+' วัน</span>':''}</td>
+      <td style="font-size:11px;color:var(--violet);">${teamStr}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:${pbarW}%;height:100%;background:${sg.color};border-radius:3px;transition:width .3s;"></div></div>
+          <span style="font-size:11px;font-weight:700;color:${sg.color};min-width:30px;">${p.progress}%</span>
+        </div>
+      </td>
+      <td style="text-align:right;font-size:12px;font-weight:700;">${p.cost?fc(p.cost):'<span style="color:var(--txt3)">—</span>'}</td>
+    </tr>`;
+  }).join('')||'<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--txt3);">ไม่พบข้อมูล</td></tr>';
+};
+

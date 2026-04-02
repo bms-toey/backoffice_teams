@@ -10,7 +10,12 @@
       "Bash(git branch:*)",
       "Bash(git push:*)",
       "Bash(git pull:*)",
-      "WebFetch(domain:bms-toey.github.io)"
+      "WebFetch(domain:bms-toey.github.io)",
+      "Bash(python3 -)",
+      "Bash(py --version)",
+      "Bash(python3.11 --version)",
+      "Bash(node -e ':*)",
+      "Bash(node)"
     ],
     "additionalDirectories": [
       "C:\\Users\\BMS\\Desktop\\backoffice-teams\\public"
