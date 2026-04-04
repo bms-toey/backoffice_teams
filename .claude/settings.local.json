@@ -15,7 +15,10 @@
       "Bash(py --version)",
       "Bash(python3.11 --version)",
       "Bash(node -e ':*)",
-      "Bash(node)"
+      "Bash(node)",
+      "Read(//d/ส่วนตัว/พัฒนาโปรแกรม/backoffice_teams/**)",
+      "Read(//d/ส่วนตัว/พัฒนาโปรแกรม/backoffice_teams/docs/**)",
+      "Read(//d/ส่วนตัว/พัฒนาโปรแกรม/backoffice_teams/docs/js/**)"
     ],
     "additionalDirectories": [
       "C:\\Users\\BMS\\Desktop\\backoffice-teams\\public"

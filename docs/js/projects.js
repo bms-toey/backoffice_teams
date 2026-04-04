@@ -276,6 +276,11 @@ window.openProjModal=function(id){
     +'<div class="f-group"><label class="f-label">ครั้งที่</label><select class="f-input" id="pf-revisit-round" '+ceA+'><option value="1"'+(p&&p.revisitRound==1?' selected':'')+'>ครั้งที่ 1</option><option value="2"'+(p&&p.revisitRound==2?' selected':'')+'>ครั้งที่ 2</option></select></div>'
     +'</div></div>'
     +'<div class="f-group"><label class="f-label">Stage</label><select class="f-input" id="pf-stg" '+ceA+'>'+stgOpts+'</select></div>'
+    +'<div class="f-group" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);">'
+    +'<input type="checkbox" id="pf-border" '+(p&&p.isBorder?'checked':'')+' '+ceA+' style="width:16px;height:16px;accent-color:var(--coral);cursor:pointer;">'
+    +'<label for="pf-border" style="font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;">📍 พื้นที่ชายแดน (ชายแดน 3 จังหวัด)</label>'
+    +'<span style="font-size:11px;color:var(--txt3);margin-left:auto;">เบี้ยเลี้ยงสูงกว่าปกติ</span>'
+    +'</div>'
     +'<div class="f-group"><label class="f-label">หมายเหตุ</label><textarea class="f-input" id="pf-note" '+ceA+'>'+esc(p?p.note:'')+'</textarea></div>'
     +(p&&p.start&&p.end?(function(){var hcnt=window.getProjectHolidayCount(p);return hcnt>0?'<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(255,107,107,.07);border-radius:8px;border:1px solid rgba(255,107,107,.2);font-size:12px;"><span>🎌</span><span style="color:var(--coral);font-weight:600;">มีวันหยุด '+hcnt+' วัน</span><span style="color:var(--txt2);">ในช่วงโครงการนี้</span><a href="#" onclick="event.preventDefault();window.showProjHolidaysPopup(\''+p.id+'\');" style="margin-left:auto;font-size:11px;color:var(--violet);">ดูวันหยุด</a></div>':'';})():'')
     +'</div>';
@@ -411,9 +416,12 @@ window.saveProject=async function(){
   var selStage=document.getElementById('pf-stg').value;
   var rawProg=parseInt((document.getElementById('pf-prog')||{}).value)||0;
   var finalProg=window.stageForces100(selStage)?100:rawProg;
-  var dbProj={project_id:pid,project_name:name.trim(),group_id:document.getElementById('pf-grp').value,site_owner:(document.getElementById('pf-owner')||{}).value||'',type_id:(document.getElementById('pf-type-modal')||document.getElementById('pf-type')||{}).value||'',stage_id:selStage,budget:parseFloat(document.getElementById('pf-cost').value)||0,start_date:document.getElementById('pf-start').value,end_date:document.getElementById('pf-end').value,revisit_1:(document.getElementById('pf-revisit1')||{}).value||'',revisit_2:(document.getElementById('pf-revisit2')||{}).value||'',parentProjectId:(document.getElementById('pf-parent-proj')||{}).value||'',revisitRound:Number((document.getElementById('pf-revisit-round')||{}).value)||0,progress_pct:finalProg,note:document.getElementById('pf-note').value,pm_staff_id:members.length>0?members[0].sid:'',status:'active',team:members.map(m=>m.sid),members:members,visits:savedVisits};
+  var dbProj={project_id:pid,project_name:name.trim(),group_id:document.getElementById('pf-grp').value,site_owner:(document.getElementById('pf-owner')||{}).value||'',type_id:(document.getElementById('pf-type-modal')||document.getElementById('pf-type')||{}).value||'',stage_id:selStage,budget:parseFloat(document.getElementById('pf-cost').value)||0,start_date:document.getElementById('pf-start').value,end_date:document.getElementById('pf-end').value,revisit_1:(document.getElementById('pf-revisit1')||{}).value||'',revisit_2:(document.getElementById('pf-revisit2')||{}).value||'',parentProjectId:(document.getElementById('pf-parent-proj')||{}).value||'',revisitRound:Number((document.getElementById('pf-revisit-round')||{}).value)||0,progress_pct:finalProg,note:document.getElementById('pf-note').value,pm_staff_id:members.length>0?members[0].sid:'',status:'active',team:members.map(m=>m.sid),members:members,visits:savedVisits,is_border:!!(document.getElementById('pf-border')||{}).checked};
   window.closeM('m-proj');
-  setDoc(getDocRef('PROJECTS',pid),dbProj).catch(e=>window.showDbError(e));
+  try {
+    await setDoc(getDocRef('PROJECTS',pid),dbProj);
+    if(typeof window.tsSyncProject==='function') await window.tsSyncProject(pid, members);
+  } catch(e){ window.showDbError(e); }
 }
 
 // ── VISITS (ฟังก์ชันเสริม: หลายรอบเข้าไซต์) ──

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//d/ส่วนตัว/พัฒนาโปรแกรม/backoffice_teams/docs/js/**)",
+      "Read(//d/ส่วนตัว/พัฒนาโปรแกรม/backoffice_teams/docs/**)",
+      "Bash(grep -E \"^//|^/\\\\*|window\\\\.|function\")",
+      "Bash(grep -E \"^//|window\\\\.|function\")",
+      "Bash(grep -E \"^//|window\\\\.\")",
+      "Read(//d/ส่วนตัว/พัฒนาโปรแกรม/backoffice_teams/docs/css/**)"
+    ]
+  }
+}

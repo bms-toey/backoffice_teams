@@ -47,7 +47,7 @@ async function seedDatabaseIfEmpty(){
 
 function setupRealtimeListeners(){
   if(!auth.currentUser) return;
-  const colls = ['STAGES','PTYPES','PGROUPS','STAFF','USERS','PROJECTS','ADVANCES','LODGINGS','POSITIONS','HOLIDAYS','LEAVES'];
+  const colls = ['STAGES','PTYPES','PGROUPS','STAFF','USERS','PROJECTS','ADVANCES','LODGINGS','POSITIONS','HOLIDAYS','LEAVES','TIMESHEETS','COSTS'];
   let loadCount = 0;
 
   const checkLoaded = () => {
@@ -80,7 +80,7 @@ function setupRealtimeListeners(){
   onSnapshot(getColRef('STAFF'), s => {
     window.STAFF = s.docs.map(doc=>{
       let d=doc.data();
-      return{id:d.staff_id||d.id,name:d.full_name||d.name||'',nickname:d.nickname||(d.full_name||d.name||'').split(' ')[0],dept:d.department||d.dept,role:d.position||d.role,email:d.email,phone:d.phone,active:d.is_active!==false&&d.is_active!=='FALSE',start_date:d.start_date,birth_date:d.birth_date,remark:d.remark};
+      return{id:d.staff_id||d.id,name:d.full_name||d.name||'',nickname:d.nickname||(d.full_name||d.name||'').split(' ')[0],dept:d.department||d.dept,role:d.position||d.role,email:d.email,phone:d.phone,active:d.is_active!==false&&d.is_active!=='FALSE',start_date:d.start_date,birth_date:d.birth_date,remark:d.remark,dailyRate:d.daily_rate!=null?Number(d.daily_rate):null};
     });
     let depts=[...new Set(window.STAFF.map(st=>st.dept).filter(Boolean))];
     if(depts.length>0) window.DEPARTMENTS=depts;
@@ -104,7 +104,7 @@ function setupRealtimeListeners(){
       var rawR2=d.revisit_2||d.revisit2||d.revisitTwo||'';
       // แปลง Firestore Timestamp เป็น string
       function tsToStr(v){if(!v)return'';if(typeof v==='string')return v;if(v&&v.toDate){var dt=v.toDate();return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');}return String(v);}
-      return{id:d.project_id||d.id,name:d.project_name||d.name||'',groupId:d.group_id||d.groupId||'',siteOwner:d.site_owner||d.siteOwner||'',typeId:d.type_id||d.typeId||'',stage:d.stage_id||d.stage||'init',cost:Number(d.budget||d.cost)||0,start:tsToStr(rawStart),end:tsToStr(rawEnd),revisit1:tsToStr(rawR1),revisit2:tsToStr(rawR2),parentProjectId:d.parentProjectId||d.parent_project_id||'',revisitRound:Number(d.revisitRound||d.revisit_round)||0,progress:Number(d.progress_pct||d.progress)||0,note:d.note||'',status:d.status||'active',pm:d.pm_staff_id||d.pm||'',team:d.team||[],members:d.members||[],visits:(d.visits||[]).map(function(v){return{id:v.id||('V'+Math.random().toString(36).slice(2,7)),no:v.no||1,start:tsToStr(v.start||v.start_date||''),end:tsToStr(v.end||v.end_date||''),purpose:v.purpose||'',team:v.team||[],status:v.status||'planned',note:v.note||''};})};
+      return{id:d.project_id||d.id,name:d.project_name||d.name||'',groupId:d.group_id||d.groupId||'',siteOwner:d.site_owner||d.siteOwner||'',typeId:d.type_id||d.typeId||'',stage:d.stage_id||d.stage||'init',cost:Number(d.budget||d.cost)||0,start:tsToStr(rawStart),end:tsToStr(rawEnd),revisit1:tsToStr(rawR1),revisit2:tsToStr(rawR2),parentProjectId:d.parentProjectId||d.parent_project_id||'',revisitRound:Number(d.revisitRound||d.revisit_round)||0,progress:Number(d.progress_pct||d.progress)||0,note:d.note||'',status:d.status||'active',pm:d.pm_staff_id||d.pm||'',team:d.team||[],members:d.members||[],isBorder:d.is_border===true||d.is_border==='TRUE',visits:(d.visits||[]).map(function(v){return{id:v.id||('V'+Math.random().toString(36).slice(2,7)),no:v.no||1,start:tsToStr(v.start||v.start_date||''),end:tsToStr(v.end||v.end_date||''),purpose:v.purpose||'',team:v.team||[],status:v.status||'planned',note:v.note||''};})};
     });
     checkLoaded();
   }, e=>window.showDbError(e));
@@ -112,7 +112,7 @@ function setupRealtimeListeners(){
   onSnapshot(getColRef('ADVANCES'), s => {
     window.ADVANCES = s.docs.map(doc=>{
       let d=doc.data();
-      return{id:d.advance_id||d.id,pid:d.project_id||d.pid,purpose:d.purpose||'',amount:Number(d.amount_requested||d.amount)||0,cleared:Number(d.amount_cleared||d.cleared)||0,rdate:d.request_date||d.rdate||'',ddate:d.due_date||d.ddate||'',status:d.status||'draft',note:d.note||'',advno:d.advance_no||d.advno||''};
+      return{id:d.advance_id||d.id,pid:d.project_id||d.pid,purpose:d.purpose||'',amount:Number(d.amount_requested||d.amount)||0,cleared:Number(d.amount_cleared||d.cleared)||0,rdate:d.request_date||d.rdate||'',ddate:d.due_date||d.ddate||'',status:d.status||'draft',note:d.note||'',advno:d.advance_no||d.advno||'',expenseItems:d.expense_items||[],laborItems:d.labor_items||[]};
     });
     checkLoaded();
   }, e=>window.showDbError(e));
@@ -141,7 +141,7 @@ function setupRealtimeListeners(){
   }, e=>window.showDbError(e));
 
   onSnapshot(getColRef('POSITIONS'), s => {
-    window.POSITIONS = s.docs.map(doc=>{let d=doc.data();return{id:d.position_id||d.id,label:d.label_th||d.label};});
+    window.POSITIONS = s.docs.map(doc=>{let d=doc.data();return{id:d.position_id||d.id,label:d.label_th||d.label,dailyRate:Number(d.daily_rate)||0};});
     checkLoaded();
   }, e=>window.showDbError(e));
 
@@ -159,6 +159,19 @@ function setupRealtimeListeners(){
     if(window.cu&&document.getElementById('view-leave')&&document.getElementById('view-leave').classList.contains('on'))window.renderLeave();
     if(window.cu&&document.getElementById('view-calendar')&&document.getElementById('view-calendar').classList.contains('on'))window.renderCalendar();
   }, e=>window.showDbError(e));
+
+  onSnapshot(getColRef('TIMESHEETS'), s => {
+    window.TIMESHEETS = s.docs.map(doc=>{let d=doc.data();return{id:d.timesheet_id||d.id,pid:d.project_id||d.pid||'',staffId:d.staff_id||'',workDate:d.work_date||'',visitStart:d.visit_start||'',visitEnd:d.visit_end||'',hours:Number(d.hours)||0,category:d.category||'other',description:d.description||'',source:d.source||''};});
+    checkLoaded();
+    if(window.cu&&document.getElementById('view-timesheet')&&document.getElementById('view-timesheet').classList.contains('on'))window.renderTimesheet();
+    if(window.cu&&document.getElementById('view-cost')&&document.getElementById('view-cost').classList.contains('on'))window.renderCost();
+  }, e=>window.showDbError(e));
+
+  onSnapshot(getColRef('COSTS'), s => {
+    window.COSTS = s.docs.map(doc=>{let d=doc.data();return{id:d.cost_id||d.id,pid:d.project_id||d.pid||'',staffId:d.staff_id||'',category:d.category||'other',amount:Number(d.amount)||0,costDate:d.cost_date||'',description:d.description||'',receiptNo:d.receipt_no||'',source:d.source||'',advanceId:d.advance_id||''};});
+    checkLoaded();
+    if(window.cu&&document.getElementById('view-cost')&&document.getElementById('view-cost').classList.contains('on'))window.renderCost();
+  }, e=>window.showDbError(e));
 }
 
 onAuthStateChanged(auth, async (user) => {
@@ -170,6 +183,12 @@ onAuthStateChanged(auth, async (user) => {
       onSnapshot(getDocRef('SETTINGS','app'), function(snap){
         var d=snap.exists()?snap.data():{};
         window.NOTIFY_TOKEN=d.notify_token||'';
+        window.SETTINGS = {
+          allowance_weekday_normal:  Number(d.allowance_weekday_normal)  || 350,
+          allowance_holiday_normal:  Number(d.allowance_holiday_normal)  || 650,
+          allowance_weekday_border:  Number(d.allowance_weekday_border)  || 650,
+          allowance_holiday_border:  Number(d.allowance_holiday_border)  || 1250,
+        };
       });
     } catch(err){
       window.showDbError(err);
@@ -276,7 +295,7 @@ window.goView = function(id,el){
   document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on');});
   var v=document.getElementById('view-'+id);
   if(v){v.style.display='';v.classList.add('on');}
-  var labels={overview:'Overview',kanban:'Delivery Board',projects:'โครงการทั้งหมด',advance:'Advance',lodging:'ระบบจัดหาที่พัก',workload:'สรุปภาระงาน',calendar:'ปฏิทินทีม',holidays:'วันหยุด',leave:'การลางาน'};
+  var labels={overview:'Overview',kanban:'Delivery Board',projects:'โครงการทั้งหมด',advance:'Advance',lodging:'ระบบจัดหาที่พัก',workload:'สรุปภาระงาน',calendar:'ปฏิทินทีม',holidays:'วันหยุด',leave:'การลางาน',timesheet:'Timesheet',cost:'Cost Tracking'};
   document.getElementById('tp-title').textContent=labels[id]||id;
   var actions={};
   document.getElementById('tp-actions').innerHTML=actions[id]||'';
@@ -289,6 +308,8 @@ window.goView = function(id,el){
   if(id==='calendar') window.renderCalendar();
   if(id==='holidays') window.renderHolidays();
   if(id==='leave') window.renderLeave();
+  if(id==='timesheet') window.renderTimesheet();
+  if(id==='cost') window.renderCost();
 }
 
 window.toggleSB = function(){
@@ -305,6 +326,8 @@ window.renderAll = function(){
   window.renderLodging();
   window.renderWorkload();
   window.renderCalendar();
+  window.renderTimesheet();
+  window.renderCost();
   window.updateBadge();
 }
 

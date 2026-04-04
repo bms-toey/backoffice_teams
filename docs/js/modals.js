@@ -7,7 +7,7 @@ window.execDelete=async function(){
   if(!window.delTarget)return;if(!window.auth.currentUser)return;
   var t=window.delTarget.type,id=window.delTarget.id;
   if(t==='lodging'){if(!window.cl())return;}else if(['staff','type','position','group','user','stage'].includes(t)){if(!window.isAdmin())return;}else{if(!window.ce())return;}
-  var sheetMap={project:'PROJECTS',advance:'ADVANCES',staff:'STAFF',type:'PTYPES',user:'USERS',position:'POSITIONS',group:'PGROUPS',lodging:'LODGINGS',stage:'STAGES'};
+  var sheetMap={project:'PROJECTS',advance:'ADVANCES',staff:'STAFF',type:'PTYPES',user:'USERS',position:'POSITIONS',group:'PGROUPS',lodging:'LODGINGS',stage:'STAGES',timesheet:'TIMESHEETS',cost:'COSTS'};
   if(t==='project'){window.PROJECTS=window.PROJECTS.filter(x=>x.id!==id);window.ADVANCES.filter(x=>x.pid===id).forEach(a=>deleteDoc(getDocRef('ADVANCES',a.id)));window.LODGINGS.filter(x=>x.pid===id).forEach(l=>deleteDoc(getDocRef('LODGINGS',l.id)));}
   else if(t==='advance')window.ADVANCES=window.ADVANCES.filter(x=>x.id!==id);
   else if(t==='lodging')window.LODGINGS=window.LODGINGS.filter(x=>x.id!==id);
@@ -17,6 +17,8 @@ window.execDelete=async function(){
   else if(t==='position')window.POSITIONS=window.POSITIONS.filter(x=>x.id!==id);
   else if(t==='group')window.PGROUPS=window.PGROUPS.filter(x=>x.id!==id);
   else if(t==='stage')window.STAGES=window.STAGES.filter(x=>x.id!==id);
+  else if(t==='timesheet')window.TIMESHEETS=window.TIMESHEETS.filter(x=>x.id!==id);
+  else if(t==='cost')window.COSTS=window.COSTS.filter(x=>x.id!==id);
   window.closeM('m-del');window.delTarget=null;window.renderAll();
   if(['staff','type','user','position','group','stage'].includes(t))window.admTab(t+'s');
   if(t==='lodging'&&window.currentLdPid)window.openLodgingGroupModal(window.currentLdPid);

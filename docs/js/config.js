@@ -33,6 +33,8 @@ window.PGROUPS = [];
 window.LODGINGS = [];
 window.HOLIDAYS = [];
 window.LEAVES = [];
+window.TIMESHEETS = [];
+window.COSTS = [];
 window.NOTIFY_TOKEN = '';
 
 window.AFLW=[
@@ -57,11 +59,106 @@ window.IMPORT_SCHEMAS = {
   'ADVANCES': { idField:'advance_id',prefix:'A', headers:["project_id","purpose","amount_requested","amount_cleared","request_date","due_date","status","note","advance_no"], example:["P123","ค่าที่พัก","5000","0","2026-01-10","2026-01-20","draft","","ADV-001"] },
   'PGROUPS': { idField:'group_id',prefix:'GRP', headers:["label_th","color_hex"], example:["ภาคเหนือ","#4361ee"] },
   'PTYPES': { idField:'type_id',prefix:'T', headers:["label_th","color_hex"], example:["งานติดตั้ง","#06d6a0"] },
-  'POSITIONS': { idField:'position_id',prefix:'POS', headers:["label_th"], example:["Project Manager"] }
+  'POSITIONS': { idField:'position_id',prefix:'POS', headers:["label_th"], example:["Project Manager"] },
+  'TIMESHEETS': { idField:'timesheet_id',prefix:'TS', headers:["project_id","staff_id","work_date","hours","category","description"], example:["P001","S001","2026-04-01","8","fieldwork","สำรวจพื้นที่โครงการ"] },
+  'COSTS': { idField:'cost_id',prefix:'CST', headers:["project_id","staff_id","category","amount","cost_date","description","receipt_no"], example:["P001","S001","travel","1500","2026-04-01","ค่าเดินทางไปพื้นที่","RCT-001"] }
 };
 
 window.isDbLoaded = false;
 window.cu = null;
+window.SETTINGS = {
+  allowance_weekday_normal: 350,
+  allowance_holiday_normal: 650,
+  allowance_weekday_border: 650,
+  allowance_holiday_border: 1250,
+};
+
+// ── LABOR HELPERS ─────────────────────────────────────────────────────────────
+// คืน daily_rate ของพนักงาน (override ต่อคน > default จากตำแหน่ง)
+window.getStaffDailyRate = function(staffId) {
+  var s = window.STAFF.find(function(x){return x.id===staffId;});
+  if(!s) return 0;
+  if(s.dailyRate != null && s.dailyRate > 0) return s.dailyRate;
+  var pos = window.POSITIONS.find(function(p){return p.label===s.role;});
+  return pos ? pos.dailyRate : 0;
+};
+
+// คืน allowance rate ตาม isBorder + isHoliday
+window.getAllowanceRate = function(isBorder, isHoliday) {
+  var st = window.SETTINGS;
+  if(isBorder)  return isHoliday ? st.allowance_holiday_border  : st.allowance_weekday_border;
+  return isHoliday ? st.allowance_holiday_normal : st.allowance_weekday_normal;
+};
+
+// นับวันทำงานจริง (ไม่รวมเสาร์-อาทิตย์ + HOLIDAYS) ในช่วงวันที่
+window.countWorkDays = function(startStr, endStr) {
+  if(!startStr || !endStr) return 0;
+  var s = window.pd(startStr), e = window.pd(endStr);
+  var count = 0;
+  var cur = new Date(s);
+  while(cur <= e) {
+    var dow = cur.getDay();
+    var ds = cur.getFullYear()+'-'+String(cur.getMonth()+1).padStart(2,'0')+'-'+String(cur.getDate()).padStart(2,'0');
+    var isHol = window.HOLIDAYS.some(function(h){return h.date===ds;});
+    if(dow!==0 && dow!==6 && !isHol) count++;
+    cur.setDate(cur.getDate()+1);
+  }
+  return count;
+};
+
+// นับวันทำงานจริง หักวันลา (approved/pending) ที่ตรงกับวันทำงาน
+// คืน { workDays, leaveDays, leaveInfo }
+window.countWorkDaysExcLeave = function(sid, startStr, endStr) {
+  if(!startStr || !endStr) return {workDays:0, leaveDays:0, leaveInfo:[]};
+  var baseWork = window.countWorkDays(startStr, endStr);
+  if(!sid || !window.getStaffLeaveConflicts) return {workDays:baseWork, leaveDays:0, leaveInfo:[]};
+
+  var leaveConflicts = window.getStaffLeaveConflicts(sid, startStr, endStr)
+    .filter(function(x){ return x.leave.status !== 'rejected'; });
+  if(!leaveConflicts.length) return {workDays:baseWork, leaveDays:0, leaveInfo:[]};
+
+  // สร้าง Set ของวันทำงานที่ลา (หัก weekends + holidays ออกแล้ว)
+  var sD = window.pd(startStr), eD = window.pd(endStr);
+  eD.setHours(23,59,59);
+  var leaveWorkDates = new Set();
+  leaveConflicts.forEach(function(x){
+    var lv = x.leave;
+    var ls = window.pd(lv.startDate), le = window.pd(lv.endDate);
+    le.setHours(23,59,59);
+    var cur = new Date(Math.max(ls.getTime(), sD.getTime()));
+    var end = new Date(Math.min(le.getTime(), eD.getTime()));
+    while(cur <= end){
+      var dow = cur.getDay();
+      var ds = cur.getFullYear()+'-'+String(cur.getMonth()+1).padStart(2,'0')+'-'+String(cur.getDate()).padStart(2,'0');
+      var isHol = (window.HOLIDAYS||[]).some(function(h){ return h.date===ds; });
+      if(dow!==0 && dow!==6 && !isHol) leaveWorkDates.add(ds);
+      cur.setDate(cur.getDate()+1);
+    }
+  });
+
+  var leaveDays = leaveWorkDates.size;
+  return {
+    workDays:  Math.max(0, baseWork - leaveDays),
+    leaveDays: leaveDays,
+    leaveInfo: leaveConflicts,
+  };
+};
+
+// คืนช่วงวันทำงานของโครงการ → [{s, e, label?}, ...]
+// ดึงจาก visits (รอบเข้าไซต์) ถ้ามี ไม่มีใช้ proj.start/proj.end
+window.getProjPeriods = function(proj) {
+  if (!proj) return [];
+  var visits = (proj.visits || []).filter(function(v) { return v.start && v.end; });
+  if (visits.length) {
+    return visits
+      .slice()
+      .sort(function(a, b) { return (a.start || '').localeCompare(b.start || ''); })
+      .map(function(v) { return { s: v.start, e: v.end, label: v.purpose || '' }; });
+  }
+  if (proj.start || proj.end) return [{ s: proj.start || '', e: proj.end || '' }];
+  return [];
+};
+
 window.advFilter = '';
 window.calY = new Date().getFullYear();
 window.calM = new Date().getMonth();

@@ -74,6 +74,13 @@
       <div class="nav-btn" onclick="window.goView('lodging',this)">
         <span class="ni">🏨</span><span class="nl">จัดหาที่พัก</span>
       </div>
+      <div class="sb-sec">ต้นทุน</div>
+      <div class="nav-btn" onclick="window.goView('timesheet',this)">
+        <span class="ni">⏱</span><span class="nl">Timesheet</span>
+      </div>
+      <div class="nav-btn" onclick="window.goView('cost',this)">
+        <span class="ni">💰</span><span class="nl">Cost Tracking</span>
+      </div>
       <div class="sb-sec">ทีม</div>
       <div class="nav-btn" onclick="window.goView('workload',this)">
         <span class="ni">🏢</span><span class="nl">สรุปภาระงาน</span>
@@ -414,6 +421,60 @@
         </div>
       </div>
 
+      <!-- TIMESHEET -->
+      <div class="view" id="view-timesheet" style="overflow-y:auto;">
+        <div class="toolbar" style="position:sticky;top:0;z-index:10;background:var(--surface);">
+          <div class="t-search"><input id="ts-q" placeholder="ค้นหาโครงการ/พนักงาน..." oninput="window.renderTimesheet()"></div>
+          <select class="t-sel" id="ts-yr" onchange="window.renderTimesheet()"><option value="">ทุกปี พ.ศ.</option></select>
+          <select class="t-sel" id="ts-mon" onchange="window.renderTimesheet()">
+            <option value="">ทุกเดือน</option>
+            <option value="1">ม.ค.</option><option value="2">ก.พ.</option><option value="3">มี.ค.</option>
+            <option value="4">เม.ย.</option><option value="5">พ.ค.</option><option value="6">มิ.ย.</option>
+            <option value="7">ก.ค.</option><option value="8">ส.ค.</option><option value="9">ก.ย.</option>
+            <option value="10">ต.ค.</option><option value="11">พ.ย.</option><option value="12">ธ.ค.</option>
+          </select>
+          <select class="t-sel" id="ts-proj" onchange="window.renderTimesheet()"><option value="">ทุกโครงการ</option></select>
+          <select class="t-sel" id="ts-staff" onchange="window.renderTimesheet()"><option value="">ทุกคน</option></select>
+        </div>
+        <div id="ts-summary-bar" style="display:flex;gap:12px;padding:12px 24px;background:var(--bg);flex-wrap:wrap;"></div>
+        <div style="padding:0 24px 28px;">
+          <div id="ts-cards" class="ts-cards-wrap"></div>
+        </div>
+      </div>
+
+      <!-- COST TRACKING -->
+      <div class="view" id="view-cost" style="overflow-y:auto;">
+        <div class="toolbar" style="position:sticky;top:0;z-index:10;background:var(--surface);">
+          <div class="t-search"><input id="cost-q" placeholder="ค้นหาโครงการ/รายละเอียด..." oninput="window.renderCost()"></div>
+          <select class="t-sel" id="cost-yr" onchange="window.renderCost()"><option value="">ทุกปี พ.ศ.</option></select>
+          <select class="t-sel" id="cost-mon" onchange="window.renderCost()">
+            <option value="">ทุกเดือน</option>
+            <option value="1">ม.ค.</option><option value="2">ก.พ.</option><option value="3">มี.ค.</option>
+            <option value="4">เม.ย.</option><option value="5">พ.ค.</option><option value="6">มิ.ย.</option>
+            <option value="7">ก.ค.</option><option value="8">ส.ค.</option><option value="9">ก.ย.</option>
+            <option value="10">ต.ค.</option><option value="11">พ.ย.</option><option value="12">ธ.ค.</option>
+          </select>
+          <select class="t-sel" id="cost-proj" onchange="window.renderCost()"><option value="">ทุกโครงการ</option></select>
+          <select class="t-sel" id="cost-cat" onchange="window.renderCost()">
+            <option value="">ทุกหมวด</option>
+            <option value="phone">📱 ค่าโทรศัพท์</option>
+            <option value="travel">🚗 ค่าเดินทาง</option>
+            <option value="postal">📮 ค่าไปรษณีย์</option>
+            <option value="taxi">🚕 ค่าแท็กซี่</option>
+            <option value="fuel">⛽ ค่าน้ำมัน</option>
+            <option value="toll">🛣️ ค่าทางด่วน</option>
+            <option value="food">🍱 ค่าอาหาร</option>
+            <option value="lodging">🏨 ค่าที่พัก</option>
+            <option value="stationery">🖨️ เครื่องเขียนแบบพิมพ์</option>
+            <option value="labor">👷 ค่าแรง</option>
+            <option value="allowance">💵 ค่าเบี้ยเลี้ยง</option>
+            <option value="other">📝 อื่นๆ</option>
+          </select>
+        </div>
+        <div id="cost-summary-bar" style="display:flex;gap:12px;padding:12px 24px;background:var(--bg);flex-wrap:wrap;"></div>
+        <div id="cost-project-list" style="padding:0 24px 28px;"></div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -436,7 +497,7 @@
 
 <!-- ADVANCE MODAL -->
 <div class="overlay" id="m-adv">
-  <div class="modal md">
+  <div class="modal xl" style="max-width:1080px;">
     <div class="m-head">
       <div class="m-icon" style="background:rgba(6,214,160,.12)">💳</div>
       <div class="m-title" id="m-adv-title">New Advance</div>
@@ -478,6 +539,7 @@
           <div class="adm-nav-item" id="at-types" onclick="window.admTab('types')"><span class="adm-nav-icon">🏷️</span> ประเภทงาน</div>
           <div class="adm-nav-item" id="at-positions" onclick="window.admTab('positions')"><span class="adm-nav-icon">💼</span> ตำแหน่ง</div>
           <div class="adm-nav-item" id="at-stages" onclick="window.admTab('stages')"><span class="adm-nav-icon">⚡</span> PM Stages</div>
+          <div class="adm-nav-item" id="at-rates" onclick="window.admTab('rates')"><span class="adm-nav-icon">💵</span> อัตราค่าใช้จ่าย</div>
           <div class="adm-nav-item" id="at-notify" onclick="window.admTab('notify')" style="margin-top:auto; border-top:1px dashed var(--border); border-radius:0; padding-top:16px;"><span class="adm-nav-icon">🔔</span> การแจ้งเตือน</div>
           <div class="adm-nav-item admin-only" id="at-users" onclick="window.admTab('users')" style="display:none;"><span class="adm-nav-icon">🔑</span> ผู้ใช้งานระบบ</div>
         </div>
@@ -581,6 +643,10 @@
       <div class="f-group">
         <label class="f-label">ชื่อตำแหน่ง *</label>
         <input class="f-input" id="apf-lbl" placeholder="เช่น Project Manager...">
+      </div>
+      <div class="f-group">
+        <label class="f-label">อัตราค่าแรง (฿/วัน)</label>
+        <input type="number" class="f-input" id="apf-rate" placeholder="เช่น 1500">
       </div>
     </div>
     <div class="m-foot">
@@ -783,6 +849,67 @@
   </div>
 </div>
 
+<!-- COST MODAL -->
+<div class="overlay" id="m-cost">
+  <div class="modal md" style="max-width:520px">
+    <div class="m-head">
+      <div class="m-icon" style="background:rgba(6,214,160,.12)">💰</div>
+      <div class="m-title" id="m-cost-title">บันทึกค่าใช้จ่าย</div>
+      <button class="m-x" onclick="window.closeM('m-cost')">✕</button>
+    </div>
+    <div class="m-body">
+      <input type="hidden" id="cost-edit-id">
+      <div class="f-grid">
+        <div class="f-group" style="grid-column:span 2">
+          <label class="f-label">โครงการ *</label>
+          <select class="f-input" id="costf-proj"></select>
+        </div>
+        <div class="f-group">
+          <label class="f-label">หมวดค่าใช้จ่าย *</label>
+          <select class="f-input" id="costf-cat">
+            <option value="phone">📱 ค่าโทรศัพท์</option>
+            <option value="travel">🚗 ค่าเดินทาง</option>
+            <option value="postal">📮 ค่าไปรษณีย์</option>
+            <option value="taxi">🚕 ค่าแท็กซี่</option>
+            <option value="fuel">⛽ ค่าน้ำมัน</option>
+            <option value="toll">🛣️ ค่าทางด่วน</option>
+            <option value="food">🍱 ค่าอาหาร</option>
+            <option value="lodging">🏨 ค่าที่พัก</option>
+            <option value="stationery">🖨️ เครื่องเขียนแบบพิมพ์</option>
+            <option value="labor">👷 ค่าแรง</option>
+            <option value="allowance">💵 ค่าเบี้ยเลี้ยง</option>
+            <option value="other">📝 อื่นๆ</option>
+          </select>
+        </div>
+        <div class="f-group">
+          <label class="f-label">จำนวนเงิน (฿) *</label>
+          <input type="number" class="f-input" id="costf-amount" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div class="f-group">
+          <label class="f-label">วันที่ *</label>
+          <input type="date" class="f-input" id="costf-date">
+        </div>
+        <div class="f-group">
+          <label class="f-label">ผู้บันทึก</label>
+          <select class="f-input" id="costf-staff"></select>
+        </div>
+        <div class="f-group" style="grid-column:span 2">
+          <label class="f-label">รายละเอียด *</label>
+          <textarea class="f-input" id="costf-desc" rows="3" placeholder="อธิบายค่าใช้จ่าย..."></textarea>
+        </div>
+        <div class="f-group" style="grid-column:span 2">
+          <label class="f-label">เลขที่ใบเสร็จ / อ้างอิง</label>
+          <input class="f-input" id="costf-receipt" placeholder="เช่น RCT-001">
+        </div>
+      </div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-ghost" onclick="window.closeM('m-cost')">ยกเลิก</button>
+      <button class="btn btn-teal" onclick="window.saveCost()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
 <!-- STAGE MODAL -->
 <div class="overlay" id="m-stage">
   <div class="modal md" style="max-width:420px">
@@ -959,5 +1086,7 @@
 <script type="module" src="js/leave.js"></script>
 <script type="module" src="js/admin.js"></script>
 <script type="module" src="js/notify.js"></script>
+<script type="module" src="js/timesheet.js"></script>
+<script type="module" src="js/cost.js"></script>
 <script type="module" src="js/modals.js"></script>
 </body>
