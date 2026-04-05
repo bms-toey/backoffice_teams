@@ -6,7 +6,10 @@ window.askDel=function(type,id,label){window.delTarget={type:type,id:id};documen
 window.execDelete=async function(){
   if(!window.delTarget)return;if(!window.auth.currentUser)return;
   var t=window.delTarget.type,id=window.delTarget.id;
-  if(t==='lodging'){if(!window.cl())return;}else if(['staff','type','position','group','user','stage'].includes(t)){if(!window.isAdmin())return;}else{if(!window.ce())return;}
+  var _delModMap={project:'projects',advance:'advance',lodging:'lodging',timesheet:'timesheet',cost:'cost',leave:'leave'};
+  if(['staff','type','position','group','user','stage'].includes(t)){if(!window.isAdmin())return;}
+  else if(_delModMap[t]){if(!window.canDel(_delModMap[t]))return;}
+  else{if(!window.isAdmin())return;}
   var sheetMap={project:'PROJECTS',advance:'ADVANCES',staff:'STAFF',type:'PTYPES',user:'USERS',position:'POSITIONS',group:'PGROUPS',lodging:'LODGINGS',stage:'STAGES',timesheet:'TIMESHEETS',cost:'COSTS'};
   if(t==='project'){window.PROJECTS=window.PROJECTS.filter(x=>x.id!==id);window.ADVANCES.filter(x=>x.pid===id).forEach(a=>deleteDoc(getDocRef('ADVANCES',a.id)));window.LODGINGS.filter(x=>x.pid===id).forEach(l=>deleteDoc(getDocRef('LODGINGS',l.id)));}
   else if(t==='advance')window.ADVANCES=window.ADVANCES.filter(x=>x.id!==id);

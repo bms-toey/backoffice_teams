@@ -6,7 +6,13 @@
       "Bash(grep -E \"^//|^/\\\\*|window\\\\.|function\")",
       "Bash(grep -E \"^//|window\\\\.|function\")",
       "Bash(grep -E \"^//|window\\\\.\")",
-      "Read(//d/ส่วนตัว/พัฒนาโปรแกรม/backoffice_teams/docs/css/**)"
+      "Read(//d/ส่วนตัว/พัฒนาโปรแกรม/backoffice_teams/docs/css/**)",
+      "Read(//d/ส่วนตัว/พัฒนาโปרแกรม/backoffice_teams/docs/js/**)",
+      "Bash(sed -i 's/window\\\\.ce\\(\\)?`<button class=\"btn btn-ghost btn-sm\" onclick=\"window\\\\.openProjModal/window.canEdit\\('\\\\''projects'\\\\''\\)?`<button class=\"btn btn-ghost btn-sm\" onclick=\"window.openProjModal/g' docs/js/projects.js)",
+      "Bash(sed -i 's/window\\\\.ce\\(\\)&&!hasLinked?`<button class=\"btn btn-red/window.canDel\\('\\\\''projects'\\\\''\\)&&!hasLinked?`<button class=\"btn btn-red/g' docs/js/projects.js)",
+      "Bash(sed -i 's/window\\\\.ce\\(\\),ceA/window.canEdit\\('\\\\''projects'\\\\''\\),ceA/g' docs/js/projects.js)",
+      "Bash(sed -i 's/document\\\\.getElementById\\('\\\\''m-proj-foot'\\\\''\\)\\\\.style\\\\.display=window\\\\.ce\\(\\)/document.getElementById\\('\\\\''m-proj-foot'\\\\''\\).style.display=window.canEdit\\('\\\\''projects'\\\\''\\)/g' docs/js/projects.js)",
+      "Bash(sed -i 's/if\\(!window\\\\.ce\\(\\)\\)return;/if\\(!window.canEdit\\('\\\\''projects'\\\\''\\)\\)return;/g' docs/js/projects.js)"
     ]
   }
 }

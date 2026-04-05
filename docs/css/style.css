@@ -605,3 +605,199 @@ select.f-input{appearance:none;cursor:pointer;}
   background:var(--violet)!important;color:#fff!important;
   border-color:var(--violet)!important;
 }
+
+/* ══════════════════════════════════════════════
+   RESPONSIVE — Mobile Sidebar Overlay
+══════════════════════════════════════════════ */
+#mob-sb-overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(26,29,46,.55);z-index:29;
+  backdrop-filter:blur(2px);
+}
+#mob-sb-overlay.on{display:block;}
+
+/* ══════════════════════════════════════════════
+   TABLET  ≤ 1024px — slim sidebar auto
+══════════════════════════════════════════════ */
+@media (max-width:1024px) and (min-width:769px){
+  #sidebar{width:64px;min-width:64px;}
+  #sidebar .sb-title,#sidebar .sb-sub,
+  #sidebar .nl,#sidebar .sb-sec,
+  #sidebar .nb,#sidebar .u-name,#sidebar .u-role{display:none!important;}
+  #sidebar .nav-btn{justify-content:center;padding:10px;}
+  #sidebar .nav-btn::before{display:none;}
+  #sidebar .sb-toggle{display:none;}
+
+  /* 2-col stat row on tablet */
+  #stat-row,[style*="grid-template-columns:repeat(4"]{
+    grid-template-columns:repeat(2,1fr)!important;
+  }
+}
+
+/* ══════════════════════════════════════════════
+   MOBILE  ≤ 768px
+══════════════════════════════════════════════ */
+@media (max-width:768px){
+
+  /* ── Base layout ── */
+  html,body{overflow:hidden;height:100%;}
+  #wrap{height:100dvh;}
+
+  /* ── Sidebar becomes slide-in drawer ── */
+  #sidebar{
+    position:fixed;left:-240px;top:0;bottom:0;
+    width:240px!important;min-width:240px!important;
+    z-index:30;transition:left .28s cubic-bezier(.4,0,.2,1);
+    box-shadow:none;
+  }
+  #sidebar.mob-open{
+    left:0;box-shadow:4px 0 24px rgba(0,0,0,.18);
+  }
+  /* restore sidebar content when open */
+  #sidebar.mob-open .sb-title,#sidebar.mob-open .sb-sub,
+  #sidebar.mob-open .nl,#sidebar.mob-open .sb-sec,
+  #sidebar.mob-open .nb,#sidebar.mob-open .u-name,
+  #sidebar.mob-open .u-role{display:block!important;}
+  #sidebar.mob-open .nb{display:inline-block!important;}
+  #sidebar.mob-open .nav-btn{justify-content:flex-start;padding:9px 10px;}
+  #sidebar.mob-open .nav-btn::before{display:block;}
+  #sidebar .sb-toggle{display:none!important;}
+
+  /* Hamburger visible on mobile */
+  #mob-menu-btn{display:flex!important;}
+
+  /* ── Topbar ── */
+  #topbar{
+    padding:0 10px;gap:6px;height:52px;
+  }
+  .tp-title{font-size:15px;letter-spacing:-.2px;}
+  .tp-badge{display:none!important;}
+  #tp-overdue{display:none!important;}
+  /* logout + pw buttons: icon-only feel */
+  #topbar > button{padding:6px 8px;font-size:13px;}
+
+  /* ── Content padding ── */
+  .toolbar{padding:10px 12px;gap:6px;flex-wrap:wrap;}
+  .dtable-wrap{padding:0 10px 16px;}
+  .t-search input{width:150px;}
+  .t-search input:focus{width:180px;}
+
+  /* ── Overview ── */
+  #view-overview{overflow-y:auto!important;}
+  /* stat-row 2 cols */
+  #stat-row,div[style*="grid-template-columns:repeat(4,1fr)"]{
+    grid-template-columns:repeat(2,1fr)!important;
+    padding:12px!important;gap:10px!important;
+  }
+  /* overview section grids → single col */
+  div[style*="grid-template-columns:1fr 340px"],
+  div[style*="grid-template-columns:1fr 1fr;gap:16px"],
+  div[style*="grid-template-columns:1fr 1fr 1fr"]{
+    grid-template-columns:1fr!important;
+  }
+  div[style*="padding:0 24px"]{padding-left:12px!important;padding-right:12px!important;}
+  div[style*="padding:20px 24px"]{padding:12px!important;}
+  div[style*="padding:16px 24px"]{padding:10px 12px!important;}
+  div[style*="padding:12px 24px"]{padding:8px 12px!important;}
+
+  /* ── Projects table ── */
+  .dtable-inner{overflow-x:auto;}
+  table{min-width:560px;}
+
+  /* ── Cards grid ── */
+  div[style*="grid-template-columns:repeat(auto-fill,minmax(340px"]{
+    grid-template-columns:1fr!important;
+    padding-left:12px!important;padding-right:12px!important;
+  }
+
+  /* ── Kanban ── */
+  #kb-board{padding:12px;gap:10px;}
+  .kb-col{min-width:180px;width:180px;}
+
+  /* ── Timesheet ── */
+  .ts-row-staff{width:140px;}
+  .ts-row-item{padding:8px 12px;gap:8px;}
+  .ts-card-head{padding:12px 14px;gap:10px;}
+
+  /* ── Workload ── */
+  .tl-left{width:160px;min-width:160px;}
+  .tl-wrap{padding:10px 12px;}
+
+  /* ── Modals ── */
+  .overlay{padding:0!important;align-items:flex-end!important;}
+  .modal{
+    border-radius:var(--r3) var(--r3) 0 0!important;
+    max-width:100vw!important;max-height:92dvh!important;
+    animation:mInMob .25s cubic-bezier(.4,0,.2,1)!important;
+  }
+  @keyframes mInMob{
+    from{opacity:0;transform:translateY(40px);}
+    to{opacity:1;transform:none;}
+  }
+  .modal.md,.modal.lg,.modal.xl{max-width:100vw!important;}
+  .m-head{padding:14px 16px;}
+  .m-body{padding:16px;}
+  .m-foot{padding:12px 16px;}
+
+  /* ── Admin modal ── */
+  .adm-layout{
+    flex-direction:column!important;height:95dvh!important;
+    border-radius:var(--r3) var(--r3) 0 0!important;
+  }
+  .adm-sidebar{
+    width:100%!important;flex-direction:row!important;
+    border-right:none!important;border-bottom:1px solid var(--border)!important;
+    flex-shrink:0!important;
+  }
+  .adm-sidebar-head{display:none!important;}
+  .adm-nav{
+    flex-direction:row!important;padding:8px 10px!important;
+    overflow-x:auto!important;gap:6px!important;flex:unset!important;
+  }
+  .adm-nav-item{
+    white-space:nowrap;padding:7px 12px!important;
+    font-size:12px!important;gap:6px!important;flex-shrink:0;
+  }
+  .adm-nav-icon{font-size:14px!important;}
+  .adm-main-body{padding:14px!important;}
+  .adm-main-head{padding:12px 16px!important;}
+
+  /* ── f-grid 2col → 1col on very narrow ── */
+  .f-grid{grid-template-columns:1fr!important;}
+
+  /* ── Login ── */
+  .login-box{width:100vw;border-radius:0;min-height:100dvh;border:none;box-shadow:none;}
+  .login-head{padding:48px 28px 20px;}
+  .login-body{padding:4px 28px 40px;}
+  #login{align-items:flex-start;}
+
+  /* ── Leave page ── */
+  div[style*="grid-template-columns:1fr 1fr"][id]{
+    grid-template-columns:1fr!important;
+  }
+
+  /* ── Advance summary ── */
+  #adv-summary-bar{padding:8px 12px!important;}
+  #adv-cards{padding:0 12px 20px!important;}
+
+  /* ── Lodging ── */
+  #ld-summary-bar{padding:8px 12px!important;}
+  #lodging-cards{padding:0 12px 20px!important;}
+
+  /* ── Scrollbar thinner on mobile ── */
+  ::-webkit-scrollbar{width:3px;height:3px;}
+
+  /* ── Cost cards ── */
+  div[style*="padding:0 24px 28px"]{padding:0 12px 20px!important;}
+}
+
+/* ══════════════════════════════════════════════
+   SMALL MOBILE  ≤ 400px
+══════════════════════════════════════════════ */
+@media (max-width:400px){
+  #stat-row,div[style*="grid-template-columns:repeat(4,1fr)"]{
+    grid-template-columns:1fr!important;
+  }
+  .ts-row-staff{width:120px;}
+  .stat-v{font-size:18px;}
+}

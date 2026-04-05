@@ -2,8 +2,13 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>Backoffice Teams</title>
+<meta name="theme-color" content="#7c5cfc">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Backoffice">
+<link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
@@ -35,7 +40,7 @@
       </div>
       <div class="f-group" style="margin-bottom:0">
         <label class="f-label">Password</label>
-        <input id="lp" type="password" class="f-input" placeholder="••••••••">
+        <input id="lp" type="text" class="f-input" placeholder="••••••••" autocomplete="off" data-form-type="other" style="-webkit-text-security:disc;font-family:monospace;">
       </div>
       <div class="login-err" id="lerr">⚠ ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง</div>
       <div class="login-info" id="linfo"></div>
@@ -113,8 +118,12 @@
     <div class="sb-toggle" onclick="window.toggleSB()">◀</div>
   </div>
 
+  <!-- Mobile sidebar overlay backdrop -->
+  <div id="mob-sb-overlay" onclick="window.closeMobSidebar()"></div>
+
   <div id="main">
     <div id="topbar">
+      <button id="mob-menu-btn" class="btn btn-ghost btn-sm" onclick="window.toggleMobSidebar()" style="display:none;" aria-label="เมนู">☰</button>
       <div class="tp-title" id="tp-title">Overview</div>
       <div class="tp-badge ok" id="tp-status" style="cursor:pointer;" onclick="window.forceSync()" title="คลิกเพื่อซิงค์ข้อมูลทันที">
         <span class="pulse ok"></span> Realtime
@@ -542,6 +551,7 @@
           <div class="adm-nav-item" id="at-rates" onclick="window.admTab('rates')"><span class="adm-nav-icon">💵</span> อัตราค่าใช้จ่าย</div>
           <div class="adm-nav-item" id="at-notify" onclick="window.admTab('notify')" style="margin-top:auto; border-top:1px dashed var(--border); border-radius:0; padding-top:16px;"><span class="adm-nav-icon">🔔</span> การแจ้งเตือน</div>
           <div class="adm-nav-item admin-only" id="at-users" onclick="window.admTab('users')" style="display:none;"><span class="adm-nav-icon">🔑</span> ผู้ใช้งานระบบ</div>
+          <div class="adm-nav-item admin-only" id="at-roles" onclick="window.admTab('roles')" style="display:none;"><span class="adm-nav-icon">🔐</span> สิทธิ์การใช้งาน</div>
         </div>
       </div>
       <div class="adm-main">
@@ -764,15 +774,15 @@
       <div class="f-grid">
         <div class="f-group">
           <label class="f-label">รหัสผ่านปัจจุบัน *</label>
-          <input type="password" class="f-input" id="cpw-old" autocomplete="current-password">
+          <input type="text" class="f-input" id="cpw-old" autocomplete="off" data-form-type="other" style="-webkit-text-security:disc;font-family:monospace;">
         </div>
         <div class="f-group">
           <label class="f-label">รหัสผ่านใหม่ *</label>
-          <input type="password" class="f-input" id="cpw-new" autocomplete="new-password">
+          <input type="text" class="f-input" id="cpw-new" autocomplete="off" data-form-type="other" style="-webkit-text-security:disc;font-family:monospace;">
         </div>
         <div class="f-group">
           <label class="f-label">ยืนยันรหัสผ่านใหม่ *</label>
-          <input type="password" class="f-input" id="cpw-confirm" autocomplete="new-password">
+          <input type="text" class="f-input" id="cpw-confirm" autocomplete="off" data-form-type="other" style="-webkit-text-security:disc;font-family:monospace;">
         </div>
         <div id="cpw-err" style="display:none;color:var(--coral);font-size:12px;padding:4px 0;font-weight:600;"></div>
       </div>
@@ -980,7 +990,7 @@
         </div>
         <div class="f-group">
           <label class="f-label">รหัสผ่าน</label>
-          <input type="password" class="f-input" id="auf-p" placeholder="กำหนดรหัสผ่าน..." autocomplete="new-password">
+          <input type="text" class="f-input" id="auf-p" placeholder="กำหนดรหัสผ่าน..." autocomplete="off" data-form-type="other" style="-webkit-text-security:disc;font-family:monospace;" onfocus="this.style.webkitTextSecurity='disc'" onpaste="event.preventDefault();this.value+=event.clipboardData.getData('text')">
         </div>
         <div class="f-group">
           <label class="f-label">ชื่อที่แสดง *</label>

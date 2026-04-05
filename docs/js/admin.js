@@ -8,6 +8,7 @@ window.admTab=function(t){window.admCur=t;document.querySelectorAll('.adm-nav-it
 function renderAdm(){
   var c=document.getElementById('adm-body');if(!c)return;var titleEl=document.getElementById('adm-head-title');
   if(window.admCur==='notify'){window.renderNotifySettings();return;}
+  if(window.admCur==='roles'){renderAdmRoles(c,titleEl);return;}
   if(window.admCur==='staff'){
     if(titleEl)titleEl.innerHTML=`👥 จัดการพนักงาน <span class="tag" style="background:var(--surface2);color:var(--txt3);margin-left:10px;font-size:11px;">${window.STAFF.length} คน</span>`;
     var activeStaff=window.STAFF.filter(function(s){return s.active!==false;});
@@ -287,6 +288,150 @@ window.saveAdmUser=async function(){
   setDoc(getDocRef('USERS',uid2),dbUsr).catch(e=>window.showDbError(e));
 }
 
+// ── ROLE PERMISSIONS ──
+function renderAdmRoles(c, titleEl) {
+  if(titleEl) titleEl.innerHTML = '🔐 สิทธิ์การใช้งาน (Role Permissions)';
+  var mods = window.PERM_MODULES || [];
+  // roles ที่ configurable ได้ (ไม่รวม admin เพราะ full access เสมอ)
+  var roles = (window.USERS || []).map(function(u){return u.role;}).filter(function(r){return r&&r!=='admin';});
+  roles = [...new Set(roles)];
+  if(!roles.length) roles = ['pm','viewer'];
+  roles.sort();
+
+  var rp = window.ROLE_PERMISSIONS || {};
+
+  // helper: get perm value
+  function getPerm(role, modId, action) {
+    if(rp[role] && rp[role][modId] && rp[role][modId][action] !== undefined) return !!rp[role][modId][action];
+    // fallback default — ตรงกับ _roleDefaultPerms ใน config.js
+    var full={view:true,add:true,edit:true,del:true}, ro={view:true,add:false,edit:false,del:false},
+        none={view:false,add:false,edit:false,del:false}, vadd={view:true,add:true,edit:false,del:false};
+    var def = role==='pm'
+      ? {overview:ro,kanban:full,projects:full,advance:full,lodging:full,workload:ro,calendar:full,leave:full,timesheet:ro,cost:ro}
+      : role==='viewer'
+      ? {overview:ro,kanban:ro,projects:none,advance:full,lodging:full,workload:ro,calendar:ro,leave:vadd,timesheet:ro,cost:ro}
+      : {overview:ro,kanban:ro,projects:ro,advance:ro,lodging:ro,workload:ro,calendar:ro,leave:ro,timesheet:ro,cost:ro};
+    return !!(def[modId]||{})[action];
+  }
+
+  var actions = [{id:'view',label:'ดู',color:'var(--teal)'},{id:'add',label:'เพิ่ม',color:'var(--violet)'},{id:'edit',label:'แก้',color:'var(--amber)'},{id:'del',label:'ลบ',color:'var(--coral)'}];
+
+  // Role header cells
+  var roleHeadCells = roles.map(function(r){
+    var rc={pm:'var(--violet)',viewer:'var(--teal)'};
+    return `<th colspan="4" style="text-align:center;padding:10px 6px;background:${rc[r]||'var(--violet)'}18;color:${rc[r]||'var(--violet)'};font-size:13px;font-weight:700;border-bottom:2px solid ${rc[r]||'var(--violet)'}40;">${window.roleLabel(r)}</th>`;
+  }).join('');
+
+  // Action sub-header cells
+  var actionHeadCells = roles.map(function(){
+    return actions.map(function(a){
+      return `<th style="text-align:center;font-size:10px;font-weight:600;color:${a.color};padding:5px 4px;white-space:nowrap;">${a.label}</th>`;
+    }).join('');
+  }).join('');
+
+  // Module rows
+  var rows = mods.map(function(mod){
+    var cells = roles.map(function(role){
+      return actions.map(function(a){
+        var checked = getPerm(role,mod.id,a.id) ? 'checked' : '';
+        // view ถูกเช็คอัตโนมัติถ้า add/edit/del ถูกเปิด
+        var onchange = a.id!=='view' ? `onchange="window._permAutoView(this,'${role}','${mod.id}')"` : `onchange="window._permViewOff(this,'${role}','${mod.id}')"`;
+        return `<td style="text-align:center;padding:6px 4px;">
+          <input type="checkbox" class="perm-cb" ${checked}
+            data-role="${role}" data-mod="${mod.id}" data-act="${a.id}"
+            style="width:16px;height:16px;accent-color:${a.color};cursor:pointer;"
+            id="pcb-${role}-${mod.id}-${a.id}" ${onchange}>
+        </td>`;
+      }).join('');
+    }).join('');
+
+    // Admin column (read-only, always on)
+    var adminCells = `<td colspan="${actions.length}" style="text-align:center;font-size:11px;color:var(--txt3);padding:6px 8px;">
+      ${actions.map(function(){return '<span style="color:var(--teal);font-size:14px;">✓</span>';}).join(' ')}
+    </td>`;
+
+    return `<tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+      <td style="padding:10px 14px;font-size:13px;font-weight:500;white-space:nowrap;">${mod.icon} ${esc(mod.label)}</td>
+      ${adminCells}
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  c.innerHTML = `
+    <div style="max-width:900px;">
+      <div style="background:rgba(124,92,252,.07);border:1px solid rgba(124,92,252,.2);border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:12px;color:var(--txt2);">
+        💡 <b>Admin</b> มีสิทธิ์เต็มทุก Module เสมอ — กำหนดสิทธิ์ได้สำหรับ Role อื่นๆ
+      </div>
+      <div style="overflow-x:auto;border:1px solid var(--border);border-radius:14px;">
+        <table style="width:100%;border-collapse:collapse;min-width:560px;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);">
+              <th style="text-align:left;padding:10px 14px;font-size:12px;color:var(--txt3);">Module</th>
+              <th colspan="${actions.length}" style="text-align:center;padding:10px 6px;background:rgba(255,107,107,.08);color:var(--coral);font-size:13px;font-weight:700;">Admin</th>
+              ${roleHeadCells}
+            </tr>
+            <tr style="border-bottom:2px solid var(--border);background:var(--surface2);">
+              <th></th>
+              <th colspan="${actions.length}" style="text-align:center;font-size:10px;color:var(--txt3);padding:5px;">เต็ม</th>
+              ${actionHeadCells}
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div style="margin-top:18px;display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="window.resetRolePerms()">↩️ รีเซ็ตเป็นค่าเริ่มต้น</button>
+        <button class="btn btn-pri" onclick="window.saveRolePerms()">💾 บันทึกสิทธิ์</button>
+      </div>
+    </div>`;
+}
+
+// auto-check view เมื่อเปิด add/edit/del
+window._permAutoView = function(cb, role, modId) {
+  if(cb.checked) {
+    var viewCb = document.getElementById('pcb-'+role+'-'+modId+'-view');
+    if(viewCb) viewCb.checked = true;
+  }
+};
+// auto-uncheck add/edit/del เมื่อปิด view
+window._permViewOff = function(cb, role, modId) {
+  if(!cb.checked) {
+    ['add','edit','del'].forEach(function(a){
+      var el=document.getElementById('pcb-'+role+'-'+modId+'-'+a);
+      if(el) el.checked=false;
+    });
+  }
+};
+
+window.saveRolePerms = async function() {
+  if(!window.isAdmin()||!window.auth.currentUser) return;
+  var mods = window.PERM_MODULES || [];
+  var roles = [...new Set((window.USERS||[]).map(function(u){return u.role;}).filter(function(r){return r&&r!=='admin';}))];
+  if(!roles.length) roles=['pm','viewer'];
+  var data = {};
+  roles.forEach(function(role){
+    data[role]={};
+    mods.forEach(function(mod){
+      data[role][mod.id]={};
+      ['view','add','edit','del'].forEach(function(a){
+        var el=document.getElementById('pcb-'+role+'-'+mod.id+'-'+a);
+        data[role][mod.id][a]=el?el.checked:false;
+      });
+    });
+  });
+  try {
+    await setDoc(getDocRef('SETTINGS','role_permissions'), data);
+    window.showAlert('บันทึกสิทธิ์สำเร็จ','success');
+  } catch(e) { window.showDbError(e); }
+};
+
+window.resetRolePerms = function() {
+  if(!window.isAdmin()) return;
+  if(!confirm('รีเซ็ตสิทธิ์ทั้งหมดเป็นค่าเริ่มต้น?')) return;
+  window.ROLE_PERMISSIONS = {};
+  window.admTab('roles');
+};
+
 // ── CHANGE PASSWORD ──
 window.openChangePassword=function(){
   ['cpw-old','cpw-new','cpw-confirm'].forEach(function(id){document.getElementById(id).value='';});
@@ -312,7 +457,7 @@ window.saveChangePassword=async function(){
     await setDoc(getDocRef('USERS',ex.id),dbUsr);
     window.cu.password=newPw;
     window.closeM('m-change-pw');
-    window.showAlert('เปลี่ยนรหัสผ่านสำเร็จ','ok');
+    window.showAlert('เปลี่ยนรหัสผ่านสำเร็จ','success');
   }catch(e2){showErr('⚠ บันทึกไม่สำเร็จ: '+e2.message);}
 };
 

@@ -180,7 +180,77 @@ window._loginRetryInterval = null;
 window.isAdmin = function() { return window.cu && window.cu.role === 'admin'; }
 window.ce = function() { return window.cu && (window.cu.role === 'admin' || window.cu.role === 'pm'); }
 window.cl = function() { return window.cu !== null; }
-window.roleLabel = function(r){ return r==='pm'?'DM/PM':r?r.toUpperCase():''; }
+window.roleLabel = function(r){ return r==='pm'?'DM/PM':r==='viewer'?'Viewer':r?r.toUpperCase():''; }
+
+// ── ROLE PERMISSIONS ──
+window.ROLE_PERMISSIONS = {};
+
+// Modules list (used in Admin UI)
+window.PERM_MODULES = [
+  { id:'overview',  label:'Overview',       icon:'📊' },
+  { id:'kanban',    label:'Delivery Board', icon:'📋' },
+  { id:'projects',  label:'โครงการ',        icon:'🗂️' },
+  { id:'advance',   label:'Advance',        icon:'💰' },
+  { id:'lodging',   label:'ที่พัก',          icon:'🏨' },
+  { id:'workload',  label:'สรุปภาระงาน',    icon:'📈' },
+  { id:'calendar',  label:'ปฏิทินทีม',      icon:'📅' },
+  { id:'leave',     label:'การลางาน',       icon:'🏖️' },
+  { id:'timesheet', label:'Timesheet',      icon:'⏱️' },
+  { id:'cost',      label:'Cost Tracking',  icon:'💵' },
+];
+
+// Default permissions when not configured (backward-compat)
+function _roleDefaultPerms(role) {
+  var full = {view:true, add:true,  edit:true,  del:true};
+  var ro   = {view:true, add:false, edit:false, del:false};
+  var none = {view:false,add:false, edit:false, del:false};
+  var vadd = {view:true, add:true,  edit:false, del:false}; // view + add only
+  if (role === 'pm') {
+    return {
+      overview: ro,    // ดูอย่างเดียว
+      kanban:   full,  // เต็ม
+      projects: full,  // เต็ม
+      advance:  full,  // เต็ม
+      lodging:  full,  // เต็ม
+      workload: ro,    // ดูอย่างเดียว
+      calendar: full,  // เต็ม
+      leave:    full,  // เต็ม
+      timesheet:ro,    // ดูอย่างเดียว
+      cost:     ro,    // ดูอย่างเดียว
+    };
+  }
+  if (role === 'viewer') {
+    return {
+      overview: ro,    // ดูอย่างเดียว
+      kanban:   ro,    // ดูอย่างเดียว
+      projects: none,  // ไม่มีสิทธิ์
+      advance:  full,  // เต็ม
+      lodging:  full,  // เต็ม
+      workload: ro,    // ดูอย่างเดียว
+      calendar: ro,    // ดูอย่างเดียว
+      leave:    vadd,  // ดู + เพิ่ม
+      timesheet:ro,    // ดูอย่างเดียว
+      cost:     ro,    // ดูอย่างเดียว
+    };
+  }
+  // fallback: view-only all
+  return {overview:ro,kanban:ro,projects:ro,advance:ro,lodging:ro,workload:ro,calendar:ro,leave:ro,timesheet:ro,cost:ro};
+}
+
+// Main permission check
+window.can = function(action, module) {
+  if (!window.cu) return false;
+  var role = window.cu.role;
+  if (role === 'admin') return true;
+  var rp = window.ROLE_PERMISSIONS && window.ROLE_PERMISSIONS[role];
+  var modPerm = rp ? rp[module] : null;
+  if (!modPerm) modPerm = _roleDefaultPerms(role)[module] || {};
+  return !!modPerm[action];
+};
+window.canView = function(m) { return window.can('view', m); };
+window.canAdd  = function(m) { return window.can('add',  m); };
+window.canEdit = function(m) { return window.can('edit', m); };
+window.canDel  = function(m) { return window.can('del',  m); };
 
 window.uid = function(){return Math.random().toString(36).slice(2,9);}
 window.fc = function(n){return new Intl.NumberFormat('th-TH',{style:'currency',currency:'THB',maximumFractionDigits:0}).format(n||0);}

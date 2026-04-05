@@ -90,7 +90,7 @@ window.renderLodging=function(){
         ${amenityD.length?`<div style="font-size:10px;margin-top:3px;">${amenityD.join(' ')}</div>`:''}
         <div style="font-size:12px;font-weight:800;color:var(--indigo);text-align:right;margin-top:4px;">${fc(l.dTotal)}</div>
         ${l.dDeposit?`<div style="font-size:10px;color:var(--txt3);margin-top:3px;padding-top:3px;border-top:1px dashed var(--indigo)20;">🔐 มัดจำ ${fc(l.dDeposit)}${l.dDepositNote?' · '+esc(l.dDepositNote):''}</div>`:''}
-        ${window.ce()&&hasDRate?`<div style="margin-top:6px;display:flex;gap:4px;">${!isAppD
+        ${window.canEdit('lodging')&&hasDRate?`<div style="margin-top:6px;display:flex;gap:4px;">${!isAppD
           ?`<button onclick="event.stopPropagation();window.approveLdType('${p.id}','${l.id}','daily')" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;border:1px solid var(--indigo);background:var(--indigo)15;color:var(--indigo);cursor:pointer;flex:1;">✅ อนุมัติรายวัน</button>`
           :`<button onclick="event.stopPropagation();window.unapproveLdType('${p.id}','${l.id}','daily')" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;border:1px solid var(--coral);background:var(--coral)15;color:var(--coral);cursor:pointer;flex:1;">↩ ยกเลิก</button>`}
         </div>`:''}
@@ -108,7 +108,7 @@ window.renderLodging=function(){
             (l.mWater||l.mElectric)?`<div style="font-size:10px;color:var(--txt2);">${l.mWater?'💧 '+l.mWater:''}${l.mWater&&l.mElectric?' · ':''}${l.mElectric?'⚡ '+l.mElectric:''}</div>`:''}
           ${l.mExtras?`<div style="font-size:10px;color:var(--txt2);">📦 ${l.mExtras}</div>`:''}
         </div>`:''}
-        ${window.ce()&&hasMRate?`<div style="margin-top:6px;display:flex;gap:4px;">${!isAppM
+        ${window.canEdit('lodging')&&hasMRate?`<div style="margin-top:6px;display:flex;gap:4px;">${!isAppM
           ?`<button onclick="event.stopPropagation();window.approveLdType('${p.id}','${l.id}','monthly')" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;border:1px solid var(--coral);background:var(--coral)15;color:var(--coral);cursor:pointer;flex:1;">✅ อนุมัติรายเดือน</button>`
           :`<button onclick="event.stopPropagation();window.unapproveLdType('${p.id}','${l.id}','monthly')" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;border:1px solid var(--amber);background:var(--amber)15;color:var(--amber);cursor:pointer;flex:1;">↩ ยกเลิก</button>`}
         </div>`:''}
@@ -125,7 +125,7 @@ window.renderLodging=function(){
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
             ${appBadges||'<span style="font-size:9px;color:var(--txt3);">ยังไม่อนุมัติ</span>'}
-            ${window.ce()?`<div style="display:flex;gap:4px;margin-top:4px;">
+            ${window.canEdit('lodging')?`<div style="display:flex;gap:4px;margin-top:4px;">
               <button onclick="event.stopPropagation();window.showLdForm('${p.id}','${l.id}')" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);cursor:pointer;">✏️</button>
               <button onclick="event.stopPropagation();window.askDel('lodging','${l.id}','${l.name||'ตัวเลือก '+(i+1)}')" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--coral)30;background:var(--coral)10;color:var(--coral);cursor:pointer;">🗑</button>
             </div>`:''}
@@ -151,7 +151,7 @@ window.renderLodging=function(){
       </div>
       <div style="padding:12px 14px;flex:1;">${optionList}</div>
       <div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:6px;">
-        ${window.cl()?`<button class="btn btn-teal btn-sm" onclick="window.showLdForm('${p.id}',null)">+ เพิ่มตัวเลือก</button>`:''}
+        ${window.canEdit('lodging')?`<button class="btn btn-teal btn-sm" onclick="window.showLdForm('${p.id}',null)">+ เพิ่มตัวเลือก</button>`:''}
       </div>
     </div>`;
   }).join('');
@@ -159,7 +159,7 @@ window.renderLodging=function(){
 
 // ── Approve by type (daily / monthly) — independent ──
 window.approveLdType=async function(pid,ldId,type){
-  if(!window.ce())return;
+  if(!window.canEdit('lodging'))return;
   var field=type==='daily'?'approved_daily':'approved_monthly';
   var localField=type==='daily'?'approvedDaily':'approvedMonthly';
   // clear same type from other options
@@ -173,7 +173,7 @@ window.approveLdType=async function(pid,ldId,type){
   window.renderLodging();
 }
 window.unapproveLdType=async function(pid,ldId,type){
-  if(!window.ce())return;
+  if(!window.canEdit('lodging'))return;
   var field=type==='daily'?'approved_daily':'approved_monthly';
   var localField=type==='daily'?'approvedDaily':'approvedMonthly';
   var l=window.LODGINGS.find(x=>x.id===ldId);
@@ -195,7 +195,7 @@ var pOpts='<option value="">-- เลือกโครงการ --</option>'
   var pt=gT(p?p.typeId:'');
   document.getElementById('m-ld-title').textContent='🏨 '+(p?esc(p.name):'ที่พัก');
   var appD=lds.find(l=>l.approvedDaily==='yes');var appM=lds.find(l=>l.approvedMonthly==='yes');
-  var addBtn=window.cl()?`<button class="btn btn-teal btn-sm" onclick="window.showLdForm('${pid}',null)">+ เพิ่มตัวเลือกใหม่</button>`:'';
+  var addBtn=window.canEdit('lodging')?`<button class="btn btn-teal btn-sm" onclick="window.showLdForm('${pid}',null)">+ เพิ่มตัวเลือกใหม่</button>`:'';
   var html=`<div style="margin-bottom:14px;padding:12px 14px;background:${pt.color}08;border:1px solid ${pt.color}25;border-radius:12px;display:flex;align-items:center;gap:10px;">
     <span style="font-size:20px;">🏗️</span>
     <div style="flex:1;"><div style="font-size:13px;font-weight:800;">${p?esc(p.name):''}</div>
@@ -222,7 +222,7 @@ var pOpts='<option value="">-- เลือกโครงการ --</option>'
     var isAppD=l.approvedDaily==='yes';var isAppM=l.approvedMonthly==='yes';
     var hasDRate=l.dsQty>0||l.ddQty>0;var hasMRate=l.msQty>0||l.mdQty>0;
     var parsedMapUrl=l.mapUrl?(l.mapUrl.startsWith('http')?l.mapUrl:'https://maps.google.com/?q='+encodeURIComponent(l.mapUrl)):'';
-    var actBtns=window.cl()?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);">
+    var actBtns=window.canEdit('lodging')?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);">
       ${hasDRate?(!isAppD
         ?`<button class="btn btn-sm" style="background:#4361ee15;color:var(--indigo);border:1px solid #4361ee30;font-weight:700;" onclick="window.approveLdType('${pid}','${l.id}','daily')">✅ อนุมัติรายวัน</button>`
         :`<button class="btn btn-sm" style="background:var(--coral)15;color:var(--coral);border:1px solid var(--coral)30;font-weight:700;" onclick="window.unapproveLdType('${pid}','${l.id}','daily')">↩ ยกเลิกรายวัน</button>`):''}
@@ -275,7 +275,7 @@ window.showLdForm=function(pid,ldId){
   window.editLdId=ldId;
   var l=ldId?window.LODGINGS.find(x=>x.id===ldId):null;
   var p=window.PROJECTS.find(x=>x.id===pid);
-  var dis=window.cl()?'':'disabled';
+  var dis=window.canEdit('lodging')?'':'disabled';
   document.getElementById('m-ld-title').textContent=(l?'✏️ แก้ไขที่พัก':'➕ เพิ่มตัวเลือกที่พักใหม่')+(p?' — '+esc(p.name):'');
 
   // ── shared amenity rows helper ──
@@ -464,11 +464,11 @@ window.showLdForm=function(pid,ldId){
   </div>`;
 
   document.getElementById('m-ld-body').innerHTML=html;
-  var saveBtn=window.cl()?`<button class="btn btn-pri" onclick="window.saveLodging()">💾 บันทึกที่พัก</button>`:'';
+  var saveBtn=window.canEdit('lodging')?`<button class="btn btn-pri" onclick="window.saveLodging()">💾 บันทึกที่พัก</button>`:'';
   document.getElementById('m-ld-foot').innerHTML=`<button class="btn btn-ghost" onclick="window.openLodgingGroupModal('${pid}')">‹ ย้อนกลับ</button>${saveBtn}`;
   document.getElementById('m-ld-foot').style.display='flex';
   window.openM('m-lodging');
-  if(window.cl()){
+  if(window.canEdit('lodging')){
     window.calcLdPrice();
     window.initLdTags('d',document.getElementById('ld-d-custom').value);
     window.initLdTags('m',document.getElementById('ld-m-custom').value);
@@ -535,7 +535,7 @@ window.initLdTags=function(side,csv){
 };
 
 window.saveLodging=async function(){
-  if(!window.cl()||!window.auth.currentUser)return;
+  if(!window.canEdit('lodging')||!window.auth.currentUser)return;
   var pid=document.getElementById('ld-pid').value;if(!pid)return;
   var id=window.editLdId||'LODG'+Date.now();
   var dTotal=parseFloat((document.getElementById('ld-d-sum').textContent||'0').replace(/,/g,''))||0;

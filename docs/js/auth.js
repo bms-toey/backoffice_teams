@@ -190,6 +190,11 @@ onAuthStateChanged(auth, async (user) => {
           allowance_holiday_border:  Number(d.allowance_holiday_border)  || 1250,
         };
       });
+      // โหลด ROLE_PERMISSIONS แยก
+      onSnapshot(getDocRef('SETTINGS','role_permissions'), function(snap){
+        window.ROLE_PERMISSIONS = snap.exists() ? snap.data() : {};
+        if (window.cu) window.setupUser();
+      });
     } catch(err){
       window.showDbError(err);
     }
@@ -228,6 +233,16 @@ function doLoginNow(u, p) {
   window.cu = usr;
   document.getElementById('login').style.display = 'none';
   document.getElementById('wrap').style.display   = 'flex';
+
+  // reset view state ทุกครั้งที่ login ใหม่ (ไม่จำ view ของ session ก่อนหน้า)
+  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on');});
+  document.querySelectorAll('.nav-btn').forEach(function(n){n.classList.remove('on');});
+  var defView=document.getElementById('view-overview');
+  if(defView){defView.style.display='';defView.classList.add('on');}
+  var defNav=document.querySelector('.nav-btn[onclick*="\'overview\'"]');
+  if(defNav){defNav.classList.add('on');}
+  var titleEl=document.getElementById('tp-title');
+  if(titleEl) titleEl.textContent='Overview';
 
   if (window.isDbLoaded) {
     window.setupUser();
@@ -287,9 +302,45 @@ window.setupUser = function(){
   if(btnImport) btnImport.style.display=window.isAdmin()?'':'none';
   var uTab=document.getElementById('at-users');
   if(uTab) uTab.style.display=(window.cu.role==='admin')?'':'none';
+  // ── apply nav visibility per role permissions ──
+  var navModules=['overview','kanban','projects','advance','lodging','workload','calendar','leave','timesheet','cost'];
+  navModules.forEach(function(m){
+    var btn=document.querySelector('.nav-btn[onclick*="\''+m+'\'"]');
+    if(!btn) return;
+    var canSee=window.canView(m);
+    btn.style.display=canSee?'':'none';
+    if(!canSee) btn.classList.remove('on');
+  });
+  // ถ้า view ปัจจุบันถูกซ่อน → redirect ไปยัง module แรกที่เข้าได้ (ไม่ trigger alert)
+  var activeView=document.querySelector('.view.on');
+  if(activeView){
+    var vid=activeView.id.replace('view-','');
+    if(navModules.indexOf(vid)>=0 && !window.canView(vid)){
+      var firstOk=navModules.find(function(m){return window.canView(m);});
+      if(firstOk){
+        var vLabels={overview:'Overview',kanban:'Delivery Board',projects:'โครงการทั้งหมด',advance:'Advance',lodging:'ระบบจัดหาที่พัก',workload:'สรุปภาระงาน',calendar:'ปฏิทินทีม',leave:'การลางาน',timesheet:'Timesheet',cost:'Cost Tracking'};
+        // navigate โดยตรง (bypass goView alert check)
+        document.querySelectorAll('.nav-btn').forEach(function(n){n.classList.remove('on');});
+        document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on');});
+        var nb=document.querySelector('.nav-btn[onclick*="\''+firstOk+'\'"]');
+        if(nb){nb.style.display='';nb.classList.add('on');}
+        var vEl=document.getElementById('view-'+firstOk);
+        if(vEl){vEl.style.display='';vEl.classList.add('on');}
+        var titleEl=document.getElementById('tp-title');
+        if(titleEl) titleEl.textContent=vLabels[firstOk]||firstOk;
+        var rFn=window['render'+firstOk.charAt(0).toUpperCase()+firstOk.slice(1)];
+        if(rFn) rFn();
+      }
+    }
+  }
 }
 
 window.goView = function(id,el){
+  // ตรวจสิทธิ์ view ก่อนนำทาง
+  var _navMods=['overview','kanban','projects','advance','lodging','workload','calendar','leave','timesheet','cost'];
+  if(_navMods.indexOf(id)>=0 && !window.canView(id)){
+    window.showAlert('คุณไม่มีสิทธิ์เข้าถึง Module นี้','warn'); return;
+  }
   document.querySelectorAll('.nav-btn').forEach(function(n){n.classList.remove('on');});
   if(el)el.classList.add('on');
   document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on');});
@@ -314,10 +365,36 @@ window.goView = function(id,el){
 
 window.toggleSB = function(){
   var sb=document.getElementById('sidebar');
-  var btn=sb.querySelector('.sb-toggle');
-  sb.classList.toggle('slim');
-  btn.textContent=sb.classList.contains('slim')?'▶':'◀';
+  if(window.innerWidth<=768){
+    window.toggleMobSidebar();
+  } else {
+    var btn=sb.querySelector('.sb-toggle');
+    sb.classList.toggle('slim');
+    if(btn) btn.textContent=sb.classList.contains('slim')?'▶':'◀';
+  }
 }
+window.toggleMobSidebar = function(){
+  var sb=document.getElementById('sidebar');
+  var ov=document.getElementById('mob-sb-overlay');
+  var isOpen=sb.classList.contains('mob-open');
+  sb.classList.toggle('mob-open',!isOpen);
+  if(ov) ov.classList.toggle('on',!isOpen);
+}
+window.closeMobSidebar = function(){
+  var sb=document.getElementById('sidebar');
+  var ov=document.getElementById('mob-sb-overlay');
+  sb.classList.remove('mob-open');
+  if(ov) ov.classList.remove('on');
+}
+// ปิด sidebar เมื่อ navigate บนมือถือ
+var _origGoView = null;
+(function(){
+  var _base = window.goView;
+  window.goView = function(id, el, noAlert){
+    if(window.innerWidth<=768) window.closeMobSidebar();
+    return _base(id, el, noAlert);
+  };
+})();
 
 window.renderAll = function(){
   window.renderOverview();

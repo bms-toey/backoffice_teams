@@ -53,7 +53,7 @@ window.renderHolidays=function(){
         +'<div style="font-size:13px;font-weight:600;color:var(--txt);">'+esc(h.name)+'</div>'
         +'<div style="font-size:11px;color:var(--txt3);margin-top:2px;">'+dateDisp+' · <span style="color:'+(HOL_TYPE_COLOR[h.type]||'var(--violet)')+';">'+esc(HOL_TYPE_LABEL[h.type]||h.type)+'</span></div>'
         +'</div>'
-        +(window.ce()?'<div style="display:flex;gap:6px;flex-shrink:0;">'
+        +(window.canEdit('leave')?'<div style="display:flex;gap:6px;flex-shrink:0;">'
           +'<button class="btn btn-ghost btn-sm" onclick="window.openHolForm(\''+h.id+'\')">✏️</button>'
           +'<button class="btn btn-red btn-sm" onclick="window.deleteHoliday(\''+h.id+'\',\''+esc(h.name)+'\')">🗑</button>'
           +'</div>':'')
@@ -113,7 +113,7 @@ window.renderLeave=function(){
     return true;
   }).slice().sort(function(a,b){return(b.startDate||'').localeCompare(a.startDate||'');});
   var el=document.getElementById('leave-list');if(!el)return;
-  var isPM=window.ce(),isAdmin=window.isAdmin();
+  var isPM=window.canEdit('leave'),isAdmin=window.isAdmin();
   var today=new Date();today.setHours(0,0,0,0);
   var next7=new Date(today);next7.setDate(next7.getDate()+7);
 
@@ -284,7 +284,7 @@ window.openLeaveForm=function(id){
   var lv=id?window.LEAVES.find(function(x){return x.id===id;}):null;
   if(lv){
     if(lv.status==='approved'&&!window.isAdmin()){window.showAlert('ไม่สามารถแก้ไขการลาที่อนุมัติแล้วได้','warn');return;}
-    if(lv.status==='rejected'&&!window.ce()){window.showAlert('คุณไม่มีสิทธิ์แก้ไขรายการที่ไม่อนุมัติ','warn');return;}
+    if(lv.status==='rejected'&&!window.canEdit('leave')){window.showAlert('คุณไม่มีสิทธิ์แก้ไขรายการที่ไม่อนุมัติ','warn');return;}
   }
   document.getElementById('leave-edit-id').value=lv?lv.id:'';
   var _isViewerForm=window.cu&&window.cu.role==='viewer';
@@ -308,7 +308,7 @@ window.openLeaveForm=function(id){
   // สถานะ: Viewer เห็นแค่รออนุมัติ
   var stSel=document.getElementById('leavef-status');
   var stGroup=document.getElementById('leavef-status-group');
-  if(!window.ce()){
+  if(!window.canEdit('leave')){
     stSel.innerHTML='<option value="pending">⏳ รออนุมัติ</option>';
     stSel.value='pending';
     stGroup.style.display='none';
@@ -330,7 +330,7 @@ window._updateLeaveSubLabel=function(leaveType){
 };
 
 window.approveLeave=function(id){
-  if(!window.ce()){window.showAlert('เฉพาะ DM/PM เท่านั้นที่อนุมัติได้','warn');return;}
+  if(!window.canEdit('leave')){window.showAlert('เฉพาะ DM/PM เท่านั้นที่อนุมัติได้','warn');return;}
   var lv=window.LEAVES.find(function(x){return x.id===id;});
   if(!lv){return;}
   var stName=(window.STAFF.find(s=>s.id===lv.staffId)||{name:'?'}).name;
@@ -374,7 +374,7 @@ window.saveLeave=async function(){
 window.deleteLeave=function(id){
   var lv=window.LEAVES.find(function(x){return x.id===id;});
   if(lv&&lv.status==='approved'&&!window.isAdmin()){window.showAlert('ไม่สามารถลบการลาที่อนุมัติแล้วได้','warn');return;}
-  if(lv&&lv.status==='rejected'&&!window.ce()){window.showAlert('คุณไม่มีสิทธิ์ลบรายการที่ไม่อนุมัติ','warn');return;}
+  if(lv&&lv.status==='rejected'&&!window.canEdit('leave')){window.showAlert('คุณไม่มีสิทธิ์ลบรายการที่ไม่อนุมัติ','warn');return;}
   window.showConfirm('ลบรายการลางานนี้?',function(){
     deleteDoc(getDocRef('LEAVES',id)).catch(function(e){window.showDbError(e);});
   },{icon:'🗑',title:'ยืนยันการลบ',okColor:'var(--coral)',okText:'ลบ'});

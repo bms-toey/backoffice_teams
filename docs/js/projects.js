@@ -105,7 +105,7 @@ window.renderProjects=function(){
       ${revisitCell}
       ${advCells}
       ${ldStatusCell}
-      <td onclick="event.stopPropagation()"><div style="display:flex;gap:4px">${window.ce()?`<button class="btn btn-ghost btn-sm" onclick="window.openProjModal('${p.id}')">✏️</button>`:''}${window.ce()&&!hasLinked?`<button class="btn btn-red btn-sm" onclick="window.askDel('project','${p.id}','${esc(p.name)}')">🗑</button>`:''}</div></td>
+      <td onclick="event.stopPropagation()"><div style="display:flex;gap:4px">${window.canEdit('projects')?`<button class="btn btn-ghost btn-sm" onclick="window.openProjModal('${p.id}')">✏️</button>`:''}${window.canDel('projects')&&!hasLinked?`<button class="btn btn-red btn-sm" onclick="window.askDel('project','${p.id}','${esc(p.name)}')">🗑</button>`:''}</div></td>
     </tr>`;
   }).join('');
   if(!rows.length)tb.innerHTML=`<tr><td colspan="${colSpan}" style="text-align:center;padding:48px;color:var(--txt3);">ไม่พบข้อมูล</td></tr>`;
@@ -249,9 +249,9 @@ window.openProjModal=function(id){
   var displayProg=p?p.progress:0;
   if(isExecStg&&p&&p.start&&p.end){var sD=pd(p.start);var eD=pd(p.end);var tMs=eD-sD;if(tMs>0)displayProg=Math.min(100,Math.max(0,Math.round((now2-sD)/tMs*100)));}
   var pVal=p?(isExecStg?displayProg:p.progress):0;
-  var progTabHtml=p?('<div style="display:flex;align-items:center;gap:7px;margin-left:auto;padding-left:10px;border-left:1px solid var(--border);white-space:nowrap;"><span style="font-size:11px;color:var(--txt2);">ความคืบหน้า</span><span id="prog-lbl" style="font-size:13px;font-weight:700;color:var(--violet);">'+pVal+'%</span>'+(isExecStg?'<span style="font-size:10px;color:var(--txt3);" title="คำนวนอัตโนมัติ">⚡</span>':'')+(window.ce()?'<input type="range" id="pf-prog" min="0" max="100" value="'+pVal+'" style="width:72px;accent-color:var(--violet);cursor:pointer;"'+(isExecStg?' disabled':' oninput="document.getElementById(\'prog-lbl\').textContent=this.value+\'%\'"')+'>':'')+'</div>'):'';
-  var memberRows=mems.map(function(m){var st=gSt(m.sid);var j=window.STAFF.findIndex(function(s){return s.id===m.sid;});var overlaps=getStaffOverlaps(m.sid,m.s,m.e,window.editPid);var warnText=overlaps.length>0?overlapWarnText(overlaps):'';return`<div class="m-row" id="mr-${m.id}" data-sid="${m.sid}" style="padding:7px 8px;border-radius:8px;margin-bottom:4px;background:var(--surface2);"><div style="display:flex;align-items:center;gap:7px;"><div style="width:26px;height:26px;border-radius:50%;background:${avC(Math.max(j,0))};color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${st.name.charAt(0)}</div><span style="flex:1;font-size:11px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${esc(st.name)}${st.nickname?` <span style="color:var(--txt3);font-weight:400;">(${esc(st.nickname)})</span>`:''}</span>${window.ce()?`<button class="btn btn-red btn-sm" style="padding:2px 7px;font-size:11px;" onclick="window.pkuDeselect('${m.id}')">✕</button>`:''}</div>${window.ce()?`<input type="hidden" id="msid-${m.id}" value="${m.sid}"><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:5px;padding-left:33px;"><input type="date" class="f-input" style="padding:4px 6px;font-size:10px;" id="ms-${m.id}" value="${m.s}" onchange="window.checkMemOverlap('${m.id}')"><input type="date" class="f-input" style="padding:4px 6px;font-size:10px;" id="me-${m.id}" value="${m.e}" onchange="window.checkMemOverlap('${m.id}')"></div><div id="mwarn-${m.id}" style="font-size:10px;color:var(--coral);margin-top:3px;padding-left:33px;display:${warnText?'block':'none'}">${warnText}</div>`:''}</div>`;}).join('');
-  var ce=window.ce(),ceA=ce?'':'disabled';
+  var progTabHtml=p?('<div style="display:flex;align-items:center;gap:7px;margin-left:auto;padding-left:10px;border-left:1px solid var(--border);white-space:nowrap;"><span style="font-size:11px;color:var(--txt2);">ความคืบหน้า</span><span id="prog-lbl" style="font-size:13px;font-weight:700;color:var(--violet);">'+pVal+'%</span>'+(isExecStg?'<span style="font-size:10px;color:var(--txt3);" title="คำนวนอัตโนมัติ">⚡</span>':'')+(window.canEdit('projects')?'<input type="range" id="pf-prog" min="0" max="100" value="'+pVal+'" style="width:72px;accent-color:var(--violet);cursor:pointer;"'+(isExecStg?' disabled':' oninput="document.getElementById(\'prog-lbl\').textContent=this.value+\'%\'"')+'>':'')+'</div>'):'';
+  var memberRows=mems.map(function(m){var st=gSt(m.sid);var j=window.STAFF.findIndex(function(s){return s.id===m.sid;});var overlaps=getStaffOverlaps(m.sid,m.s,m.e,window.editPid);var warnText=overlaps.length>0?overlapWarnText(overlaps):'';return`<div class="m-row" id="mr-${m.id}" data-sid="${m.sid}" style="padding:7px 8px;border-radius:8px;margin-bottom:4px;background:var(--surface2);"><div style="display:flex;align-items:center;gap:7px;"><div style="width:26px;height:26px;border-radius:50%;background:${avC(Math.max(j,0))};color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${st.name.charAt(0)}</div><span style="flex:1;font-size:11px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${esc(st.name)}${st.nickname?` <span style="color:var(--txt3);font-weight:400;">(${esc(st.nickname)})</span>`:''}</span>${window.canEdit('projects')?`<button class="btn btn-red btn-sm" style="padding:2px 7px;font-size:11px;" onclick="window.pkuDeselect('${m.id}')">✕</button>`:''}</div>${window.canEdit('projects')?`<input type="hidden" id="msid-${m.id}" value="${m.sid}"><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:5px;padding-left:33px;"><input type="date" class="f-input" style="padding:4px 6px;font-size:10px;" id="ms-${m.id}" value="${m.s}" onchange="window.checkMemOverlap('${m.id}')"><input type="date" class="f-input" style="padding:4px 6px;font-size:10px;" id="me-${m.id}" value="${m.e}" onchange="window.checkMemOverlap('${m.id}')"></div><div id="mwarn-${m.id}" style="font-size:10px;color:var(--coral);margin-top:3px;padding-left:33px;display:${warnText?'block':'none'}">${warnText}</div>`:''}</div>`;}).join('');
+  var ce=window.canEdit('projects'),ceA=ce?'':'disabled';
   var hasDates=!!(p&&p.start&&p.end)||mems.length>0;
   var tabBar='<div id="pf-tabs" style="display:flex;gap:6px;align-items:center;padding:12px 24px;border-bottom:1px solid var(--border);margin:-24px -24px 20px;background:var(--surface);position:sticky;top:-24px;z-index:5;">'
     +'<button class="pf-tab-btn" data-tab="info" onclick="window.pfTab(\'info\')" style="background:var(--violet);color:#fff;border:1px solid var(--violet);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">📋 ข้อมูลโครงการ</button>'
@@ -292,7 +292,7 @@ window.openProjModal=function(id){
   document.getElementById('m-proj-body').innerHTML=tabBar+infoPane+teamPane+visitsPane;
   // Inject member rows into right panel (mem-list inside pickerHtml)
   if(ce){var ml=document.getElementById('mem-list');if(ml)ml.innerHTML=memberRows;}
-  document.getElementById('m-proj-foot').style.display=window.ce()?'':'none';
+  document.getElementById('m-proj-foot').style.display=window.canEdit('projects')?'':'none';
   window.openM('m-proj');
   window.updateProjFormByGroup(p?p.parentProjectId:'');
 }
@@ -307,7 +307,7 @@ window.updateTeamTabVisibility=function(){
   if(!hasDates){var tp=document.getElementById('pf-pane-team');if(tp&&tp.style.display!=='none')window.pfTab('info');}
 };
 window.pkuSelect=function(sid){
-  if(!window.ce())return;
+  if(!window.canEdit('projects'))return;
   var s=gSt(sid);var j=window.STAFF.findIndex(function(x){return x.id===sid;});
   var mid='M'+uid();var sdt=(document.getElementById('pf-start')||{}).value||'';var edt=(document.getElementById('pf-end')||{}).value||'';
   var overlaps=getStaffOverlaps(sid,sdt,edt,window.editPid);var warnText=overlaps.length>0?overlapWarnText(overlaps):'';
@@ -339,7 +339,7 @@ window.pkuSelect=function(sid){
   if(leaveC.length>0)window.showOverlapPopup('<span style="color:var(--amber)">'+leaveWarnText+'</span>');
 };
 window.pkuDeselect=function(mid){
-  if(!window.ce())return;
+  if(!window.canEdit('projects'))return;
   var row=document.getElementById('mr-'+mid);if(!row)return;
   var sid=row.getAttribute('data-sid');
   row.remove();
@@ -384,7 +384,7 @@ window.pfTab=function(tab){
   document.querySelectorAll('#pf-tabs .pf-tab-btn').forEach(function(el){var t=el.getAttribute('data-tab');var on=t===tab;el.style.background=on?'var(--violet)':'var(--surface2)';el.style.color=on?'#fff':'var(--txt2)';el.style.borderColor=on?'var(--violet)':'var(--border)';});
 };
 window.addMem=function(){
-  if(!window.ce())return;
+  if(!window.canEdit('projects'))return;
   var sel=document.getElementById('add-mem-sel');if(!sel||!sel.value)return;
   var sid=sel.value;var s=gSt(sid);var j=window.STAFF.findIndex(function(x){return x.id===sid;});
   var mid='M'+uid();var sdt=(document.getElementById('pf-start')||{}).value||'';var edt=(document.getElementById('pf-end')||{}).value||'';
@@ -394,7 +394,7 @@ window.addMem=function(){
   list.appendChild(div);
 }
 window.rmMem=function(mid){
-  if(!window.ce())return;
+  if(!window.canEdit('projects'))return;
   var el=document.getElementById('mr-'+mid);if(!el)return;
   var sidEl=document.getElementById('msid-'+mid);
   if(sidEl){
@@ -407,7 +407,7 @@ window.rmMem=function(mid){
 };
 
 window.saveProject=async function(){
-  if(!window.ce())return;if(!window.auth.currentUser)return;
+  if(!window.canEdit('projects'))return;if(!window.auth.currentUser)return;
   var name=(document.getElementById('pf-name')||{}).value||'';if(!name.trim())return;
   var pid=window.editPid||'P'+Date.now();
   var memDs=document.querySelectorAll('#mem-list > .m-row[id^="mr-"]');
@@ -427,7 +427,7 @@ window.saveProject=async function(){
 // ── VISITS (ฟังก์ชันเสริม: หลายรอบเข้าไซต์) ──
 window._visitCounter = 0;
 window.buildVisitsSection = function(p) {
-  if(!window.ce()) {
+  if(!window.canEdit('projects')) {
     // view-only: ถ้ามี visits แสดงสรุป
     if(!p||!p.visits||p.visits.length===0) return '';
     var html='<div class="f-group"><label class="f-label" style="color:var(--violet)">📍 รอบเข้าไซต์</label><div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">';

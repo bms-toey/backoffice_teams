@@ -31,7 +31,7 @@ window.renderKanban = function(){
       var urgColor=diffDays===null?'var(--txt3)':diffDays<0?'var(--coral)':diffDays<=7?'var(--coral)':diffDays<=15?'var(--amber)':'var(--txt3)';
       var endStr=p.end?fd(p.end):'—';
       var urgBadge=diffDays!==null&&diffDays<=15?`<span style="font-size:9px;font-weight:700;color:${urgColor};background:${urgColor}18;padding:1px 5px;border-radius:6px;">${diffDays<0?'ล่าช้า '+Math.abs(diffDays)+'ว':'เหลือ '+diffDays+'ว'}</span>`:'';
-      return`<div class="kb-card" draggable="${window.ce()}" ondragstart="window.kbDrag(event,'${p.id}')" onclick="window.openProjModal('${p.id}')">
+      return`<div class="kb-card" draggable="${window.canEdit('kanban')}" ondragstart="window.kbDrag(event,'${p.id}')" onclick="window.openProjModal('${p.id}')">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:7px;">
           <div style="display:flex;flex-wrap:wrap;gap:3px;">
             <span class="kb-card-type" style="background:${pt.color}18;color:${pt.color};margin:0">${esc(pt.label)}</span>
@@ -59,7 +59,7 @@ window.renderKanban = function(){
       ${totalBudget>0?`<div style="padding:6px 14px;font-size:10px;font-weight:700;color:${sg.color};background:${sg.color}08;border-bottom:1px solid ${sg.color}22;">${fc(totalBudget)}</div>`:''}
       <div class="kb-body">
         ${cards}
-        ${items.length===0?`<div class="kb-empty">${window.ce()?'ลากมาวาง':'ว่าง'}</div>`:''}
+        ${items.length===0?`<div class="kb-empty">${window.canEdit('kanban')?'ลากมาวาง':'ว่าง'}</div>`:''}
       </div></div>`;
   }).join('');
 }
@@ -170,7 +170,7 @@ window.stageForces100=function(stageId){
 window.kbDrop=async function(e,sid){
   e.preventDefault();
   document.querySelectorAll('.kb-col').forEach(function(c){c.classList.remove('kb-drop');});
-  if(!window.kbPid||!window.ce())return;
+  if(!window.kbPid||!window.canEdit('kanban'))return;
   if(!window.auth.currentUser)return;
   var p=window.PROJECTS.find(function(x){return x.id===window.kbPid;});
   if(p){
