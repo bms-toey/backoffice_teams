@@ -259,7 +259,9 @@ window.openProjModal=function(id){
     +'<button class="pf-tab-btn" data-tab="visits" onclick="window.pfTab(\'visits\')" style="background:var(--surface2);color:var(--txt2);border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">📍 รอบเข้าไซต์หลายช่วง'+(p&&p.visits&&p.visits.length>0?' ('+p.visits.length+')':'')+'</button>'
     +progTabHtml
     +'</div>';
+  var smartBtn=(!p&&ce)?'<div style="margin-bottom:16px;"><button type="button" onclick="window.openSmartSchedule()" style="width:100%;padding:11px 16px;background:linear-gradient(135deg,#7c5cfc,#4361ee);color:#fff;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 14px rgba(124,92,252,.35);"><span style="font-size:18px;">🤖</span><span>จัดงานอัจฉริยะ</span><span style="font-size:11px;font-weight:400;opacity:.85;">— ค้นหาช่วงเวลาว่างและทีมงานอัตโนมัติ</span></button></div>':'';
   var infoPane='<div id="pf-pane-info">'
+    +smartBtn
     +'<div class="f-group"><label class="f-label">ชื่อโครงการ *</label><input class="f-input" id="pf-name" value="'+esc(p?p.name:'')+'" placeholder="ชื่อโครงการ" '+ceA+'></div>'
     +'<div class="f-grid">'
     +'<div class="f-group"><label class="f-label">กลุ่มโครงการ</label><select class="f-input" id="pf-grp" onchange="window.updateProjFormByGroup(\'\')" '+ceA+'>'+grpOpts+'</select></div>'
@@ -404,6 +406,116 @@ window.rmMem=function(mid){
   }
   el.remove();
   var cnt=document.getElementById('pku-sel-cnt');if(cnt){var n=document.querySelectorAll('#mem-list .m-row').length;cnt.textContent=n>0?'('+n+')':'';}
+};
+
+// ── SMART SCHEDULE ──
+window._ssSlots = [];
+window.openSmartSchedule = function() {
+  var depts = [...new Set(window.STAFF.filter(function(s){return s.active!==false;}).map(function(s){return s.dept||'ไม่ระบุทีม';}))].sort(function(a,b){return a.localeCompare(b,'th');});
+  var deptChecks = depts.map(function(d){return'<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:3px 0;"><input type="checkbox" class="ss-dept-chk" value="'+esc(d)+'" checked style="width:14px;height:14px;accent-color:var(--violet);">'+esc(d)+'</label>';}).join('');
+  var ov=document.createElement('div');ov.id='ss-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10001;display:flex;align-items:center;justify-content:center;animation:fadeIn .15s ease;';
+  ov.innerHTML='<div style="background:var(--surface);border-radius:18px;padding:28px;max-width:540px;width:95%;max-height:92vh;overflow-y:auto;box-shadow:0 16px 56px rgba(0,0,0,.4);border:1px solid var(--border);">'
+    +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:22px;">'
+    +'<div style="width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#7c5cfc,#4361ee);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">🤖</div>'
+    +'<div><div style="font-size:17px;font-weight:700;color:var(--txt);">จัดงานอัจฉริยะ</div><div style="font-size:11px;color:var(--txt3);margin-top:2px;">ค้นหาช่วงเวลาที่พนักงานว่าง ไม่มีงานซ้อน</div></div>'
+    +'<button onclick="document.getElementById(\'ss-overlay\').remove()" style="margin-left:auto;background:none;border:none;font-size:20px;cursor:pointer;color:var(--txt3);line-height:1;">✕</button>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">'
+    +'<div class="f-group"><label class="f-label">ระยะเวลาโครงการ (สัปดาห์) *</label><input type="number" id="ss-weeks" class="f-input" value="2" min="1" max="52"></div>'
+    +'<div class="f-group"><label class="f-label">ค้นหาล่วงหน้าสูงสุด (สัปดาห์)</label><input type="number" id="ss-lookahead" class="f-input" value="16" min="4" max="52"></div>'
+    +'</div>'
+    +'<div class="f-group" style="margin-bottom:16px;">'
+    +'<label class="f-label">แผนกที่ต้องการ</label>'
+    +'<div style="display:flex;gap:8px;margin-bottom:8px;">'
+    +'<button onclick="window.ssDeptAll(true)" style="font-size:11px;padding:3px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--txt2);">เลือกทั้งหมด</button>'
+    +'<button onclick="window.ssDeptAll(false)" style="font-size:11px;padding:3px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--txt2);">ยกเลิกทั้งหมด</button>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;max-height:140px;overflow-y:auto;padding:10px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);">'+deptChecks+'</div>'
+    +'</div>'
+    +'<button onclick="window.runSmartSchedule()" style="width:100%;padding:12px;background:linear-gradient(135deg,#7c5cfc,#4361ee);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:16px;">🔍 ค้นหาช่วงเวลาที่ว่าง</button>'
+    +'<div id="ss-results"></div>'
+    +'</div>';
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
+  document.body.appendChild(ov);
+};
+
+window.ssDeptAll = function(check) {
+  document.querySelectorAll('#ss-overlay .ss-dept-chk').forEach(function(el){el.checked=check;});
+};
+
+window.runSmartSchedule = function() {
+  var weeks=parseInt((document.getElementById('ss-weeks')||{}).value)||2;
+  var lookahead=parseInt((document.getElementById('ss-lookahead')||{}).value)||16;
+  var selDepts=Array.from(document.querySelectorAll('#ss-overlay .ss-dept-chk:checked')).map(function(el){return el.value;});
+  var resEl=document.getElementById('ss-results');
+  if(!selDepts.length){resEl.innerHTML='<div style="color:var(--coral);font-size:12px;text-align:center;padding:16px;">กรุณาเลือกอย่างน้อย 1 แผนก</div>';return;}
+  var targetStaff=window.STAFF.filter(function(s){return s.active!==false&&selDepts.includes(s.dept||'ไม่ระบุทีม');});
+  if(!targetStaff.length){resEl.innerHTML='<div style="color:var(--amber);font-size:12px;text-align:center;padding:16px;">ไม่พบพนักงานในแผนกที่เลือก</div>';return;}
+  resEl.innerHTML='<div style="text-align:center;padding:20px;color:var(--txt3);font-size:13px;">⏳ กำลังค้นหา...</div>';
+  // Start from tomorrow
+  var today=new Date();today.setHours(0,0,0,0);
+  var startSearch=new Date(today);startSearch.setDate(startSearch.getDate()+1);
+  // Snap to next Monday
+  var dow=startSearch.getDay();if(dow!==1){var toMon=dow===0?1:(8-dow);startSearch.setDate(startSearch.getDate()+toMon);}
+  var durationDays=weeks*7;
+  var slots=[];
+  for(var off=0;off<lookahead*7;off+=7){
+    var sl=new Date(startSearch);sl.setDate(sl.getDate()+off);
+    var se=new Date(sl);se.setDate(se.getDate()+durationDays-1);
+    var sStr=sl.toISOString().slice(0,10);var eStr=se.toISOString().slice(0,10);
+    var holCnt=(window.HOLIDAYS||[]).filter(function(h){if(!h.date)return false;var hd=pd(h.date);return hd>=sl&&hd<=se;}).length;
+    var free=[],busy=[];
+    targetStaff.forEach(function(s){
+      var ov2=window.getStaffOverlaps(s.id,sStr,eStr,window.editPid||'');
+      var lv=window.getStaffLeaveConflicts(s.id,sStr,eStr);
+      if(ov2.length===0&&lv.length===0)free.push(s);
+      else busy.push({staff:s,overlaps:ov2,leaves:lv});
+    });
+    slots.push({start:sStr,end:eStr,freeStaff:free,busyStaff:busy,holCnt:holCnt,score:free.length*10-holCnt*2});
+  }
+  slots.sort(function(a,b){return b.score-a.score;});
+  window._ssSlots=slots;
+  var top=slots.slice(0,5);
+  if(!top.length||top[0].freeStaff.length===0){resEl.innerHTML='<div style="color:var(--amber);font-size:12px;text-align:center;padding:16px;">⚠ ไม่พบช่วงเวลาที่พนักงานว่างพร้อมกัน ลองเพิ่มสัปดาห์ค้นหาหรือลดจำนวนแผนก</div>';return;}
+  var html='<div style="font-size:11px;font-weight:600;color:var(--txt3);margin-bottom:10px;">ผลลัพธ์ที่แนะนำ (เรียงตามความพร้อมของทีม)</div>';
+  top.forEach(function(r,i){
+    var freeNm=r.freeStaff.map(function(s){return s.nickname||s.name.split(' ')[0];}).join(', ');
+    var borderCol=i===0?'var(--teal)':i===1?'var(--violet)':'var(--border)';
+    html+='<div style="background:var(--surface2);border-radius:10px;padding:13px 14px;margin-bottom:8px;border:1px solid var(--border);border-left:4px solid '+borderCol+';">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px;">'
+      +'<div>'
+      +'<span style="font-size:13px;font-weight:700;color:var(--txt);">📅 '+fd(r.start)+' → '+fd(r.end)+'</span>'
+      +(i===0?'<span style="display:inline-block;font-size:9px;background:var(--teal);color:#fff;padding:1px 7px;border-radius:10px;margin-left:7px;vertical-align:middle;font-weight:700;">✨ แนะนำ</span>':'')
+      +'</div>'
+      +'<button onclick="window.applySmartSlot('+i+')" style="padding:6px 16px;background:linear-gradient(135deg,#7c5cfc,#4361ee);color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;">✓ เลือก</button>'
+      +'</div>'
+      +(r.freeStaff.length>0?'<div style="font-size:11px;color:var(--teal);margin-bottom:2px;">✅ ว่าง '+r.freeStaff.length+' คน'+(freeNm?' — <span style="color:var(--txt2);">'+esc(freeNm)+'</span>':'')+'</div>':'')
+      +(r.busyStaff.length>0?'<div style="font-size:10px;color:var(--amber);">⏳ ติดงานอื่น '+r.busyStaff.length+' คน</div>':'')
+      +(r.holCnt>0?'<div style="font-size:10px;color:var(--coral);">🎌 มีวันหยุดในช่วงนี้ '+r.holCnt+' วัน</div>':'')
+      +'</div>';
+  });
+  resEl.innerHTML=html;
+};
+
+window.applySmartSlot = function(idx) {
+  var r=window._ssSlots[idx];if(!r)return;
+  var startEl=document.getElementById('pf-start');var endEl=document.getElementById('pf-end');
+  if(startEl)startEl.value=r.start;
+  if(endEl)endEl.value=r.end;
+  // Trigger onchange to update mem dates + team tab visibility
+  if(startEl)startEl.dispatchEvent(new Event('change'));
+  if(endEl)endEl.dispatchEvent(new Event('change'));
+  window.updateTeamTabVisibility();
+  // Add free staff to team (silent, no duplicate)
+  r.freeStaff.forEach(function(s){
+    var existing=document.querySelector('#mem-list .m-row[data-sid="'+s.id+'"]');
+    if(!existing)window.pkuSelect(s.id);
+  });
+  // Switch to team tab
+  setTimeout(function(){window.pfTab('team');},50);
+  var ov=document.getElementById('ss-overlay');if(ov)ov.remove();
+  window.showAlert('กำหนดช่วง '+fd(r.start)+' → '+fd(r.end)+'\nทีมงาน '+r.freeStaff.length+' คนเรียบร้อย ✓','success');
 };
 
 window.saveProject=async function(){

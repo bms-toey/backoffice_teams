@@ -2,8 +2,8 @@ import { getFirestore, setDoc, deleteDoc } from "https://www.gstatic.com/firebas
 const db = getFirestore();
 const { esc, fd, fc, fca, pd, gS, gT, gG, gSt, gC, avC, uid, getFY, getYearBE, getStaffOverlaps, overlapWarnText, getStaffLeaveConflicts, getColRef, getDocRef } = window;
 // ── HOLIDAYS ──
-var HOL_TYPE_LABEL={national:'🇹🇭 วันหยุดราชการ',company:'🏢 วันหยุดบริษัท',custom:'⭐ อื่นๆ'};
-var HOL_TYPE_COLOR={national:'var(--coral)',company:'var(--violet)',custom:'var(--amber)'};
+var HOL_TYPE_LABEL={national:'🇹🇭 วันหยุดราชการ',company:'🏢 วันหยุดบริษัท',both:'🎌 วันหยุดราชการ/วันหยุดบริษัท',custom:'⭐ อื่นๆ'};
+var HOL_TYPE_COLOR={national:'var(--coral)',company:'var(--violet)',both:'var(--teal)',custom:'var(--amber)'};
 
 window.renderHolidays=function(){
   var yf=document.getElementById('hol-yr');
@@ -24,7 +24,7 @@ window.renderHolidays=function(){
   // summary
   var sumEl=document.getElementById('hol-summary');
   if(sumEl){
-    var byType={national:list.filter(function(h){return h.type==='national';}).length,company:list.filter(function(h){return h.type==='company';}).length,custom:list.filter(function(h){return(h.type||'custom')==='custom';}).length};
+    var byType={national:list.filter(function(h){return h.type==='national';}).length,company:list.filter(function(h){return h.type==='company';}).length,both:list.filter(function(h){return h.type==='both';}).length,custom:list.filter(function(h){return(h.type||'custom')==='custom';}).length};
     sumEl.innerHTML='<div style="display:flex;gap:10px;flex-wrap:wrap;">'+
       Object.entries(byType).map(function(e){if(!e[1])return'';return'<div style="display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:6px 14px;font-size:12px;">'+(HOL_TYPE_LABEL[e[0]]||e[0])+'<span style="font-weight:700;color:'+HOL_TYPE_COLOR[e[0]]+';">'+e[1]+' วัน</span></div>';}).join('')+
       '<div style="display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:6px 14px;font-size:12px;">ทั้งหมด <span style="font-weight:700;color:var(--violet);">'+list.length+' วัน</span></div>'+
@@ -437,7 +437,7 @@ window._holParseRows=function(rows){
     if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return;
     // normalize BE → CE
     var dy=Number(date.slice(0,4));if(dy>=2500)date=(dy-543)+date.slice(4);
-    if(!['national','company','custom'].includes(type))type='national';
+    if(!['national','company','both','custom'].includes(type))type='national';
     result.push({name:name,date:date,type:type});
   });
   return result;

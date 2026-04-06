@@ -205,6 +205,7 @@
                 <option value="progress_asc">📊 คืบหน้า น้อยก่อน</option>
                 <option value="name_asc">🔤 ชื่อ ก→ฮ</option>
               </select>
+              <button class="btn btn-ghost btn-sm" onclick="window.exportOvExcel()" title="Export ตารางโครงการเป็น Excel" style="white-space:nowrap;">📥 Export Excel</button>
             </div>
             <div style="overflow-x:auto;">
               <table class="t-table" style="min-width:820px;">
@@ -347,6 +348,8 @@
             <input type="checkbox" id="cal-only-active" checked onchange="window.renderCalendar()"> แสดงเฉพาะคนที่มีงาน
           </label>
           <button class="btn btn-ghost btn-sm" id="cal-fs-btn" onclick="window.toggleCalFullscreen()" style="margin-left:4px;padding:5px 10px;font-size:12px;" title="ขยายเต็มจอ">⛶ เต็มจอ</button>
+          <button class="btn btn-ghost btn-sm" id="cal-sync-btn" onclick="window.gcalSync()" style="margin-left:4px;padding:5px 10px;font-size:12px;border:1.5px solid var(--border);" title="เชื่อมต่อ Google Calendar แล้วซิงค์งาน">🔄 Sync GCal</button>
+          <button id="cal-sync-disconnect" onclick="window.gcalDisconnect()" style="display:none;margin-left:2px;padding:4px 7px;font-size:11px;background:none;border:1px solid #ccc;border-radius:6px;color:var(--txt3);cursor:pointer;" title="ยกเลิกการเชื่อมต่อ Google Calendar">✕</button>
         </div>
         <div class="tl-wrap" id="cal-grid"></div>
       </div>
@@ -690,6 +693,7 @@
           <select class="f-input" id="holf-type">
             <option value="national">🇹🇭 วันหยุดราชการ</option>
             <option value="company">🏢 วันหยุดบริษัท</option>
+            <option value="both">🎌 วันหยุดราชการ/วันหยุดบริษัท</option>
             <option value="custom">⭐ อื่นๆ</option>
           </select>
         </div>
@@ -1099,4 +1103,5 @@
 <script type="module" src="js/timesheet.js"></script>
 <script type="module" src="js/cost.js"></script>
 <script type="module" src="js/modals.js"></script>
+<script type="module" src="js/gcal.js"></script>
 </body>

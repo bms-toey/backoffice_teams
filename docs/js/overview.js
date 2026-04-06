@@ -156,8 +156,9 @@ window.renderOvTable = function() {
     return 0;
   });
   var now=new Date();now.setHours(0,0,0,0);
+  window._ovTableRows = rows;
   var tb=document.getElementById('ov-tbl-rows');if(!tb)return;
-  tb.innerHTML=rows.map(function(p){
+  tb.innerHTML=rows.map(function(p,_ri){
     var sg=gS(p.stage);var pt=gT(p.typeId);var pg=gG(p.groupId);
     var endDate=p.end?pd(p.end):null;
     var diffDays=endDate?Math.ceil((endDate-now)/(1000*60*60*24)):null;
@@ -185,5 +186,77 @@ window.renderOvTable = function() {
       <td style="text-align:right;font-size:12px;font-weight:700;">${p.cost?fc(p.cost):'<span style="color:var(--txt3)">—</span>'}</td>
     </tr>`;
   }).join('')||'<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--txt3);">ไม่พบข้อมูล</td></tr>';
+};
+
+window.exportOvExcel = function() {
+  if(!window.XLSX){ window.showAlert('XLSX library ยังโหลดไม่เสร็จ กรุณารอสักครู่','warn'); return; }
+  var rows = window._ovTableRows || [];
+  if(!rows.length){ window.showAlert('ไม่มีข้อมูลโครงการตามตัวกรองที่เลือก','info'); return; }
+
+  var now = new Date(); now.setHours(0,0,0,0);
+
+  // Build header
+  var headers = [
+    'ลำดับ','ชื่อโครงการ','เจ้าของสถานที่','ประเภทโครงการ','กลุ่มโครงการ',
+    'Stage','วันเริ่มต้น','วันสิ้นสุด','คงเหลือ (วัน)',
+    'PM','ทีมงาน','ความคืบหน้า (%)','งบประมาณ (฿)','สถานะ','หมายเหตุ'
+  ];
+
+  var data = rows.map(function(p, i) {
+    var sg = gS(p.stage);
+    var pt = gT(p.typeId);
+    var pg = gG(p.groupId);
+    var pmStaff = window.STAFF.find(function(s){ return s.id === p.pm; });
+    var mems = (p.members && p.members.length > 0 ? p.members : p.team.map(function(id){ return {sid:id}; }));
+    var teamNames = mems.map(function(m){
+      var s = window.STAFF.find(function(x){ return x.id === m.sid; });
+      return s ? s.name : '';
+    }).filter(Boolean).join(', ');
+    var endDate = p.end ? pd(p.end) : null;
+    var diffDays = endDate ? Math.ceil((endDate - now) / (1000*60*60*24)) : null;
+    var statusText = p.status === 'cancelled' ? 'ยกเลิก'
+      : p.progress === 100 || p.stage === 'close' ? 'เสร็จสิ้น'
+      : diffDays === null ? 'ไม่ระบุ'
+      : diffDays < 0 ? 'ล่าช้า ' + Math.abs(diffDays) + ' วัน'
+      : diffDays <= 15 ? 'เสี่ยง (' + diffDays + ' วัน)'
+      : 'ปกติ';
+
+    return [
+      i + 1,
+      p.name || '',
+      p.siteOwner || '',
+      pt ? pt.label : '',
+      pg ? pg.label : '',
+      sg ? sg.label : '',
+      p.start || '',
+      p.end || '',
+      diffDays !== null ? diffDays : '',
+      pmStaff ? pmStaff.name : '',
+      teamNames,
+      p.progress || 0,
+      p.cost || 0,
+      statusText,
+      p.note || '',
+    ];
+  });
+
+  var wsData = [headers].concat(data);
+  var ws = window.XLSX.utils.aoa_to_sheet(wsData);
+
+  // Column widths
+  ws['!cols'] = [
+    {wch:6},{wch:35},{wch:20},{wch:16},{wch:16},
+    {wch:14},{wch:14},{wch:14},{wch:12},
+    {wch:16},{wch:30},{wch:14},{wch:16},{wch:16},{wch:30}
+  ];
+
+  var wb = window.XLSX.utils.book_new();
+  window.XLSX.utils.book_append_sheet(wb, ws, 'Projects');
+
+  // File name: projects_YYYY-MM-DD.xlsx
+  var today = new Date();
+  var fname = 'projects_' + today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0') + '.xlsx';
+  window.XLSX.writeFile(wb, fname);
+  window.showAlert('Export ' + rows.length + ' โครงการเรียบร้อย ✓', 'success');
 };
 
