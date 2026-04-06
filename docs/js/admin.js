@@ -38,11 +38,22 @@ function renderAdm(){
       </div>`;
     }
     c.innerHTML=
-      `<div style="display:flex;justify-content:flex-end;margin-bottom:20px">${window.isAdmin()?`<button class="btn btn-pri" onclick="window.admStaffForm(null)">+ เพิ่มพนักงาน</button>`:''}</div>`+
+      `<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:20px">${window.isAdmin()?`<button class="btn btn-ghost" onclick="window.openStaffImport()">📥 นำเข้าข้อมูล</button><button class="btn btn-pri" onclick="window.admStaffForm(null)">+ เพิ่มพนักงาน</button>`:''}</div>`+
       `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">`+
       activeStaff.map(staffCard).join('')+
       inactiveStaff.map(staffCard).join('')+
       `</div>`;
+  }
+  else if(window.admCur==='dept'){
+    if(titleEl)titleEl.innerHTML=`🏢 ข้อมูลแผนก <span class="tag" style="background:var(--surface2);color:var(--txt3);margin-left:10px;font-size:11px;">${window.DEPT_LIST.length} แผนก</span>`;
+    c.innerHTML=`<div style="display:flex;justify-content:flex-end;margin-bottom:20px">${window.isAdmin()?`<button class="btn btn-pri" onclick="window.admDeptForm(null)">+ เพิ่มแผนก</button>`:''}</div><div style="display:flex;flex-direction:column;gap:8px;max-width:640px;">`+
+    window.DEPT_LIST.map(function(d,i){
+      return`<div class="fade" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:14px;transition:all .2s;" onmouseover="this.style.borderColor='var(--violet)';this.style.background='var(--surface2)'" onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--surface)'">
+        <div style="width:28px;height:28px;border-radius:8px;background:var(--violet)18;color:var(--violet);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;">${i+1}</div>
+        <div style="flex:1;font-size:14px;font-weight:500;color:var(--txt);">🏢 ${esc(d.label)}</div>
+        ${window.isAdmin()?`<div style="display:flex;gap:6px;"><button class="btn btn-ghost btn-sm" onclick="window.admDeptForm('${d.id}')">✏️</button><button class="btn btn-red btn-sm" onclick="window.askDel('department','${d.id}','${esc(d.label)}')">🗑</button></div>`:''}
+      </div>`;
+    }).join('')+`</div>`;
   }
   else if(window.admCur==='groups'){if(titleEl)titleEl.innerHTML=`📂 กลุ่มโครงการ`;c.innerHTML=`<div style="display:flex;justify-content:flex-end;margin-bottom:20px">${window.isAdmin()?`<button class="btn btn-pri" onclick="window.admGroupForm(null)">+ เพิ่มกลุ่มโครงการ</button>`:''}</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">`+window.PGROUPS.map(function(g){return`<div class="adm-card fade"><div style="width:40px;height:40px;border-radius:10px;background:${g.color};flex-shrink:0;box-shadow:0 4px 12px ${g.color}55;"></div><div class="adm-card-info"><div style="font-size:14px;font-weight:600;color:var(--txt)">${esc(g.label)}</div><div style="display:flex;align-items:center;gap:6px;margin-top:4px;"><div style="width:10px;height:10px;border-radius:50%;background:${g.color};"></div><span style="font-size:11px;font-weight:400;color:var(--txt3)">${g.color}</span></div></div><div class="adm-card-actions">${window.isAdmin()?`<button class="btn btn-ghost btn-sm" onclick="window.admGroupForm('${g.id}')">✏️</button><button class="btn btn-red btn-sm" onclick="window.askDel('group','${g.id}','${esc(g.label)}')">🗑</button>`:''}</div></div>`;}).join('')+`</div>`;}
   else if(window.admCur==='types'){if(titleEl)titleEl.innerHTML=`🏷️ ประเภทงาน`;c.innerHTML=`<div style="display:flex;justify-content:flex-end;margin-bottom:20px">${window.isAdmin()?`<button class="btn btn-pri" onclick="window.admTypeForm(null)">+ เพิ่มประเภทงาน</button>`:''}</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">`+window.PTYPES.map(function(t){return`<div class="adm-card fade"><div style="width:40px;height:40px;border-radius:10px;background:${t.color};flex-shrink:0;box-shadow:0 4px 12px ${t.color}55;"></div><div class="adm-card-info"><div style="font-size:14px;font-weight:600;color:var(--txt)">${esc(t.label)}</div><div style="display:flex;align-items:center;gap:6px;margin-top:4px;"><div style="width:10px;height:10px;border-radius:50%;background:${t.color};"></div><span style="font-size:11px;font-weight:400;color:var(--txt3)">${t.color}</span></div></div><div class="adm-card-actions">${window.isAdmin()?`<button class="btn btn-ghost btn-sm" onclick="window.admTypeForm('${t.id}')">✏️</button><button class="btn btn-red btn-sm" onclick="window.askDel('type','${t.id}','${esc(t.label)}')">🗑</button>`:''}</div></div>`;}).join('')+`</div>`;}
@@ -161,6 +172,26 @@ window.saveAdmPosition=async function(){
   setDoc(getDocRef('POSITIONS',pid),{position_id:pid,label_th:l.trim(),daily_rate:rate}).catch(e=>window.showDbError(e));
 }
 
+window._editDeptId=null;
+window.admDeptForm=function(id){
+  var realId=(id&&id!=='null'&&id!=='')?id:null;
+  window._editDeptId=realId;
+  var d=realId?window.DEPT_LIST.find(function(x){return x.id===realId;}):null;
+  document.getElementById('m-dept-icon').textContent=d?'✏️':'🏢';
+  document.getElementById('m-dept-title').textContent=d?'แก้ไขแผนก':'เพิ่มแผนก';
+  setIdBadge('m-dept-id-badge', realId);
+  document.getElementById('adf-lbl').value=d?d.label:'';
+  window.openM('m-department');
+}
+window.saveAdmDept=async function(){
+  if(!window.isAdmin()||!window.auth.currentUser)return;
+  var l=(document.getElementById('adf-lbl')||{}).value||'';if(!l.trim())return;
+  var did=window._editDeptId||'DEPT'+Date.now();
+  window.closeM('m-department');
+  window.admTab('dept');
+  setDoc(getDocRef('DEPARTMENTS',did),{dept_id:did,label_th:l.trim()}).catch(e=>window.showDbError(e));
+}
+
 window.saveAllowanceRates=async function(){
   if(!window.isAdmin()||!window.auth.currentUser)return;
   var data={
@@ -202,13 +233,20 @@ window.saveAdmStage=async function(){
 }
 window.stgDragId=null;window.stgDrag=function(e,id){window.stgDragId=id;}
 window.stgDrop=async function(e,targetId){e.preventDefault();if(!window.stgDragId||window.stgDragId===targetId||!window.isAdmin())return;let arr=[...window.STAGES];let fromIdx=arr.findIndex(x=>x.id===window.stgDragId);let toIdx=arr.findIndex(x=>x.id===targetId);if(fromIdx<0||toIdx<0)return;let[moved]=arr.splice(fromIdx,1);arr.splice(toIdx,0,moved);arr.forEach((s,i)=>s.order=i+1);window.STAGES=arr;window.admTab('stages');try{const batch=writeBatch(db);arr.forEach(s=>{batch.update(getDocRef('STAGES',s.id),{order:s.order});});await batch.commit();}catch(err){window.showDbError(err);}window.stgDragId=null;}
+window.openStaffImport=function(){
+  document.getElementById('import-file').value='';
+  document.getElementById('import-msg').innerHTML='รองรับเฉพาะไฟล์ .csv เท่านั้น';
+  document.getElementById('import-type').value='STAFF';
+  window.updateImportPreview();
+  window.openM('m-import');
+}
 window._editStaffId = null;
 window.admStaffForm=function(id){
   var realId = (id && id !== 'null' && id !== '') ? id : null;
   window._editStaffId = realId;
   var s = realId ? window.STAFF.find(function(x){return x.id===realId;}) : null;
-  var deptOpts=window.DEPARTMENTS.map(function(d){return`<option value="${esc(d)}">`;}).join('');
-  var posOpts=window.POSITIONS.map(function(p){return`<option value="${esc(p.label)}">`;}).join('');
+  var deptOpts=`<option value="">-- เลือกแผนก --</option>`+window.DEPT_LIST.map(function(d){return`<option value="${esc(d.label)}"${s&&s.dept===d.label?' selected':''}>🏢 ${esc(d.label)}</option>`;}).join('');
+  var posOpts=`<option value="">-- เลือกตำแหน่ง --</option>`+window.POSITIONS.map(function(p){return`<option value="${esc(p.label)}"${s&&s.role===p.label?' selected':''}>💼 ${esc(p.label)}</option>`;}).join('');
   var iconEl=document.getElementById('m-staff-icon');
   var titleEl=document.getElementById('m-staff-title');
   if(iconEl) iconEl.textContent = s ? '✏️' : '👤';
@@ -226,8 +264,8 @@ window.admStaffForm=function(id){
     <div class="f-grid">
       <div class="f-group"><label class="f-label">ชื่อ-นามสกุล *</label><input class="f-input" id="asf-name" value="${esc(s?s.name:'')}" placeholder="ชื่อ-นามสกุล"></div>
       <div class="f-group"><label class="f-label">ชื่อเล่น</label><input class="f-input" id="asf-nick" value="${esc(s?s.nickname:'')}" placeholder="ชื่อเล่น"></div>
-      <div class="f-group"><label class="f-label">แผนก</label><input type="text" class="f-input" id="asf-dept" list="dl-depts" value="${esc(s?s.dept:'')}" placeholder="เลือกหรือพิมพ์..."><datalist id="dl-depts">${deptOpts}</datalist></div>
-      <div class="f-group"><label class="f-label">ตำแหน่ง</label><input type="text" class="f-input" id="asf-role" list="dl-pos" value="${esc(s?s.role:'')}" placeholder="เลือกหรือพิมพ์..."><datalist id="dl-pos">${posOpts}</datalist></div>
+      <div class="f-group"><label class="f-label">แผนก</label><select class="f-input" id="asf-dept">${deptOpts}</select></div>
+      <div class="f-group"><label class="f-label">ตำแหน่ง</label><select class="f-input" id="asf-role">${posOpts}</select></div>
       <div class="f-group"><label class="f-label">Email</label><input class="f-input" id="asf-email" value="${esc(s?s.email:'')}" placeholder="email@company.com"></div>
       <div class="f-group"><label class="f-label">เบอร์โทร</label><input class="f-input" id="asf-phone" value="${esc(s?s.phone:'')}" placeholder="08X-XXX-XXXX"></div>
       <div class="f-group"><label class="f-label">วันเริ่มงาน</label><input type="date" class="f-input" id="asf-start" value="${s&&s.start_date?s.start_date:''}"></div>

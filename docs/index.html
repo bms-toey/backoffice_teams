@@ -547,6 +547,7 @@
         </div>
         <div class="adm-nav" id="adm-tabs">
           <div class="adm-nav-item on" id="at-staff" onclick="window.admTab('staff')"><span class="adm-nav-icon">👥</span> พนักงาน</div>
+          <div class="adm-nav-item" id="at-dept" onclick="window.admTab('dept')"><span class="adm-nav-icon">🏢</span> แผนก</div>
           <div class="adm-nav-item" id="at-groups" onclick="window.admTab('groups')"><span class="adm-nav-icon">📂</span> กลุ่มโครงการ</div>
           <div class="adm-nav-item" id="at-types" onclick="window.admTab('types')"><span class="adm-nav-icon">🏷️</span> ประเภทงาน</div>
           <div class="adm-nav-item" id="at-positions" onclick="window.admTab('positions')"><span class="adm-nav-icon">💼</span> ตำแหน่ง</div>
@@ -665,6 +666,28 @@
     <div class="m-foot">
       <button class="btn btn-ghost" onclick="window.closeM('m-position')">ยกเลิก</button>
       <button class="btn btn-pri" onclick="window.saveAdmPosition()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- DEPARTMENT MODAL -->
+<div class="overlay" id="m-department">
+  <div class="modal md" style="max-width:420px">
+    <div class="m-head">
+      <div class="m-icon" style="background:rgba(76,201,240,.12)" id="m-dept-icon">🏢</div>
+      <div class="m-title" id="m-dept-title">เพิ่มแผนก</div>
+      <span id="m-dept-id-badge" style="display:none;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--txt3);background:var(--surface2);border:1px solid var(--border);padding:3px 8px;border-radius:6px;margin-left:auto;margin-right:8px;white-space:nowrap;"></span>
+      <button class="m-x" onclick="window.closeM('m-department')">✕</button>
+    </div>
+    <div class="m-body">
+      <div class="f-group">
+        <label class="f-label">ชื่อแผนก *</label>
+        <input class="f-input" id="adf-lbl" placeholder="เช่น IT, Finance, HR...">
+      </div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-ghost" onclick="window.closeM('m-department')">ยกเลิก</button>
+      <button class="btn btn-pri" onclick="window.saveAdmDept()">💾 บันทึก</button>
     </div>
   </div>
 </div>
@@ -1062,6 +1085,7 @@
           <option value="PGROUPS">📂 กลุ่มโครงการ (Groups)</option>
           <option value="PTYPES">🏷 ประเภทงาน (Types)</option>
           <option value="POSITIONS">💼 ตำแหน่งงาน (Positions)</option>
+          <option value="DEPARTMENTS">🏢 แผนก (Departments)</option>
         </select>
       </div>
       <div style="margin-bottom:20px; padding:16px; background:var(--surface2); border-radius:12px; border:1px dashed var(--border);">

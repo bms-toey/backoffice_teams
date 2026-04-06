@@ -197,9 +197,10 @@ window.exportOvExcel = function() {
 
   // Build header
   var headers = [
-    'ลำดับ','ชื่อโครงการ','เจ้าของสถานที่','ประเภทโครงการ','กลุ่มโครงการ',
-    'Stage','วันเริ่มต้น','วันสิ้นสุด','คงเหลือ (วัน)',
-    'PM','ทีมงาน','ความคืบหน้า (%)','งบประมาณ (฿)','สถานะ','หมายเหตุ'
+    'ลำดับ','ชื่อโครงการ','กลุ่มโครงการ','ประเภทโครงการ',
+    'เจ้าของไซต์','ชื่อผู้ติดตั้ง',
+    'Stage','วันเริ่มต้น','วันสิ้นสุด','Revisit 1','Revisit 2','คงเหลือ (วัน)',
+    'พื้นที่ชายแดน','งบประมาณ (฿)','ความคืบหน้า (%)','ทีมงาน','สถานะ','หมายเหตุ'
   ];
 
   var data = rows.map(function(p, i) {
@@ -224,17 +225,20 @@ window.exportOvExcel = function() {
     return [
       i + 1,
       p.name || '',
-      p.siteOwner || '',
-      pt ? pt.label : '',
       pg ? pg.label : '',
+      pt ? pt.label : '',
+      p.siteOwner || '',
+      p.installer || '',
       sg ? sg.label : '',
       p.start || '',
       p.end || '',
+      p.revisit1 || '',
+      p.revisit2 || '',
       diffDays !== null ? diffDays : '',
-      pmStaff ? pmStaff.name : '',
-      teamNames,
-      p.progress || 0,
+      p.isBorder ? 'ใช่' : 'ไม่ใช่',
       p.cost || 0,
+      p.progress || 0,
+      teamNames,
       statusText,
       p.note || '',
     ];
@@ -245,9 +249,10 @@ window.exportOvExcel = function() {
 
   // Column widths
   ws['!cols'] = [
-    {wch:6},{wch:35},{wch:20},{wch:16},{wch:16},
-    {wch:14},{wch:14},{wch:14},{wch:12},
-    {wch:16},{wch:30},{wch:14},{wch:16},{wch:16},{wch:30}
+    {wch:6},{wch:35},{wch:18},{wch:18},
+    {wch:20},{wch:20},
+    {wch:14},{wch:14},{wch:14},{wch:14},{wch:14},{wch:12},
+    {wch:14},{wch:16},{wch:14},{wch:35},{wch:16},{wch:30}
   ];
 
   var wb = window.XLSX.utils.book_new();

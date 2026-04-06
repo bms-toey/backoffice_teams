@@ -212,6 +212,9 @@ window.openProjModal=function(id){
   function _ownerPri(r){if(!r)return 99;if(r.includes('ผู้จัดการ'))return 1;if(r.includes('หัวหน้า'))return 2;return 3;}
   var ownerStaff=window.STAFF.filter(function(s){return s.active!==false&&s.role&&(s.role.includes('ผู้จัดการ')||s.role.includes('หัวหน้า'));}).slice().sort(function(a,b){var pa=_ownerPri(a.role),pb=_ownerPri(b.role);if(pa!==pb)return pa-pb;return(a.name||'').localeCompare(b.name||'','th');});
   var ownerOpts='<option value="">-- เลือกเจ้าของไซต์ --</option>'+ownerStaff.map(function(s){return`<option value="${esc(s.name)}"${p&&p.siteOwner===s.name?' selected':''}>${esc(s.name)}${s.nickname?' ('+esc(s.nickname)+')':''}`;}).join('');
+  var _instPosIds=['POS17733356564931','POS17733356564934','POS17733356564935','POS17733356564937','POS17733356564936'];
+  var _instPosLabels=window.POSITIONS.filter(function(pos){return _instPosIds.includes(pos.id);}).map(function(pos){return pos.label;});
+  var installerOpts='<option value="">-- เลือกผู้ติดตั้ง --</option>'+window.STAFF.filter(function(s){return s.active!==false&&_instPosLabels.includes(s.role);}).slice().sort(function(a,b){return(a.name||'').localeCompare(b.name||'','th');}).map(function(s){return`<option value="${esc(s.name)}"${p&&p.installer===s.name?' selected':''}>${esc(s.name)}${s.nickname?' ('+esc(s.nickname)+')':''}`;}).join('');
   var currentSids=mems.map(function(m){return m.sid;});
   var pickerHtml=(function(){
     var depts=[...new Set(staffSorted.map(function(s){return s.dept||'ไม่ระบุทีม';}))];
@@ -263,26 +266,30 @@ window.openProjModal=function(id){
   var infoPane='<div id="pf-pane-info">'
     +smartBtn
     +'<div class="f-group"><label class="f-label">ชื่อโครงการ *</label><input class="f-input" id="pf-name" value="'+esc(p?p.name:'')+'" placeholder="ชื่อโครงการ" '+ceA+'></div>'
+    +'<input type="hidden" id="pf-stg" value="'+(p?p.stage:(window.STAGES.length?window.STAGES[0].id:''))+'">'
     +'<div class="f-grid">'
-    +'<div class="f-group"><label class="f-label">กลุ่มโครงการ</label><select class="f-input" id="pf-grp" onchange="window.updateProjFormByGroup(\'\')" '+ceA+'>'+grpOpts+'</select></div>'
-    +'<div class="f-group"><label class="f-label">เจ้าของไซต์</label><select class="f-input" id="pf-owner" '+ceA+'>'+ownerOpts+'</select></div>'
-    +'<div class="f-group"><label class="f-label">ประเภท</label><select class="f-input" id="pf-type-modal" '+ceA+'>'+typOpts+'</select></div>'
-    +'<div class="f-group"><label class="f-label">งบประมาณ (฿)</label><input type="number" class="f-input" id="pf-cost" value="'+(p?p.cost:'')+'" '+ceA+'></div>'
-    +'<div class="f-group"><label class="f-label">วันเริ่ม</label><input type="date" class="f-input" id="pf-start" value="'+(p?p.start:'')+'" onchange="window.updateAllMemDates();window.updateTeamTabVisibility();" '+ceA+'></div>'
-    +'<div class="f-group"><label class="f-label">วันสิ้นสุด</label><input type="date" class="f-input" id="pf-end" value="'+(p?p.end:'')+'" onchange="window.updateAllMemDates();window.updateTeamTabVisibility();" '+ceA+'></div>'
+    +'<div class="f-group"><label class="f-label">กลุ่มโครงการ *</label><select class="f-input" id="pf-grp" onchange="window.updateProjFormByGroup(\'\')" '+ceA+'>'+grpOpts+'</select></div>'
+    +'<div class="f-group"><label class="f-label">ประเภท *</label><select class="f-input" id="pf-type-modal" '+ceA+'>'+typOpts+'</select></div>'
+    +'<div class="f-group"><label class="f-label">เจ้าของไซต์ *</label><select class="f-input" id="pf-owner" '+ceA+'>'+ownerOpts+'</select></div>'
+    +'<div class="f-group"><label class="f-label">ชื่อผู้ติดตั้ง *</label><select class="f-input" id="pf-installer" '+ceA+'>'+installerOpts+'</select></div>'
+    +'<div class="f-group"><label class="f-label">วันเริ่ม *</label><input type="date" class="f-input" id="pf-start" value="'+(p?p.start:'')+'" onchange="window.updateAllMemDates();window.updateTeamTabVisibility();" '+ceA+'></div>'
+    +'<div class="f-group"><label class="f-label">วันสิ้นสุด *</label><input type="date" class="f-input" id="pf-end" value="'+(p?p.end:'')+'" onchange="window.updateAllMemDates();window.updateTeamTabVisibility();" '+ceA+'></div>'
     +'<div class="f-group" id="pf-revisit1-grp"><label class="f-label">Revisit 1</label><input type="date" class="f-input" id="pf-revisit1" value="'+(p?p.revisit1:'')+'" '+ceA+'></div>'
     +'<div class="f-group" id="pf-revisit2-grp"><label class="f-label">Revisit 2</label><input type="date" class="f-input" id="pf-revisit2" value="'+(p?p.revisit2:'')+'" '+ceA+'></div>'
+    +'</div>'
+    +'<div class="f-grid" style="align-items:start;margin-top:4px;">'
+    +'<div class="f-group" style="margin:0;">'
+    +'<label class="f-label" style="margin-bottom:6px;display:block;">พื้นที่</label>'
+    +'<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;height:40px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);box-sizing:border-box;">'
+    +'<input type="checkbox" id="pf-border" '+(p&&p.isBorder?'checked':'')+' '+ceA+' style="width:16px;height:16px;accent-color:var(--coral);cursor:pointer;">'
+    +'<label for="pf-border" style="font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;">📍 พื้นที่ชายแดน (ชายแดน 3 จังหวัด)</label>'
+    +'</div></div>'
+    +'<div class="f-group" style="margin:0;"><label class="f-label">งบประมาณ (฿) *</label><input type="number" class="f-input" id="pf-cost" value="'+(p?p.cost:'')+'" placeholder="0" '+ceA+'></div>'
     +'</div>'
     +'<div id="pf-revisit-parent-wrap"><div class="f-grid">'
     +'<div class="f-group"><label class="f-label">โครงการหลัก (Onsite/แถม)</label><select class="f-input" id="pf-parent-proj" '+ceA+'><option value="">-- เลือกโครงการหลัก --</option></select></div>'
     +'<div class="f-group"><label class="f-label">ครั้งที่</label><select class="f-input" id="pf-revisit-round" '+ceA+'><option value="1"'+(p&&p.revisitRound==1?' selected':'')+'>ครั้งที่ 1</option><option value="2"'+(p&&p.revisitRound==2?' selected':'')+'>ครั้งที่ 2</option></select></div>'
     +'</div></div>'
-    +'<div class="f-group"><label class="f-label">Stage</label><select class="f-input" id="pf-stg" '+ceA+'>'+stgOpts+'</select></div>'
-    +'<div class="f-group" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);">'
-    +'<input type="checkbox" id="pf-border" '+(p&&p.isBorder?'checked':'')+' '+ceA+' style="width:16px;height:16px;accent-color:var(--coral);cursor:pointer;">'
-    +'<label for="pf-border" style="font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;">📍 พื้นที่ชายแดน (ชายแดน 3 จังหวัด)</label>'
-    +'<span style="font-size:11px;color:var(--txt3);margin-left:auto;">เบี้ยเลี้ยงสูงกว่าปกติ</span>'
-    +'</div>'
     +'<div class="f-group"><label class="f-label">หมายเหตุ</label><textarea class="f-input" id="pf-note" '+ceA+'>'+esc(p?p.note:'')+'</textarea></div>'
     +(p&&p.start&&p.end?(function(){var hcnt=window.getProjectHolidayCount(p);return hcnt>0?'<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(255,107,107,.07);border-radius:8px;border:1px solid rgba(255,107,107,.2);font-size:12px;"><span>🎌</span><span style="color:var(--coral);font-weight:600;">มีวันหยุด '+hcnt+' วัน</span><span style="color:var(--txt2);">ในช่วงโครงการนี้</span><a href="#" onclick="event.preventDefault();window.showProjHolidaysPopup(\''+p.id+'\');" style="margin-left:auto;font-size:11px;color:var(--violet);">ดูวันหยุด</a></div>':'';})():'')
     +'</div>';
@@ -521,14 +528,23 @@ window.applySmartSlot = function(idx) {
 window.saveProject=async function(){
   if(!window.canEdit('projects'))return;if(!window.auth.currentUser)return;
   var name=(document.getElementById('pf-name')||{}).value||'';if(!name.trim())return;
+  var _vErr=[];
+  if(!(document.getElementById('pf-grp')||{}).value)_vErr.push('กลุ่มโครงการ');
+  if(!(document.getElementById('pf-type-modal')||document.getElementById('pf-type')||{}).value)_vErr.push('ประเภท');
+  if(!(document.getElementById('pf-owner')||{}).value)_vErr.push('เจ้าของไซต์');
+  if(!(document.getElementById('pf-installer')||{}).value)_vErr.push('ชื่อผู้ติดตั้ง');
+  if(!(document.getElementById('pf-start')||{}).value)_vErr.push('วันเริ่ม');
+  if(!(document.getElementById('pf-end')||{}).value)_vErr.push('วันสิ้นสุด');
+  if(!(parseFloat((document.getElementById('pf-cost')||{}).value)>0))_vErr.push('งบประมาณ (฿)');
+  if(_vErr.length){window.showAlert('กรุณาระบุ: '+_vErr.join(', '),'error');return;}
   var pid=window.editPid||'P'+Date.now();
   var memDs=document.querySelectorAll('#mem-list > .m-row[id^="mr-"]');
   var members=Array.from(memDs).map(function(div){var mid=div.id.slice(3);var sidEl=document.getElementById('msid-'+mid);var sid=sidEl?sidEl.value:'';return{id:mid,sid:sid,s:(document.getElementById('ms-'+mid)||{}).value||'',e:(document.getElementById('me-'+mid)||{}).value||''};}).filter(function(m){return m.sid;});
   var savedVisits=window.collectVisits();
-  var selStage=document.getElementById('pf-stg').value;
+  var selStage=(document.getElementById('pf-stg')||{}).value||(window.STAGES.length?window.STAGES[0].id:'');
   var rawProg=parseInt((document.getElementById('pf-prog')||{}).value)||0;
   var finalProg=window.stageForces100(selStage)?100:rawProg;
-  var dbProj={project_id:pid,project_name:name.trim(),group_id:document.getElementById('pf-grp').value,site_owner:(document.getElementById('pf-owner')||{}).value||'',type_id:(document.getElementById('pf-type-modal')||document.getElementById('pf-type')||{}).value||'',stage_id:selStage,budget:parseFloat(document.getElementById('pf-cost').value)||0,start_date:document.getElementById('pf-start').value,end_date:document.getElementById('pf-end').value,revisit_1:(document.getElementById('pf-revisit1')||{}).value||'',revisit_2:(document.getElementById('pf-revisit2')||{}).value||'',parentProjectId:(document.getElementById('pf-parent-proj')||{}).value||'',revisitRound:Number((document.getElementById('pf-revisit-round')||{}).value)||0,progress_pct:finalProg,note:document.getElementById('pf-note').value,pm_staff_id:members.length>0?members[0].sid:'',status:'active',team:members.map(m=>m.sid),members:members,visits:savedVisits,is_border:!!(document.getElementById('pf-border')||{}).checked};
+  var dbProj={project_id:pid,project_name:name.trim(),group_id:document.getElementById('pf-grp').value,site_owner:(document.getElementById('pf-owner')||{}).value||'',installer_name:(document.getElementById('pf-installer')||{}).value||'',type_id:(document.getElementById('pf-type-modal')||document.getElementById('pf-type')||{}).value||'',stage_id:selStage,budget:parseFloat(document.getElementById('pf-cost').value)||0,start_date:document.getElementById('pf-start').value,end_date:document.getElementById('pf-end').value,revisit_1:(document.getElementById('pf-revisit1')||{}).value||'',revisit_2:(document.getElementById('pf-revisit2')||{}).value||'',parentProjectId:(document.getElementById('pf-parent-proj')||{}).value||'',revisitRound:Number((document.getElementById('pf-revisit-round')||{}).value)||0,progress_pct:finalProg,note:document.getElementById('pf-note').value,pm_staff_id:members.length>0?members[0].sid:'',status:'active',team:members.map(m=>m.sid),members:members,visits:savedVisits,is_border:!!(document.getElementById('pf-border')||{}).checked};
   window.closeM('m-proj');
   try {
     await setDoc(getDocRef('PROJECTS',pid),dbProj);

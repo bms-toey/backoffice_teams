@@ -28,6 +28,7 @@ window.USERS = [];
 window.PROJECTS = [];
 window.ADVANCES = [];
 window.DEPARTMENTS = ['IT','Finance','PM','HR','Marketing','Operations','Procurement','Other'];
+window.DEPT_LIST = [];
 window.POSITIONS = [];
 window.PGROUPS = [];
 window.LODGINGS = [];
@@ -60,6 +61,7 @@ window.IMPORT_SCHEMAS = {
   'PGROUPS': { idField:'group_id',prefix:'GRP', headers:["label_th","color_hex"], example:["ภาคเหนือ","#4361ee"] },
   'PTYPES': { idField:'type_id',prefix:'T', headers:["label_th","color_hex"], example:["งานติดตั้ง","#06d6a0"] },
   'POSITIONS': { idField:'position_id',prefix:'POS', headers:["label_th"], example:["Project Manager"] },
+  'DEPARTMENTS': { idField:'dept_id',prefix:'DEPT', headers:["label_th"], example:["ฝ่ายไอที"] },
   'TIMESHEETS': { idField:'timesheet_id',prefix:'TS', headers:["project_id","staff_id","work_date","hours","category","description"], example:["P001","S001","2026-04-01","8","fieldwork","สำรวจพื้นที่โครงการ"] },
   'COSTS': { idField:'cost_id',prefix:'CST', headers:["project_id","staff_id","category","amount","cost_date","description","receipt_no"], example:["P001","S001","travel","1500","2026-04-01","ค่าเดินทางไปพื้นที่","RCT-001"] }
 };

@@ -7,10 +7,10 @@ window.execDelete=async function(){
   if(!window.delTarget)return;if(!window.auth.currentUser)return;
   var t=window.delTarget.type,id=window.delTarget.id;
   var _delModMap={project:'projects',advance:'advance',lodging:'lodging',timesheet:'timesheet',cost:'cost',leave:'leave'};
-  if(['staff','type','position','group','user','stage'].includes(t)){if(!window.isAdmin())return;}
+  if(['staff','type','position','group','user','stage','department'].includes(t)){if(!window.isAdmin())return;}
   else if(_delModMap[t]){if(!window.canDel(_delModMap[t]))return;}
   else{if(!window.isAdmin())return;}
-  var sheetMap={project:'PROJECTS',advance:'ADVANCES',staff:'STAFF',type:'PTYPES',user:'USERS',position:'POSITIONS',group:'PGROUPS',lodging:'LODGINGS',stage:'STAGES',timesheet:'TIMESHEETS',cost:'COSTS'};
+  var sheetMap={project:'PROJECTS',advance:'ADVANCES',staff:'STAFF',type:'PTYPES',user:'USERS',position:'POSITIONS',group:'PGROUPS',lodging:'LODGINGS',stage:'STAGES',timesheet:'TIMESHEETS',cost:'COSTS',department:'DEPARTMENTS'};
   if(t==='project'){window.PROJECTS=window.PROJECTS.filter(x=>x.id!==id);window.ADVANCES.filter(x=>x.pid===id).forEach(a=>deleteDoc(getDocRef('ADVANCES',a.id)));window.LODGINGS.filter(x=>x.pid===id).forEach(l=>deleteDoc(getDocRef('LODGINGS',l.id)));}
   else if(t==='advance')window.ADVANCES=window.ADVANCES.filter(x=>x.id!==id);
   else if(t==='lodging')window.LODGINGS=window.LODGINGS.filter(x=>x.id!==id);
@@ -20,10 +20,12 @@ window.execDelete=async function(){
   else if(t==='position')window.POSITIONS=window.POSITIONS.filter(x=>x.id!==id);
   else if(t==='group')window.PGROUPS=window.PGROUPS.filter(x=>x.id!==id);
   else if(t==='stage')window.STAGES=window.STAGES.filter(x=>x.id!==id);
+  else if(t==='department'){window.DEPT_LIST=window.DEPT_LIST.filter(x=>x.id!==id);window.DEPARTMENTS=window.DEPT_LIST.map(d=>d.label);}
   else if(t==='timesheet')window.TIMESHEETS=window.TIMESHEETS.filter(x=>x.id!==id);
   else if(t==='cost')window.COSTS=window.COSTS.filter(x=>x.id!==id);
   window.closeM('m-del');window.delTarget=null;window.renderAll();
   if(['staff','type','user','position','group','stage'].includes(t))window.admTab(t+'s');
+  if(t==='department')window.admTab('dept');
   if(t==='lodging'&&window.currentLdPid)window.openLodgingGroupModal(window.currentLdPid);
   deleteDoc(getDocRef(sheetMap[t],id)).catch(e=>window.showDbError(e));
 }

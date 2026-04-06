@@ -19,6 +19,16 @@ async function initAuth(){
 
 async function seedDatabaseIfEmpty(){
   if(!auth.currentUser) return;
+  // seed DEPARTMENTS ถ้ายังไม่มีข้อมูล
+  const deptsSnap = await getDocs(getColRef('DEPARTMENTS'));
+  if(deptsSnap.empty){
+    const dBatch = writeBatch(db);
+    ['ติดตั้งระบบคลังสินค้า','ติดตั้งระบบและดูแลหลังการขาย','ติดตั้งระบบบัญชี','แผนกวิเคราะห์ข้อมูล','แผนกฝึกอบรม'].forEach(function(name,i){
+      var did='DEPT_'+(i+1);
+      dBatch.set(getDocRef('DEPARTMENTS',did),{dept_id:did,label_th:name});
+    });
+    await dBatch.commit();
+  }
   const usersSnap = await getDocs(getColRef('USERS'));
   if(usersSnap.empty){
     const batch = writeBatch(db);
@@ -47,7 +57,7 @@ async function seedDatabaseIfEmpty(){
 
 function setupRealtimeListeners(){
   if(!auth.currentUser) return;
-  const colls = ['STAGES','PTYPES','PGROUPS','STAFF','USERS','PROJECTS','ADVANCES','LODGINGS','POSITIONS','HOLIDAYS','LEAVES','TIMESHEETS','COSTS'];
+  const colls = ['STAGES','PTYPES','PGROUPS','STAFF','USERS','PROJECTS','ADVANCES','LODGINGS','POSITIONS','HOLIDAYS','LEAVES','TIMESHEETS','COSTS','DEPARTMENTS'];
   let loadCount = 0;
 
   const checkLoaded = () => {
@@ -82,8 +92,6 @@ function setupRealtimeListeners(){
       let d=doc.data();
       return{id:d.staff_id||d.id,name:d.full_name||d.name||'',nickname:d.nickname||(d.full_name||d.name||'').split(' ')[0],dept:d.department||d.dept,role:d.position||d.role,email:d.email,phone:d.phone,active:d.is_active!==false&&d.is_active!=='FALSE',start_date:d.start_date,birth_date:d.birth_date,remark:d.remark,dailyRate:d.daily_rate!=null?Number(d.daily_rate):null};
     });
-    let depts=[...new Set(window.STAFF.map(st=>st.dept).filter(Boolean))];
-    if(depts.length>0) window.DEPARTMENTS=depts;
     checkLoaded();
   }, e=>window.showDbError(e));
 
@@ -104,7 +112,7 @@ function setupRealtimeListeners(){
       var rawR2=d.revisit_2||d.revisit2||d.revisitTwo||'';
       // แปลง Firestore Timestamp เป็น string
       function tsToStr(v){if(!v)return'';if(typeof v==='string')return v;if(v&&v.toDate){var dt=v.toDate();return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');}return String(v);}
-      return{id:d.project_id||d.id,name:d.project_name||d.name||'',groupId:d.group_id||d.groupId||'',siteOwner:d.site_owner||d.siteOwner||'',typeId:d.type_id||d.typeId||'',stage:d.stage_id||d.stage||'init',cost:Number(d.budget||d.cost)||0,start:tsToStr(rawStart),end:tsToStr(rawEnd),revisit1:tsToStr(rawR1),revisit2:tsToStr(rawR2),parentProjectId:d.parentProjectId||d.parent_project_id||'',revisitRound:Number(d.revisitRound||d.revisit_round)||0,progress:Number(d.progress_pct||d.progress)||0,note:d.note||'',status:d.status||'active',pm:d.pm_staff_id||d.pm||'',team:d.team||[],members:d.members||[],isBorder:d.is_border===true||d.is_border==='TRUE',visits:(d.visits||[]).map(function(v){return{id:v.id||('V'+Math.random().toString(36).slice(2,7)),no:v.no||1,start:tsToStr(v.start||v.start_date||''),end:tsToStr(v.end||v.end_date||''),purpose:v.purpose||'',team:v.team||[],status:v.status||'planned',note:v.note||''};})};
+      return{id:d.project_id||d.id,name:d.project_name||d.name||'',groupId:d.group_id||d.groupId||'',siteOwner:d.site_owner||d.siteOwner||'',installer:d.installer_name||d.installer||'',typeId:d.type_id||d.typeId||'',stage:d.stage_id||d.stage||'init',cost:Number(d.budget||d.cost)||0,start:tsToStr(rawStart),end:tsToStr(rawEnd),revisit1:tsToStr(rawR1),revisit2:tsToStr(rawR2),parentProjectId:d.parentProjectId||d.parent_project_id||'',revisitRound:Number(d.revisitRound||d.revisit_round)||0,progress:Number(d.progress_pct||d.progress)||0,note:d.note||'',status:d.status||'active',pm:d.pm_staff_id||d.pm||'',team:d.team||[],members:d.members||[],isBorder:d.is_border===true||d.is_border==='TRUE',visits:(d.visits||[]).map(function(v){return{id:v.id||('V'+Math.random().toString(36).slice(2,7)),no:v.no||1,start:tsToStr(v.start||v.start_date||''),end:tsToStr(v.end||v.end_date||''),purpose:v.purpose||'',team:v.team||[],status:v.status||'planned',note:v.note||''};})};
     });
     checkLoaded();
   }, e=>window.showDbError(e));
@@ -171,6 +179,12 @@ function setupRealtimeListeners(){
     window.COSTS = s.docs.map(doc=>{let d=doc.data();return{id:d.cost_id||d.id,pid:d.project_id||d.pid||'',staffId:d.staff_id||'',category:d.category||'other',amount:Number(d.amount)||0,costDate:d.cost_date||'',description:d.description||'',receiptNo:d.receipt_no||'',source:d.source||'',advanceId:d.advance_id||''};});
     checkLoaded();
     if(window.cu&&document.getElementById('view-cost')&&document.getElementById('view-cost').classList.contains('on'))window.renderCost();
+  }, e=>window.showDbError(e));
+
+  onSnapshot(getColRef('DEPARTMENTS'), s => {
+    window.DEPT_LIST = s.docs.map(doc=>{let d=doc.data();return{id:d.dept_id||d.id,label:d.label_th||d.label||''};}).sort((a,b)=>a.label.localeCompare(b.label,'th'));
+    if(window.DEPT_LIST.length>0) window.DEPARTMENTS=window.DEPT_LIST.map(d=>d.label);
+    checkLoaded();
   }, e=>window.showDbError(e));
 }
 
