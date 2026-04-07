@@ -1,42 +1,69 @@
 import { getFirestore, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 const db = getFirestore();
 const { esc, fd, fc, fca, pd, gS, gT, gG, gSt, gC, avC, uid, getFY, getYearBE, getStaffOverlaps, overlapWarnText, getStaffLeaveConflicts, getColRef, getDocRef } = window;
-// ── NOTIFY SETTINGS ──
+
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+function _tokenCard(opts) {
+  // opts: { id, title, desc, tokenVar, saveFunc, testFunc, events }
+  return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:20px 24px;margin-bottom:16px;">'
+    +'<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:4px;">'+opts.title+'</div>'
+    +'<div style="font-size:12px;color:var(--txt3);margin-bottom:14px;line-height:1.6;">'+opts.desc+'</div>'
+    +'<div class="f-group" style="margin-bottom:12px;">'
+    +'<label class="f-label">API Token</label>'
+    +'<div style="display:flex;gap:8px;">'
+    +'<input class="f-input" id="'+opts.id+'-input" type="password" placeholder="ใส่ Token ที่นี่..." value="'+esc(opts.tokenVar||'')+'" style="flex:1;font-family:monospace;font-size:12px;">'
+    +'<button onclick="document.getElementById(\''+opts.id+'-input\').type=document.getElementById(\''+opts.id+'-input\').type===\'password\'?\'text\':\'password\'" style="padding:8px 12px;background:var(--surface3);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;" title="แสดง/ซ่อน Token">👁</button>'
+    +'</div>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+    +'<button onclick="window.'+opts.saveFunc+'()" style="padding:8px 20px;background:var(--violet);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">💾 บันทึก Token</button>'
+    +'<button onclick="window.'+opts.testFunc+'()" style="padding:8px 20px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">🧪 ทดสอบส่ง</button>'
+    +'<span id="'+opts.id+'-msg" style="font-size:12px;color:var(--teal);"></span>'
+    +'</div>'
+    +(opts.events ? '<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;"><div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:6px;">เหตุการณ์ที่แจ้งเตือน</div><div style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--txt2);">'+opts.events.map(function(e){return'<div style="display:flex;align-items:center;gap:8px;"><span style="width:20px;text-align:center;">'+e[0]+'</span>'+e[1]+'</div>';}).join('')+'</div></div>' : '')
+    +'</div>';
+}
+
+// ── NOTIFY SETTINGS UI ───────────────────────────────────────────────────────
 window.renderNotifySettings=function(){
-    var c=document.getElementById('adm-body');if(!c)return;
-    var titleEl=document.getElementById('adm-head-title');
-    if(titleEl)titleEl.innerHTML='🔔 ตั้งค่าการแจ้งเตือน';
-    c.innerHTML='<div style="max-width:560px;padding:8px 4px;">'
-      +'<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:20px 24px;margin-bottom:20px;">'
-      +'<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:6px;">🔔 Notify API Token</div>'
-      +'<div style="font-size:12px;color:var(--txt3);margin-bottom:14px;line-height:1.6;">ใส่ Token สำหรับส่งแจ้งเตือนเมื่อมีการลางาน อนุมัติ หรือไม่อนุมัติ<br>Token จะถูกเก็บใน Firestore และใช้งานร่วมกันทุก session</div>'
-      +'<div class="f-group" style="margin-bottom:12px;">'
-      +'<label class="f-label">API Token</label>'
-      +'<div style="display:flex;gap:8px;">'
-      +'<input class="f-input" id="notify-token-input" type="password" placeholder="ใส่ Token ที่นี่..." value="'+esc(window.NOTIFY_TOKEN||'')+'" style="flex:1;font-family:monospace;font-size:12px;">'
-      +'<button onclick="document.getElementById(\'notify-token-input\').type=document.getElementById(\'notify-token-input\').type===\'password\'?\'text\':\'password\'" style="padding:8px 12px;background:var(--surface3);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;" title="แสดง/ซ่อน Token">👁</button>'
-      +'</div>'
-      +'</div>'
-      +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
-      +'<button onclick="window.saveNotifyToken()" style="padding:8px 20px;background:var(--violet);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">💾 บันทึก Token</button>'
-      +'<button onclick="window.testNotify()" style="padding:8px 20px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">🧪 ทดสอบส่ง</button>'
-      +'<span id="notify-save-msg" style="font-size:12px;color:var(--teal);"></span>'
-      +'</div>'
-      +'</div>'
-      +'<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px 20px;">'
-      +'<div style="font-size:12px;font-weight:700;color:var(--txt2);margin-bottom:8px;">เหตุการณ์ที่แจ้งเตือน</div>'
-      +'<div style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--txt2);">'
-      +'<div style="display:flex;align-items:center;gap:8px;"><span style="width:20px;text-align:center;">📋</span> บันทึกการลางานใหม่</div>'
-      +'<div style="display:flex;align-items:center;gap:8px;"><span style="width:20px;text-align:center;">✅</span> อนุมัติการลา</div>'
-      +'<div style="display:flex;align-items:center;gap:8px;"><span style="width:20px;text-align:center;">❌</span> ไม่อนุมัติการลา</div>'
-      +'</div>'
-      +'</div>'
-      +'</div>';
+  var c=document.getElementById('adm-body');if(!c)return;
+  var titleEl=document.getElementById('adm-head-title');
+  if(titleEl)titleEl.innerHTML='🔔 ตั้งค่าการแจ้งเตือน';
+  c.innerHTML='<div style="max-width:580px;padding:8px 4px;">'
+    +_tokenCard({
+      id:'notify-token',
+      title:'🔔 แจ้งเตือนการลางาน',
+      desc:'Token สำหรับส่งแจ้งเตือนเมื่อมีการลางาน อนุมัติ หรือไม่อนุมัติ',
+      tokenVar:window.NOTIFY_TOKEN||'',
+      saveFunc:'saveNotifyToken',
+      testFunc:'testNotify',
+      events:[['📋','บันทึกการลางานใหม่'],['✅','อนุมัติการลา'],['❌','ไม่อนุมัติการลา']]
+    })
+    +_tokenCard({
+      id:'notify-advance-token',
+      title:'📋 แจ้งเตือน Advance',
+      desc:'Token สำหรับแจ้งเตือนเมื่อโครงการเข้าสู่ PM Stage "plan" และเตือนล่วงหน้า 14 วัน กรณียังไม่มี Advance',
+      tokenVar:window.NOTIFY_ADVANCE_TOKEN||'',
+      saveFunc:'saveNotifyAdvanceToken',
+      testFunc:'testNotifyAdvance',
+      events:[['📋','ถึงกำหนดจัดทำ Advance (เข้า Stage plan)'],['⚠️','เตือนซ้ำ: ก่อนเริ่มโครงการ 14 วัน ยังไม่มี Advance']]
+    })
+    +_tokenCard({
+      id:'notify-project-token',
+      title:'🚀 แจ้งเตือนเริ่ม/ปิดโครงการ',
+      desc:'Token สำหรับแจ้งเตือนวันเริ่มต้นและวันสิ้นสุดโครงการ',
+      tokenVar:window.NOTIFY_PROJECT_TOKEN||'',
+      saveFunc:'saveNotifyProjectToken',
+      testFunc:'testNotifyProject',
+      events:[['🚀','เริ่มดำเนินการโครงการแล้ว (วันเริ่มต้น)'],['🏁','ปิดโครงการแล้ว (วันสิ้นสุด)'],['💰','ปิดโครงการ/จ่ายเงินแล้ว (Stage: close)']]
+    })
+    +'</div>';
 };
 
+// ── SAVE TOKENS ──────────────────────────────────────────────────────────────
 window.saveNotifyToken=async function(){
   var val=(document.getElementById('notify-token-input')||{}).value||'';
-  var msg=document.getElementById('notify-save-msg');
+  var msg=document.getElementById('notify-token-msg');
   try{
     await setDoc(getDocRef('SETTINGS','app'),{notify_token:val},{merge:true});
     window.NOTIFY_TOKEN=val;
@@ -44,10 +71,138 @@ window.saveNotifyToken=async function(){
   }catch(e){window.showDbError(e);}
 };
 
-window.testNotify=function(){
-  window.sendLeaveNotify('test',null);
+window.saveNotifyAdvanceToken=async function(){
+  var val=(document.getElementById('notify-advance-token-input')||{}).value||'';
+  var msg=document.getElementById('notify-advance-token-msg');
+  try{
+    await setDoc(getDocRef('SETTINGS','app'),{notify_advance_token:val},{merge:true});
+    window.NOTIFY_ADVANCE_TOKEN=val;
+    if(msg){msg.textContent='✅ บันทึกแล้ว';setTimeout(function(){msg.textContent='';},2500);}
+  }catch(e){window.showDbError(e);}
 };
 
+window.saveNotifyProjectToken=async function(){
+  var val=(document.getElementById('notify-project-token-input')||{}).value||'';
+  var msg=document.getElementById('notify-project-token-msg');
+  try{
+    await setDoc(getDocRef('SETTINGS','app'),{notify_project_token:val},{merge:true});
+    window.NOTIFY_PROJECT_TOKEN=val;
+    if(msg){msg.textContent='✅ บันทึกแล้ว';setTimeout(function(){msg.textContent='';},2500);}
+  }catch(e){window.showDbError(e);}
+};
+
+// ── TEST BUTTONS ─────────────────────────────────────────────────────────────
+window.testNotify=function(){window.sendLeaveNotify('test',null);};
+window.testNotifyAdvance=function(){
+  var fake={name:'[ทดสอบ] โครงการตัวอย่าง',siteOwner:'ทดสอบไซต์',installer:'ทดสอบผู้ติดตั้ง',start:new Date().toISOString().slice(0,10),end:''};
+  window.sendAdvanceNotify(fake,false);
+};
+window.testNotifyProject=function(){
+  var fake={name:'[ทดสอบ] โครงการตัวอย่าง',siteOwner:'ทดสอบไซต์',installer:'ทดสอบผู้ติดตั้ง',start:new Date().toISOString().slice(0,10),end:new Date().toISOString().slice(0,10)};
+  window.sendProjectNotify(fake,'start');
+};
+
+// ── PROJECT INFO BLOCK ────────────────────────────────────────────────────────
+function _projNotifyBlock(p){
+  return '📌 ชื่อโครงการ: **'+(p.name||'')+'**'
+    +'\n🏢 เจ้าของไซต์: '+(p.siteOwner||'—')
+    +'\n👷 ชื่อผู้ติดตั้ง: '+(p.installer||'—')
+    +'\n📅 '+(p.start?fd(p.start):'—')+(p.end?' – '+fd(p.end):'');
+}
+
+// ── SEND ADVANCE SAVED / STATUS NOTIFY ───────────────────────────────────────
+window.sendAdvanceSavedNotify=async function(adv,isNew){
+  var token=window.NOTIFY_ADVANCE_TOKEN||'';if(!token)return;
+  var p=((window.PROJECTS||[]).find(function(x){return x.id===adv.pid;})||{});
+  var sf=(window.AFLW||[]).find(function(x){return x.id===adv.status;})||{label:adv.status||'—'};
+  var header=isNew?'✅ **จัดทำ Advance แล้ว**':'🔄 **อัปเดตสถานะ Advance**';
+  var used=Number(adv.cleared)||0;
+  var remaining=(Number(adv.amount)||0)-used;
+  var clearedBlock=adv.status==='cleared'
+    ?'\n💸 ใช้ไป: '+fc(used)+' บาท'
+     +'\n🏦 คงเหลือ: '+fc(remaining)+' บาท'
+    :'';
+  var content=header+'\n'+_projNotifyBlock(p)
+    +'\n📋 สถานะ: **'+sf.label+'**'
+    +(adv.advno?'\n🔖 เลขที่: '+adv.advno:'')
+    +(adv.amount?'\n💰 จำนวน: '+fc(adv.amount)+' บาท':'')
+    +clearedBlock;
+  try{
+    await fetch('https://api.notify.bmscloud.in.th/api/v1/push-notify',{
+      method:'POST',headers:{'Token':token,'Content-Type':'application/json'},
+      body:JSON.stringify({content:content,receiver:null})
+    });
+  }catch(e){console.warn('Advance saved notify error:',e);}
+};
+
+// ── SEND ADVANCE NOTIFY (stage plan / 14-day reminder) ────────────────────────
+window.sendAdvanceNotify=async function(p,isReminder){
+  var token=window.NOTIFY_ADVANCE_TOKEN||'';if(!token)return;
+  var header=isReminder
+    ?'⚠️ **เตือนซ้ำ: ยังไม่มีการจัดทำ Advance**\nเหลืออีก 14 วัน ก่อนเริ่มโครงการ'
+    :'📋 **ถึงกำหนดที่ต้องจัดทำ Advance แล้ว**';
+  var content=header+'\n'+_projNotifyBlock(p);
+  try{
+    await fetch('https://api.notify.bmscloud.in.th/api/v1/push-notify',{
+      method:'POST',headers:{'Token':token,'Content-Type':'application/json'},
+      body:JSON.stringify({content:content,receiver:null})
+    });
+  }catch(e){console.warn('Advance notify error:',e);}
+};
+
+// ── SEND PROJECT START/END NOTIFY ────────────────────────────────────────────
+window.sendProjectNotify=async function(p,eventType){
+  var token=window.NOTIFY_PROJECT_TOKEN||'';if(!token)return;
+  var header=eventType==='start'?'🚀 **เริ่มดำเนินการโครงการแล้ว**'
+            :eventType==='close'?'💰 **ปิดโครงการ/จ่ายเงินแล้ว**'
+            :'🏁 **ปิดโครงการแล้ว**';
+  var content=header+'\n'+_projNotifyBlock(p);
+  try{
+    await fetch('https://api.notify.bmscloud.in.th/api/v1/push-notify',{
+      method:'POST',headers:{'Token':token,'Content-Type':'application/json'},
+      body:JSON.stringify({content:content,receiver:null})
+    });
+  }catch(e){console.warn('Project notify error:',e);}
+};
+
+// ── DAILY CHECK (dedup via localStorage) ─────────────────────────────────────
+function _todayStr(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function _notiKey(type,pid){return'noti_sent_'+type+'_'+pid+'_'+_todayStr();}
+function _notiSent(type,pid){return!!localStorage.getItem(_notiKey(type,pid));}
+function _notiMark(type,pid){try{localStorage.setItem(_notiKey(type,pid),'1');}catch(e){}}
+
+window.checkDailyNotifications=async function(){
+  var today=_todayStr();
+  var in14=new Date();in14.setDate(in14.getDate()+14);
+  var in14Str=in14.getFullYear()+'-'+String(in14.getMonth()+1).padStart(2,'0')+'-'+String(in14.getDate()).padStart(2,'0');
+
+  for(var p of(window.PROJECTS||[])){
+    if(p.status==='cancelled')continue;
+
+    // Advance 14-day reminder: stage='plan', start = today+14, no advance record
+    if(p.stage==='plan'&&p.start===in14Str){
+      var hasAdv=(window.ADVANCES||[]).some(function(a){return a.pid===p.id;});
+      if(!hasAdv&&!_notiSent('adv14',p.id)){
+        await window.sendAdvanceNotify(p,true);
+        _notiMark('adv14',p.id);
+      }
+    }
+
+    // Project start notification
+    if(p.start===today&&!_notiSent('proj_start',p.id)){
+      await window.sendProjectNotify(p,'start');
+      _notiMark('proj_start',p.id);
+    }
+
+    // Project end notification
+    if(p.end===today&&!_notiSent('proj_end',p.id)){
+      await window.sendProjectNotify(p,'end');
+      _notiMark('proj_end',p.id);
+    }
+  }
+};
+
+// ── LEAVE NOTIFY (existing) ───────────────────────────────────────────────────
 window.sendLeaveNotify=async function(eventType,lv){
   var token=window.NOTIFY_TOKEN||'';
   if(!token)return;
@@ -96,4 +251,3 @@ window.sendLeaveNotify=async function(eventType,lv){
     });
   }catch(e){console.warn('Notify API error:',e);}
 };
-

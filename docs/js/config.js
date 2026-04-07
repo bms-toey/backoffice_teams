@@ -108,6 +108,46 @@ window.countWorkDays = function(startStr, endStr) {
   return count;
 };
 
+// คำนวณวันทำงาน + วันหยุดบริษัท สำหรับคำนวณค่าแรง/เบี้ยเลี้ยงใน Advance
+// - workDays    = วัน จ-ศ ที่ไม่ใช่วันหยุดบริษัท (company/both) และไม่ได้ลา
+// - holidayDays = วัน จ-ศ ที่เป็นวันหยุด type company หรือ both เท่านั้น
+// - leaveDays   = วันลาที่ตัดออกจาก workDays
+window.countLaborDaysInfo = function(sid, startStr, endStr) {
+  if(!startStr || !endStr) return {workDays:0, holidayDays:0, leaveDays:0};
+  var s = window.pd(startStr), e = window.pd(endStr);
+  var workSet = new Set(), holSet = new Set();
+  var cur = new Date(s);
+  while(cur <= e) {
+    var dow = cur.getDay();
+    if(dow !== 0 && dow !== 6) {
+      var ds = cur.getFullYear()+'-'+String(cur.getMonth()+1).padStart(2,'0')+'-'+String(cur.getDate()).padStart(2,'0');
+      var hol = (window.HOLIDAYS||[]).find(function(h){return h.date===ds;});
+      if(hol && (hol.type==='company'||hol.type==='both')) holSet.add(ds);
+      else workSet.add(ds);
+    }
+    cur.setDate(cur.getDate()+1);
+  }
+  var leaveDays = 0;
+  if(sid && window.getStaffLeaveConflicts) {
+    var sD = window.pd(startStr), eD = window.pd(endStr);
+    eD.setHours(23,59,59);
+    window.getStaffLeaveConflicts(sid, startStr, endStr)
+      .filter(function(x){return x.leave.status!=='rejected';})
+      .forEach(function(x){
+        var lv=x.leave, ls=window.pd(lv.startDate), le=window.pd(lv.endDate);
+        le.setHours(23,59,59);
+        var c=new Date(Math.max(ls.getTime(),sD.getTime()));
+        var end2=new Date(Math.min(le.getTime(),eD.getTime()));
+        while(c<=end2){
+          var d2=c.getDay(), ds2=c.getFullYear()+'-'+String(c.getMonth()+1).padStart(2,'0')+'-'+String(c.getDate()).padStart(2,'0');
+          if(d2!==0&&d2!==6&&workSet.has(ds2)){workSet.delete(ds2);leaveDays++;}
+          c.setDate(c.getDate()+1);
+        }
+      });
+  }
+  return {workDays:workSet.size, holidayDays:holSet.size, leaveDays:leaveDays};
+};
+
 // นับวันทำงานจริง หักวันลา (approved/pending) ที่ตรงกับวันทำงาน
 // คืน { workDays, leaveDays, leaveInfo }
 window.countWorkDaysExcLeave = function(sid, startStr, endStr) {

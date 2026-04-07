@@ -284,7 +284,7 @@ window.openProjModal=function(id){
     +'<input type="checkbox" id="pf-border" '+(p&&p.isBorder?'checked':'')+' '+ceA+' style="width:16px;height:16px;accent-color:var(--coral);cursor:pointer;">'
     +'<label for="pf-border" style="font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;">📍 พื้นที่ชายแดน (ชายแดน 3 จังหวัด)</label>'
     +'</div></div>'
-    +'<div class="f-group" style="margin:0;"><label class="f-label">งบประมาณ (฿) *</label><input type="number" class="f-input" id="pf-cost" value="'+(p?p.cost:'')+'" placeholder="0" '+ceA+'></div>'
+    +'<div class="f-group" style="margin:0;"><label class="f-label">งบประมาณ (฿) *</label><input type="number" class="f-input" id="pf-cost" value="'+(p&&p.cost!=null?Number(p.cost).toFixed(2):'0.00')+'" placeholder="0.00" step="0.01" min="0" '+ceA+'></div>'
     +'</div>'
     +'<div id="pf-revisit-parent-wrap"><div class="f-grid">'
     +'<div class="f-group"><label class="f-label">โครงการหลัก (Onsite/แถม)</label><select class="f-input" id="pf-parent-proj" '+ceA+'><option value="">-- เลือกโครงการหลัก --</option></select></div>'
@@ -535,7 +535,7 @@ window.saveProject=async function(){
   if(!(document.getElementById('pf-installer')||{}).value)_vErr.push('ชื่อผู้ติดตั้ง');
   if(!(document.getElementById('pf-start')||{}).value)_vErr.push('วันเริ่ม');
   if(!(document.getElementById('pf-end')||{}).value)_vErr.push('วันสิ้นสุด');
-  if(!(parseFloat((document.getElementById('pf-cost')||{}).value)>0))_vErr.push('งบประมาณ (฿)');
+  var _cv=(document.getElementById('pf-cost')||{}).value;if(_cv===''||_cv==null||isNaN(parseFloat(_cv))||parseFloat(_cv)<0)_vErr.push('งบประมาณ (฿)');
   if(_vErr.length){window.showAlert('กรุณาระบุ: '+_vErr.join(', '),'error');return;}
   var pid=window.editPid||'P'+Date.now();
   var memDs=document.querySelectorAll('#mem-list > .m-row[id^="mr-"]');

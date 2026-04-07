@@ -90,11 +90,16 @@ window.renderCost = function() {
   const q    = (document.getElementById('cost-q')?.value || '').toLowerCase();
   const yr   = document.getElementById('cost-yr')?.value || '';
   const mon  = document.getElementById('cost-mon')?.value || '';
+  const type = document.getElementById('cost-type')?.value || '';
   const proj = document.getElementById('cost-proj')?.value || '';
   const cat  = document.getElementById('cost-cat')?.value || '';
 
   let rows = window.COSTS.slice();
 
+  if (type) rows = rows.filter(r => {
+    const p = window.PROJECTS.find(p => p.id === r.pid);
+    return p?.typeId === type;
+  });
   if (proj) rows = rows.filter(r => r.pid === proj);
   if (cat)  rows = rows.filter(r => r.category === cat);
   if (yr)   rows = rows.filter(r => getYearBE(r.costDate) == yr);
@@ -166,6 +171,15 @@ window.renderCost = function() {
   rows.forEach(r => {
     if (!byProject[r.pid]) { pidOrder.push(r.pid); byProject[r.pid] = []; }
     byProject[r.pid].push(r);
+  });
+
+  // Sort: project end date descending (latest end first)
+  pidOrder.sort((a, b) => {
+    const projA = window.PROJECTS.find(p => p.id === a);
+    const projB = window.PROJECTS.find(p => p.id === b);
+    const endA  = projA?.end || '';
+    const endB  = projB?.end || '';
+    return endB.localeCompare(endA);
   });
 
   // auto-expand single project filter
@@ -362,12 +376,22 @@ window.renderCost = function() {
 // ── FILTERS ───────────────────────────────────────────────────────────────────
 function _populateCostFilters() {
   const yrSel   = document.getElementById('cost-yr');
+  const typeSel = document.getElementById('cost-type');
   const projSel = document.getElementById('cost-proj');
   if (!yrSel) return;
 
   const years = [...new Set(window.COSTS.map(r => getYearBE(r.costDate)).filter(Boolean))].sort((a,b)=>b-a);
   const curYr = yrSel.value;
   yrSel.innerHTML = '<option value="">ทุกปี พ.ศ.</option>' + years.map(y => `<option value="${y}"${y==curYr?' selected':''}>${y}</option>`).join('');
+
+  // Project types that appear in costs
+  if (typeSel && (window.PTYPES || []).length) {
+    const pids    = [...new Set(window.COSTS.map(r => r.pid).filter(Boolean))];
+    const typeIds = new Set(window.PROJECTS.filter(p => pids.includes(p.id)).map(p => p.typeId).filter(Boolean));
+    const curType = typeSel.value;
+    typeSel.innerHTML = '<option value="">ทุกประเภท</option>' +
+      window.PTYPES.filter(t => typeIds.has(t.id)).map(t => `<option value="${t.id}"${t.id===curType?' selected':''}>${esc(t.label)}</option>`).join('');
+  }
 
   const pids = [...new Set(window.COSTS.map(r => r.pid).filter(Boolean))];
   const curProj = projSel.value;

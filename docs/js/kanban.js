@@ -128,12 +128,17 @@ window.runAutoStage=async function(silent){
   });
   if(updates.length===0)return;
   for(var u of updates){
+    var prevAutoStage=u.p.stage;
     u.p.stage=u.newStage;u.p.progress=u.newProg;
     var finalAutoP=window.stageForces100(u.newStage)?100:u.newProg;
     if(window.stageForces100(u.newStage))u.p.progress=100;
     var dbUp={stage_id:u.newStage,stage:u.newStage};
     if(finalAutoP>=0)dbUp.progress_pct=finalAutoP;
     await setDoc(getDocRef('PROJECTS',u.p.id),dbUp,{merge:true}).catch(e=>window.showDbError(e));
+    // แจ้งเตือน Advance เมื่อ auto-stage เลื่อนโครงการเข้า 'plan'
+    if(u.newStage==='plan'&&prevAutoStage!=='plan'&&window.sendAdvanceNotify){window.sendAdvanceNotify(u.p,false);}
+    // แจ้งเตือนปิดโครงการ/จ่ายเงินแล้ว เมื่อ auto-stage เลื่อนเข้า 'close'
+    if(u.newStage==='close'&&prevAutoStage!=='close'&&window.sendProjectNotify){window.sendProjectNotify(u.p,'close');}
   }
   if(!silent)window.showToast(`⚡ อัปเดต Stage อัตโนมัติ ${updates.length} โครงการ`,'info');
   window.renderKanban();window.renderOverview();window.renderProjects();
@@ -174,12 +179,17 @@ window.kbDrop=async function(e,sid){
   if(!window.auth.currentUser)return;
   var p=window.PROJECTS.find(function(x){return x.id===window.kbPid;});
   if(p){
+    var prevStage=p.stage;
     p.stage=sid;
     var force100=window.stageForces100(sid);
     if(force100)p.progress=100;
     window.renderKanban();window.renderOverview();
     var upd={stage_id:sid,stage:sid};if(force100)upd.progress_pct=100;
     setDoc(getDocRef('PROJECTS',p.id),upd,{merge:true}).catch(err=>window.showDbError(err));
+    // แจ้งเตือน Advance เมื่อโครงการเข้า stage 'plan'
+    if(sid==='plan'&&prevStage!=='plan'&&window.sendAdvanceNotify){window.sendAdvanceNotify(p,false);}
+    // แจ้งเตือนปิดโครงการ/จ่ายเงินแล้ว เมื่อเข้า stage 'close'
+    if(sid==='close'&&prevStage!=='close'&&window.sendProjectNotify){window.sendProjectNotify(p,'close');}
   }
   window.kbPid=null;
 }

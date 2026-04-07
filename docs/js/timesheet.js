@@ -66,6 +66,7 @@ function _getTsHolLeave(r) {
 
   var hols = (window.HOLIDAYS || []).filter(function(h) {
     if (!h.date) return false;
+    if (h.type !== 'company' && h.type !== 'both') return false;
     var hd = pd(h.date);
     return hd >= sD && hd <= eD;
   });
@@ -86,7 +87,7 @@ function _getTsHolLeave(r) {
 function _holLeaveBadgesHtml(info) {
   var parts = [];
   if (info.hols.length) {
-    parts.push('<span style="font-size:10px;color:var(--coral);background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.25);border-radius:5px;padding:1px 7px;white-space:nowrap;cursor:default;" title="' + info.hols.map(function(h){return h.name;}).join(', ') + '">🎌 วันหยุดนักขัตฤกษ์ ' + info.hols.length + ' วัน</span>');
+    parts.push('<span style="font-size:10px;color:var(--coral);background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.25);border-radius:5px;padding:1px 7px;white-space:nowrap;cursor:default;" title="' + info.hols.map(function(h){return h.name;}).join(', ') + '">🏢 วันหยุดบริษัท ' + info.hols.length + ' วัน</span>');
   }
   // group leaves by category key (emoji+label), sum days, collect titles
   var grouped = {};
@@ -120,11 +121,16 @@ window.renderTimesheet = function() {
   const q          = (document.getElementById('ts-q')?.value || '').toLowerCase();
   const yr         = document.getElementById('ts-yr')?.value || '';
   const mon        = document.getElementById('ts-mon')?.value || '';
+  const typeFilter = document.getElementById('ts-type')?.value || '';
   const projFilter = document.getElementById('ts-proj')?.value || '';
   const stf        = document.getElementById('ts-staff')?.value || '';
 
   let rows = window.TIMESHEETS.slice();
 
+  if (typeFilter) rows = rows.filter(r => {
+    const p = window.PROJECTS.find(p => p.id === r.pid);
+    return p?.typeId === typeFilter;
+  });
   if (projFilter) rows = rows.filter(r => r.pid === projFilter);
   if (stf)        rows = rows.filter(r => r.staffId === stf);
   if (yr)         rows = rows.filter(r => getYearBE(r.workDate) == yr);
@@ -186,11 +192,13 @@ window.renderTimesheet = function() {
   // Auto-open when filtered to single project
   if (pids.length === 1 || projFilter) pids.forEach(p => openSet.add(p));
 
-  // Sort: most recent workDate first
+  // Sort: project end date descending (latest end first)
   pids.sort((a, b) => {
-    const maxA = projMap[a].reduce((m, r) => r.workDate > m ? r.workDate : m, '');
-    const maxB = projMap[b].reduce((m, r) => r.workDate > m ? r.workDate : m, '');
-    return maxB.localeCompare(maxA);
+    const projA = window.PROJECTS.find(p => p.id === a);
+    const projB = window.PROJECTS.find(p => p.id === b);
+    const endA  = projA?.end || '';
+    const endB  = projB?.end || '';
+    return endB.localeCompare(endA);
   });
 
   cards.innerHTML = pids.map(pid => {
@@ -290,6 +298,7 @@ window.tsToggleCard = function(pid) {
 // ── FILTERS ───────────────────────────────────────────────────────────────────
 function _populateTsFilters() {
   const yrSel   = document.getElementById('ts-yr');
+  const typeSel = document.getElementById('ts-type');
   const projSel = document.getElementById('ts-proj');
   const stfSel  = document.getElementById('ts-staff');
   if (!yrSel) return;
@@ -298,6 +307,15 @@ function _populateTsFilters() {
   const years = [...new Set(window.TIMESHEETS.map(r => getYearBE(r.workDate)).filter(Boolean))].sort((a,b)=>b-a);
   const curYr = yrSel.value;
   yrSel.innerHTML = '<option value="">ทุกปี พ.ศ.</option>' + years.map(y => `<option value="${y}"${y==curYr?' selected':''}>${y}</option>`).join('');
+
+  // Project types that appear in timesheets
+  if (typeSel && (window.PTYPES || []).length) {
+    const pids     = [...new Set(window.TIMESHEETS.map(r => r.pid).filter(Boolean))];
+    const typeIds  = new Set(window.PROJECTS.filter(p => pids.includes(p.id)).map(p => p.typeId).filter(Boolean));
+    const curType  = typeSel.value;
+    typeSel.innerHTML = '<option value="">ทุกประเภท</option>' +
+      window.PTYPES.filter(t => typeIds.has(t.id)).map(t => `<option value="${t.id}"${t.id===curType?' selected':''}>${esc(t.label)}</option>`).join('');
+  }
 
   // Projects that have timesheets
   const pids = [...new Set(window.TIMESHEETS.map(r => r.pid).filter(Boolean))];

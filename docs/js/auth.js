@@ -65,7 +65,7 @@ function setupRealtimeListeners(){
     if(loadCount === colls.length){
       window.isDbLoaded = true;
       window.hideLoader();
-      if(window.cu){ window.setupUser(); window.renderAll(); window.startAutoStageLoop(); }
+      if(window.cu){ window.setupUser(); window.renderAll(); window.startAutoStageLoop(); if(window.checkDailyNotifications)window.checkDailyNotifications(); }
     } else if(loadCount > colls.length){
       if(window.cu && window.kbPid===null) window.renderAll();
       if(window.cu) window.runAutoStage(true);
@@ -197,6 +197,8 @@ onAuthStateChanged(auth, async (user) => {
       onSnapshot(getDocRef('SETTINGS','app'), function(snap){
         var d=snap.exists()?snap.data():{};
         window.NOTIFY_TOKEN=d.notify_token||'';
+        window.NOTIFY_ADVANCE_TOKEN=d.notify_advance_token||'';
+        window.NOTIFY_PROJECT_TOKEN=d.notify_project_token||'';
         window.SETTINGS = {
           allowance_weekday_normal:  Number(d.allowance_weekday_normal)  || 350,
           allowance_holiday_normal:  Number(d.allowance_holiday_normal)  || 650,
@@ -360,7 +362,7 @@ window.goView = function(id,el){
   document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on');});
   var v=document.getElementById('view-'+id);
   if(v){v.style.display='';v.classList.add('on');}
-  var labels={overview:'Overview',kanban:'Delivery Board',projects:'โครงการทั้งหมด',advance:'Advance',lodging:'ระบบจัดหาที่พัก',workload:'สรุปภาระงาน',calendar:'ปฏิทินทีม',holidays:'วันหยุด',leave:'การลางาน',timesheet:'Timesheet',cost:'Cost Tracking'};
+  var labels={overview:'Overview',kanban:'Delivery Board',projects:'โครงการทั้งหมด',advance:'Advance',lodging:'ระบบจัดหาที่พัก',workload:'สรุปภาระงาน',availability:'ทีมว่าง',calendar:'ปฏิทินทีม',holidays:'วันหยุด',leave:'การลางาน',timesheet:'Timesheet',cost:'Cost Tracking'};
   document.getElementById('tp-title').textContent=labels[id]||id;
   var actions={};
   document.getElementById('tp-actions').innerHTML=actions[id]||'';
@@ -370,6 +372,14 @@ window.goView = function(id,el){
   if(id==='advance') window.renderAdvance();
   if(id==='lodging') window.renderLodging();
   if(id==='workload') window.renderWorkload();
+  if(id==='availability'){
+    window.avlPopulateDept&&window.avlPopulateDept();
+    // set default dates if not set
+    var avlS=document.getElementById('avl-start'),avlE=document.getElementById('avl-end');
+    if(avlS&&!avlS.value){var t=new Date();avlS.value=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');}
+    if(avlE&&!avlE.value){var t2=new Date();t2.setDate(t2.getDate()+29);avlE.value=t2.getFullYear()+'-'+String(t2.getMonth()+1).padStart(2,'0')+'-'+String(t2.getDate()).padStart(2,'0');}
+    window.renderAvailability&&window.renderAvailability();
+  }
   if(id==='calendar') window.renderCalendar();
   if(id==='holidays') window.renderHolidays();
   if(id==='leave') window.renderLeave();

@@ -160,6 +160,7 @@ window.advStep=async function(dir){
 window.saveAdvance=async function(){
   if(!window.canEdit('advance'))return;if(!window.auth.currentUser)return;
   var pur=(document.getElementById('af-purpose')||{}).value||'';if(!pur.trim())return;
+  var isNew=!window.editAid;
   var aid=window.editAid||'A'+Date.now();
   var finalPid=document.getElementById('af-pid').value.trim();
   var status=document.getElementById('af-status').value;
@@ -172,6 +173,11 @@ window.saveAdvance=async function(){
   try {
     await setDoc(getDocRef('ADVANCES',aid),dbAdv);
     if(isFullCleared) await window.advSyncCosts(aid, finalPid, pur.trim(), dbAdv);
+    // แจ้งเตือน Advance บันทึก/อัปเดต
+    if(window.sendAdvanceSavedNotify){
+      var advObj={pid:finalPid,status:status,advno:dbAdv.advance_no,amount:dbAdv.amount_requested,cleared:dbAdv.amount_cleared};
+      window.sendAdvanceSavedNotify(advObj,isNew);
+    }
   } catch(e){ window.showDbError(e); }
 }
 
@@ -313,8 +319,8 @@ window.advInitLaborTable = function(pid, workStart, workEnd, isBorder, existingI
           me = (mem && mem.e) || workEnd   || '';
         }
         if(ms && me) {
-          var info = window.countWorkDaysExcLeave ? window.countWorkDaysExcLeave(it.staffId, ms, me) : {leaveDays:0};
-          enriched = Object.assign({}, it, { workStart:ms, workEnd:me, leaveDays:info.leaveDays, visitLabel:visitLabel });
+          var info = window.countLaborDaysInfo ? window.countLaborDaysInfo(it.staffId, ms, me) : {workDays:0, holidayDays:0, leaveDays:0};
+          enriched = Object.assign({}, it, { workStart:ms, workEnd:me, workDays:info.workDays, holidayDays:info.holidayDays, leaveDays:info.leaveDays, visitLabel:visitLabel });
         }
       }
       window.advAddLaborRow(enriched, 0, isBorder);
@@ -325,8 +331,8 @@ window.advInitLaborTable = function(pid, workStart, workEnd, isBorder, existingI
       var visitLabel = v.no ? 'ช่วงที่ '+v.no : '';
       v.team.forEach(function(sid){
         if(!sid) return;
-        var info = window.countWorkDaysExcLeave(sid, v.start, v.end);
-        window.advAddLaborRow({staffId:sid, workStart:v.start, workEnd:v.end, workDays:info.workDays, holidayDays:0, leaveDays:info.leaveDays, dailyRate:null, included:true, visitLabel:visitLabel}, info.workDays, isBorder);
+        var info = window.countLaborDaysInfo(sid, v.start, v.end);
+        window.advAddLaborRow({staffId:sid, workStart:v.start, workEnd:v.end, workDays:info.workDays, holidayDays:info.holidayDays, leaveDays:info.leaveDays, dailyRate:null, included:true, visitLabel:visitLabel}, info.workDays, isBorder);
       });
     });
   } else {
@@ -334,8 +340,8 @@ window.advInitLaborTable = function(pid, workStart, workEnd, isBorder, existingI
     mems.forEach(function(m){
       var ms = m.s || workStart || '';
       var me = m.e || workEnd   || '';
-      var info = (ms && me) ? window.countWorkDaysExcLeave(m.sid, ms, me) : {workDays:0, leaveDays:0};
-      window.advAddLaborRow({staffId:m.sid, workStart:ms, workEnd:me, workDays:info.workDays, holidayDays:0, leaveDays:info.leaveDays, dailyRate:null, included:true}, info.workDays, isBorder);
+      var info = (ms && me) ? window.countLaborDaysInfo(m.sid, ms, me) : {workDays:0, holidayDays:0, leaveDays:0};
+      window.advAddLaborRow({staffId:m.sid, workStart:ms, workEnd:me, workDays:info.workDays, holidayDays:info.holidayDays, leaveDays:info.leaveDays, dailyRate:null, included:true}, info.workDays, isBorder);
     });
   }
   window.advCalcTotal();
