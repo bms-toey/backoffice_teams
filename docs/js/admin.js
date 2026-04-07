@@ -10,39 +10,58 @@ function renderAdm(){
   if(window.admCur==='notify'){window.renderNotifySettings();return;}
   if(window.admCur==='roles'){renderAdmRoles(c,titleEl);return;}
   if(window.admCur==='staff'){
-    if(titleEl)titleEl.innerHTML=`👥 จัดการพนักงาน <span class="tag" style="background:var(--surface2);color:var(--txt3);margin-left:10px;font-size:11px;">${window.STAFF.length} คน</span>`;
     var activeStaff=window.STAFF.filter(function(s){return s.active!==false;});
     var inactiveStaff=window.STAFF.filter(function(s){return s.active===false;});
-    function staffCard(s,i){
+    if(titleEl)titleEl.innerHTML=`👥 จัดการพนักงาน <span class="tag" style="background:var(--surface2);color:var(--txt3);margin-left:10px;font-size:11px;">ใช้งาน ${activeStaff.length} คน</span>`;
+    function staffRow(s,i){
       var initials=s.name.split(' ').map(function(w){return w.charAt(0);}).join('').substring(0,2).toUpperCase();
-      return`<div class="fade" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px;transition:all .2s;box-shadow:var(--sh-sm);" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='var(--sh-md)';this.style.borderColor='var(--border2)'" onmouseout="this.style.transform='';this.style.boxShadow='var(--sh-sm)';this.style.borderColor='var(--border)'">
-        <div style="display:flex;align-items:flex-start;gap:14px;">
-          <div style="width:48px;height:48px;border-radius:14px;background:${avC(i)};color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;flex-shrink:0;">${initials}</div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:14px;font-weight:600;color:var(--txt);margin-bottom:2px;">${esc(s.name)}${s.nickname?` <span style="font-size:12px;color:var(--txt3);font-weight:400;">(${esc(s.nickname)})</span>`:''}</div>
-            <div style="font-size:12px;color:var(--violet);font-weight:500;">${esc(s.role||'—')}</div>
-          </div>
-          ${s.active===false?`<span style="font-size:10px;background:rgba(255,107,107,.15);color:var(--coral);padding:2px 8px;border-radius:20px;font-weight:600;">Inactive</span>`:''}
+      return`<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;transition:background .15s;cursor:default;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+        <div style="width:38px;height:38px;border-radius:10px;background:${avC(i)};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">${initials}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;color:var(--txt);line-height:1.3;">${esc(s.name)}${s.nickname?` <span style="font-size:11px;color:var(--txt3);font-weight:400;">(${esc(s.nickname)})</span>`:''}</div>
+          <div style="font-size:11px;color:var(--violet);font-weight:500;margin-top:1px;">${esc(s.role||'—')}</div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:6px;padding-top:4px;border-top:1px solid var(--border);">
-          <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt2);">
-            <span style="width:16px;text-align:center;opacity:.6">🏢</span><span style="background:var(--surface2);padding:2px 10px;border-radius:20px;font-size:11px;">${esc(s.dept||'—')}</span>
-          </div>
-          ${s.email?`<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt3);"><span style="width:16px;text-align:center;opacity:.6">✉️</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(s.email)}</span></div>`:''}
-          ${s.phone?`<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt3);"><span style="width:16px;text-align:center;opacity:.6">📞</span><span>${esc(s.phone)}</span></div>`:''}
+        <div style="display:flex;align-items:center;gap:20px;flex-shrink:0;">
+          ${s.phone?`<span style="font-size:12px;color:var(--txt3);">📞 ${esc(s.phone)}</span>`:'<span style="font-size:12px;color:var(--border2);">—</span>'}
+          ${s.email?`<span style="font-size:12px;color:var(--txt3);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">✉️ ${esc(s.email)}</span>`:''}
         </div>
-        ${window.isAdmin()?`<div style="display:flex;gap:8px;padding-top:4px;">
-          <button class="btn btn-ghost btn-sm" style="flex:1;justify-content:center;" onclick="window.admStaffForm('${s.id}')">✏️ แก้ไข</button>
+        ${window.isAdmin()?`<div style="display:flex;gap:6px;flex-shrink:0;">
+          <button class="btn btn-ghost btn-sm" onclick="window.admStaffForm('${s.id}')">✏️</button>
           <button class="btn btn-red btn-sm" onclick="window.askDel('staff','${s.id}','${esc(s.name)}')">🗑</button>
         </div>`:''}
       </div>`;
     }
+    function deptSection(label,list,ci,isInactive){
+      if(!list.length)return'';
+      var accentColor=isInactive?'var(--coral)':avC(ci);
+      var badge=isInactive?`<span style="font-size:11px;background:rgba(255,107,107,.12);color:var(--coral);padding:1px 8px;border-radius:20px;">${list.length} คน</span>`:`<span style="font-size:11px;background:var(--surface2);color:var(--txt3);padding:1px 8px;border-radius:20px;">${list.length} คน</span>`;
+      var divider=`<div style="height:1px;background:var(--border);margin:0 16px;"></div>`;
+      return`<div class="fade" style="margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:0 2px;">
+          <div style="width:4px;height:18px;border-radius:2px;background:${accentColor};flex-shrink:0;"></div>
+          <div style="font-size:13px;font-weight:700;color:var(--txt);">${esc(label)}</div>
+          ${badge}
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;${isInactive?'opacity:.65;':''}">`+
+        list.map(function(s,i){return(i>0?divider:'')+staffRow(s,i);}).join('')+
+      `</div></div>`;
+    }
+    var deptOrder=window.DEPT_LIST.map(function(d){return d.label;});
+    var grouped={};
+    deptOrder.forEach(function(d){grouped[d]=[];});
+    grouped['ไม่ระบุแผนก']=[];
+    activeStaff.forEach(function(s){
+      if(deptOrder.includes(s.dept))grouped[s.dept].push(s);
+      else grouped['ไม่ระบุแผนก'].push(s);
+    });
+    var sections='';
+    var ci=0;
+    deptOrder.forEach(function(dept){if(grouped[dept]&&grouped[dept].length)sections+=deptSection(dept,grouped[dept],ci++,false);});
+    if(grouped['ไม่ระบุแผนก'].length)sections+=deptSection('ไม่ระบุแผนก',grouped['ไม่ระบุแผนก'],ci++,false);
+    if(inactiveStaff.length)sections+=deptSection('พ้นสภาพ / ไม่ใช้งาน',inactiveStaff,ci,true);
     c.innerHTML=
       `<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:20px">${window.isAdmin()?`<button class="btn btn-ghost" onclick="window.openStaffImport()">📥 นำเข้าข้อมูล</button><button class="btn btn-pri" onclick="window.admStaffForm(null)">+ เพิ่มพนักงาน</button>`:''}</div>`+
-      `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">`+
-      activeStaff.map(staffCard).join('')+
-      inactiveStaff.map(staffCard).join('')+
-      `</div>`;
+      sections;
   }
   else if(window.admCur==='dept'){
     if(titleEl)titleEl.innerHTML=`🏢 ข้อมูลแผนก <span class="tag" style="background:var(--surface2);color:var(--txt3);margin-left:10px;font-size:11px;">${window.DEPT_LIST.length} แผนก</span>`;

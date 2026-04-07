@@ -24,7 +24,7 @@ window.execDelete=async function(){
   else if(t==='timesheet')window.TIMESHEETS=window.TIMESHEETS.filter(x=>x.id!==id);
   else if(t==='cost')window.COSTS=window.COSTS.filter(x=>x.id!==id);
   window.closeM('m-del');window.delTarget=null;window.renderAll();
-  if(['staff','type','user','position','group','stage'].includes(t))window.admTab(t+'s');
+  if(t==='staff')window.admTab('staff');else if(['type','user','position','group','stage'].includes(t))window.admTab(t+'s');
   if(t==='department')window.admTab('dept');
   if(t==='lodging'&&window.currentLdPid)window.openLodgingGroupModal(window.currentLdPid);
   deleteDoc(getDocRef(sheetMap[t],id)).catch(e=>window.showDbError(e));
@@ -51,6 +51,7 @@ window.execImport=async function(){
       for(let i=1;i<lines.length;i++){const values=lines[i].map(v=>v.trim());let rowObj={};const newId=schema.prefix+Date.now()+i;rowObj[schema.idField]=newId;if(selType==='PROJECTS'){rowObj.status='active';rowObj.team=[];rowObj.members=[];}headers.forEach((h,index)=>{if(values[index]!==undefined&&schema.headers.includes(h)){let val=values[index];if(['budget','progress_pct','amount_requested','amount_cleared'].includes(h))val=Number(val)||0;if(['is_active'].includes(h))val=(val.toUpperCase()==='TRUE');rowObj[h]=val;}});batch.set(getDocRef(selType,newId),rowObj);opCount++;await commitBatchIfNeeded();}
       if(opCount>0)await batch.commit();
       window.closeM('m-import');window.showAlert(`นำเข้าข้อมูล ${selType} สำเร็จ ${lines.length-1} รายการ`,'success');
+      var admEl=document.getElementById('m-admin');if(admEl&&admEl.classList.contains('on')&&window.admCur)setTimeout(function(){window.admTab(window.admCur);},600);
     }catch(err){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">❌ เกิดข้อผิดพลาด: '+err.message+'</span>';}
   };reader.readAsText(file);
 }
