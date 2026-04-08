@@ -229,16 +229,19 @@ window.ROLE_PERMISSIONS = {};
 
 // Modules list (used in Admin UI)
 window.PERM_MODULES = [
-  { id:'overview',  label:'Overview',       icon:'📊' },
-  { id:'kanban',    label:'Delivery Board', icon:'📋' },
-  { id:'projects',  label:'โครงการ',        icon:'🗂️' },
-  { id:'advance',   label:'Advance',        icon:'💰' },
-  { id:'lodging',   label:'ที่พัก',          icon:'🏨' },
-  { id:'workload',  label:'สรุปภาระงาน',    icon:'📈' },
-  { id:'calendar',  label:'ปฏิทินทีม',      icon:'📅' },
-  { id:'leave',     label:'การลางาน',       icon:'🏖️' },
-  { id:'timesheet', label:'Timesheet',      icon:'⏱️' },
-  { id:'cost',      label:'Cost Tracking',  icon:'💵' },
+  { id:'overview',      label:'Overview',       icon:'📊' },
+  { id:'kanban',        label:'Delivery Board', icon:'📋' },
+  { id:'projects',      label:'โครงการ',        icon:'🗂️' },
+  { id:'advance',       label:'Advance',        icon:'💰' },
+  { id:'lodging',       label:'ที่พัก',          icon:'🏨' },
+  { id:'workload',      label:'สรุปภาระงาน',    icon:'📈' },
+  { id:'calendar',      label:'ปฏิทินทีม',      icon:'📅' },
+  { id:'leave',         label:'การลางาน',       icon:'🏖️' },
+  { id:'timesheet',     label:'Timesheet',      icon:'⏱️' },
+  { id:'cost',          label:'Cost Tracking',  icon:'💵' },
+  { id:'availability',  label:'ทีมว่าง',         icon:'👥' },
+  { id:'holiday',       label:'วันหยุด',         icon:'🎌' },
+  { id:'admin',         label:'Admin Panel',    icon:'⚙️' },
 ];
 
 // Default permissions when not configured (backward-compat)
@@ -249,34 +252,40 @@ function _roleDefaultPerms(role) {
   var vadd = {view:true, add:true,  edit:false, del:false}; // view + add only
   if (role === 'pm') {
     return {
-      overview: ro,    // ดูอย่างเดียว
-      kanban:   full,  // เต็ม
-      projects: full,  // เต็ม
-      advance:  full,  // เต็ม
-      lodging:  full,  // เต็ม
-      workload: ro,    // ดูอย่างเดียว
-      calendar: full,  // เต็ม
-      leave:    full,  // เต็ม
-      timesheet:ro,    // ดูอย่างเดียว
-      cost:     ro,    // ดูอย่างเดียว
+      overview:     ro,    // ดูอย่างเดียว
+      kanban:       full,  // เต็ม
+      projects:     full,  // เต็ม
+      advance:      full,  // เต็ม
+      lodging:      full,  // เต็ม
+      workload:     ro,    // ดูอย่างเดียว
+      calendar:     full,  // เต็ม
+      leave:        full,  // เต็ม
+      timesheet:    ro,    // ดูอย่างเดียว
+      cost:         ro,    // ดูอย่างเดียว
+      availability: ro,    // ดูอย่างเดียว
+      holiday:      ro,    // ดูอย่างเดียว
+      admin:        none,  // ไม่มีสิทธิ์
     };
   }
   if (role === 'viewer') {
     return {
-      overview: ro,    // ดูอย่างเดียว
-      kanban:   ro,    // ดูอย่างเดียว
-      projects: none,  // ไม่มีสิทธิ์
-      advance:  full,  // เต็ม
-      lodging:  full,  // เต็ม
-      workload: ro,    // ดูอย่างเดียว
-      calendar: ro,    // ดูอย่างเดียว
-      leave:    vadd,  // ดู + เพิ่ม
-      timesheet:ro,    // ดูอย่างเดียว
-      cost:     ro,    // ดูอย่างเดียว
+      overview:     ro,    // ดูอย่างเดียว
+      kanban:       ro,    // ดูอย่างเดียว
+      projects:     none,  // ไม่มีสิทธิ์
+      advance:      full,  // เต็ม
+      lodging:      full,  // เต็ม
+      workload:     ro,    // ดูอย่างเดียว
+      calendar:     ro,    // ดูอย่างเดียว
+      leave:        vadd,  // ดู + เพิ่ม
+      timesheet:    ro,    // ดูอย่างเดียว
+      cost:         ro,    // ดูอย่างเดียว
+      availability: ro,    // ดูอย่างเดียว
+      holiday:      none,  // ไม่มีสิทธิ์
+      admin:        none,  // ไม่มีสิทธิ์
     };
   }
   // fallback: view-only all
-  return {overview:ro,kanban:ro,projects:ro,advance:ro,lodging:ro,workload:ro,calendar:ro,leave:ro,timesheet:ro,cost:ro};
+  return {overview:ro,kanban:ro,projects:ro,advance:ro,lodging:ro,workload:ro,calendar:ro,leave:ro,timesheet:ro,cost:ro,availability:ro,holiday:none,admin:none};
 }
 
 // Main permission check

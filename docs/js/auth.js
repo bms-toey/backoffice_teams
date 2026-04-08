@@ -310,7 +310,7 @@ window.setupUser = function(){
   av.style.background=roleColors[window.cu.role]||'linear-gradient(135deg,#7c5cfc,#ff6b6b)';
   document.getElementById('u-name').textContent=window.cu.name;
   document.getElementById('u-role').textContent=window.roleLabel(window.cu.role);
-  document.querySelectorAll('.admin-only').forEach(function(el){el.style.display=window.isAdmin()?'':'none';});
+  document.querySelectorAll('.admin-only').forEach(function(el){el.style.display=(window.isAdmin()||window.canView('admin'))?'':'none';});
   document.querySelectorAll('.ce-only').forEach(function(el){el.style.display=window.ce()?'':'none';});
   document.querySelectorAll('.cl-only').forEach(function(el){el.style.display=window.cl()?'':'none'});
   // import button in topbar — admin only

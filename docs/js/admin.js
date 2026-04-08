@@ -2,7 +2,7 @@ import { getFirestore, setDoc, writeBatch } from "https://www.gstatic.com/fireba
 const db = getFirestore();
 const { esc, fd, fc, fca, pd, gS, gT, gG, gSt, gC, avC, uid, getFY, getYearBE, getStaffOverlaps, overlapWarnText, getStaffLeaveConflicts, getColRef, getDocRef } = window;
 // ── ADMIN ──
-window.openAdminModal=function(){if(window.isAdmin()){window.admTab('staff');window.openM('m-admin');}}
+window.openAdminModal=function(){if(window.isAdmin()||window.canView('admin')){window.admTab('staff');window.openM('m-admin');}}
 window.admTab=function(t){window.admCur=t;document.querySelectorAll('.adm-nav-item').forEach(function(el){el.classList.remove('on');});var el=document.getElementById('at-'+t);if(el)el.classList.add('on');renderAdm();}
 
 function renderAdm(){
@@ -25,9 +25,9 @@ function renderAdm(){
           ${s.phone?`<span style="font-size:12px;color:var(--txt3);">📞 ${esc(s.phone)}</span>`:'<span style="font-size:12px;color:var(--border2);">—</span>'}
           ${s.email?`<span style="font-size:12px;color:var(--txt3);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">✉️ ${esc(s.email)}</span>`:''}
         </div>
-        ${window.isAdmin()?`<div style="display:flex;gap:6px;flex-shrink:0;">
-          <button class="btn btn-ghost btn-sm" onclick="window.admStaffForm('${s.id}')">✏️</button>
-          <button class="btn btn-red btn-sm" onclick="window.askDel('staff','${s.id}','${esc(s.name)}')">🗑</button>
+        ${(window.canEdit('admin')||window.canDel('admin'))?`<div style="display:flex;gap:6px;flex-shrink:0;">
+          ${window.canEdit('admin')?`<button class="btn btn-ghost btn-sm" onclick="window.admStaffForm('${s.id}')">✏️</button>`:''}
+          ${window.canDel('admin')?`<button class="btn btn-red btn-sm" onclick="window.askDel('staff','${s.id}','${esc(s.name)}')">🗑</button>`:''}
         </div>`:''}
       </div>`;
     }
@@ -60,23 +60,23 @@ function renderAdm(){
     if(grouped['ไม่ระบุแผนก'].length)sections+=deptSection('ไม่ระบุแผนก',grouped['ไม่ระบุแผนก'],ci++,false);
     if(inactiveStaff.length)sections+=deptSection('พ้นสภาพ / ไม่ใช้งาน',inactiveStaff,ci,true);
     c.innerHTML=
-      `<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:20px">${window.isAdmin()?`<button class="btn btn-ghost" onclick="window.openStaffImport()">📥 นำเข้าข้อมูล</button><button class="btn btn-pri" onclick="window.admStaffForm(null)">+ เพิ่มพนักงาน</button>`:''}</div>`+
+      `<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:20px">${window.canAdd('admin')?`<button class="btn btn-ghost" onclick="window.openStaffImport()">📥 นำเข้าข้อมูล</button><button class="btn btn-pri" onclick="window.admStaffForm(null)">+ เพิ่มพนักงาน</button>`:''}</div>`+
       sections;
   }
   else if(window.admCur==='dept'){
     if(titleEl)titleEl.innerHTML=`🏢 ข้อมูลแผนก <span class="tag" style="background:var(--surface2);color:var(--txt3);margin-left:10px;font-size:11px;">${window.DEPT_LIST.length} แผนก</span>`;
-    c.innerHTML=`<div style="display:flex;justify-content:flex-end;margin-bottom:20px">${window.isAdmin()?`<button class="btn btn-pri" onclick="window.admDeptForm(null)">+ เพิ่มแผนก</button>`:''}</div><div style="display:flex;flex-direction:column;gap:8px;max-width:640px;">`+
+    c.innerHTML=`<div style="display:flex;justify-content:flex-end;margin-bottom:20px">${window.canAdd('admin')?`<button class="btn btn-pri" onclick="window.admDeptForm(null)">+ เพิ่มแผนก</button>`:''}</div><div style="display:flex;flex-direction:column;gap:8px;max-width:640px;">`+
     window.DEPT_LIST.map(function(d,i){
       return`<div class="fade" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:14px;transition:all .2s;" onmouseover="this.style.borderColor='var(--violet)';this.style.background='var(--surface2)'" onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--surface)'">
         <div style="width:28px;height:28px;border-radius:8px;background:var(--violet)18;color:var(--violet);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;">${i+1}</div>
         <div style="flex:1;font-size:14px;font-weight:500;color:var(--txt);">🏢 ${esc(d.label)}</div>
-        ${window.isAdmin()?`<div style="display:flex;gap:6px;"><button class="btn btn-ghost btn-sm" onclick="window.admDeptForm('${d.id}')">✏️</button><button class="btn btn-red btn-sm" onclick="window.askDel('department','${d.id}','${esc(d.label)}')">🗑</button></div>`:''}
+        ${(window.canEdit('admin')||window.canDel('admin'))?`<div style="display:flex;gap:6px;">${window.canEdit('admin')?`<button class="btn btn-ghost btn-sm" onclick="window.admDeptForm('${d.id}')">✏️</button>`:''}${window.canDel('admin')?`<button class="btn btn-red btn-sm" onclick="window.askDel('department','${d.id}','${esc(d.label)}')">🗑</button>`:''}</div>`:''}
       </div>`;
     }).join('')+`</div>`;
   }
-  else if(window.admCur==='groups'){if(titleEl)titleEl.innerHTML=`📂 กลุ่มโครงการ`;c.innerHTML=`<div style="display:flex;justify-content:flex-end;margin-bottom:20px">${window.isAdmin()?`<button class="btn btn-pri" onclick="window.admGroupForm(null)">+ เพิ่มกลุ่มโครงการ</button>`:''}</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">`+window.PGROUPS.map(function(g){return`<div class="adm-card fade"><div style="width:40px;height:40px;border-radius:10px;background:${g.color};flex-shrink:0;box-shadow:0 4px 12px ${g.color}55;"></div><div class="adm-card-info"><div style="font-size:14px;font-weight:600;color:var(--txt)">${esc(g.label)}</div><div style="display:flex;align-items:center;gap:6px;margin-top:4px;"><div style="width:10px;height:10px;border-radius:50%;background:${g.color};"></div><span style="font-size:11px;font-weight:400;color:var(--txt3)">${g.color}</span></div></div><div class="adm-card-actions">${window.isAdmin()?`<button class="btn btn-ghost btn-sm" onclick="window.admGroupForm('${g.id}')">✏️</button><button class="btn btn-red btn-sm" onclick="window.askDel('group','${g.id}','${esc(g.label)}')">🗑</button>`:''}</div></div>`;}).join('')+`</div>`;}
-  else if(window.admCur==='types'){if(titleEl)titleEl.innerHTML=`🏷️ ประเภทงาน`;c.innerHTML=`<div style="display:flex;justify-content:flex-end;margin-bottom:20px">${window.isAdmin()?`<button class="btn btn-pri" onclick="window.admTypeForm(null)">+ เพิ่มประเภทงาน</button>`:''}</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">`+window.PTYPES.map(function(t){return`<div class="adm-card fade"><div style="width:40px;height:40px;border-radius:10px;background:${t.color};flex-shrink:0;box-shadow:0 4px 12px ${t.color}55;"></div><div class="adm-card-info"><div style="font-size:14px;font-weight:600;color:var(--txt)">${esc(t.label)}</div><div style="display:flex;align-items:center;gap:6px;margin-top:4px;"><div style="width:10px;height:10px;border-radius:50%;background:${t.color};"></div><span style="font-size:11px;font-weight:400;color:var(--txt3)">${t.color}</span></div></div><div class="adm-card-actions">${window.isAdmin()?`<button class="btn btn-ghost btn-sm" onclick="window.admTypeForm('${t.id}')">✏️</button><button class="btn btn-red btn-sm" onclick="window.askDel('type','${t.id}','${esc(t.label)}')">🗑</button>`:''}</div></div>`;}).join('')+`</div>`;}
-  else if(window.admCur==='positions'){if(titleEl)titleEl.innerHTML=`💼 ตำแหน่งงาน`;c.innerHTML=`<div style="display:flex;justify-content:flex-end;margin-bottom:20px">${window.isAdmin()?`<button class="btn btn-pri" onclick="window.admPositionForm(null)">+ เพิ่มตำแหน่ง</button>`:''}</div><div style="display:flex;flex-direction:column;gap:8px;max-width:640px;">`+window.POSITIONS.map(function(p,i){return`<div class="fade" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:14px;transition:all .2s;" onmouseover="this.style.borderColor='var(--violet)';this.style.background='var(--surface2)'" onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--surface)'"><div style="width:28px;height:28px;border-radius:8px;background:var(--violet)18;color:var(--violet);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;">${i+1}</div><div style="flex:1;font-size:14px;font-weight:500;color:var(--txt);">${esc(p.label)}</div><div style="font-size:12px;color:var(--teal);font-weight:600;white-space:nowrap;">${p.dailyRate>0?fc(p.dailyRate)+'/วัน':'—'}</div>${window.isAdmin()?`<div style="display:flex;gap:6px;"><button class="btn btn-ghost btn-sm" onclick="window.admPositionForm('${p.id}')">✏️</button><button class="btn btn-red btn-sm" onclick="window.askDel('position','${p.id}','${esc(p.label)}')">🗑</button></div>`:''}</div>`;}).join('')+`</div>`;}
+  else if(window.admCur==='groups'){if(titleEl)titleEl.innerHTML=`📂 กลุ่มโครงการ`;c.innerHTML=`<div style="display:flex;justify-content:flex-end;margin-bottom:20px">${window.canAdd('admin')?`<button class="btn btn-pri" onclick="window.admGroupForm(null)">+ เพิ่มกลุ่มโครงการ</button>`:''}</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">`+window.PGROUPS.map(function(g){return`<div class="adm-card fade"><div style="width:40px;height:40px;border-radius:10px;background:${g.color};flex-shrink:0;box-shadow:0 4px 12px ${g.color}55;"></div><div class="adm-card-info"><div style="font-size:14px;font-weight:600;color:var(--txt)">${esc(g.label)}</div><div style="display:flex;align-items:center;gap:6px;margin-top:4px;"><div style="width:10px;height:10px;border-radius:50%;background:${g.color};"></div><span style="font-size:11px;font-weight:400;color:var(--txt3)">${g.color}</span></div></div><div class="adm-card-actions">${window.canEdit('admin')?`<button class="btn btn-ghost btn-sm" onclick="window.admGroupForm('${g.id}')">✏️</button>`:''}${window.canDel('admin')?`<button class="btn btn-red btn-sm" onclick="window.askDel('group','${g.id}','${esc(g.label)}')">🗑</button>`:''}</div></div>`;}).join('')+`</div>`;}
+  else if(window.admCur==='types'){if(titleEl)titleEl.innerHTML=`🏷️ ประเภทงาน`;c.innerHTML=`<div style="display:flex;justify-content:flex-end;margin-bottom:20px">${window.canAdd('admin')?`<button class="btn btn-pri" onclick="window.admTypeForm(null)">+ เพิ่มประเภทงาน</button>`:''}</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">`+window.PTYPES.map(function(t){return`<div class="adm-card fade"><div style="width:40px;height:40px;border-radius:10px;background:${t.color};flex-shrink:0;box-shadow:0 4px 12px ${t.color}55;"></div><div class="adm-card-info"><div style="font-size:14px;font-weight:600;color:var(--txt)">${esc(t.label)}</div><div style="display:flex;align-items:center;gap:6px;margin-top:4px;"><div style="width:10px;height:10px;border-radius:50%;background:${t.color};"></div><span style="font-size:11px;font-weight:400;color:var(--txt3)">${t.color}</span></div></div><div class="adm-card-actions">${window.canEdit('admin')?`<button class="btn btn-ghost btn-sm" onclick="window.admTypeForm('${t.id}')">✏️</button>`:''}${window.canDel('admin')?`<button class="btn btn-red btn-sm" onclick="window.askDel('type','${t.id}','${esc(t.label)}')">🗑</button>`:''}</div></div>`;}).join('')+`</div>`;}
+  else if(window.admCur==='positions'){if(titleEl)titleEl.innerHTML=`💼 ตำแหน่งงาน`;c.innerHTML=`<div style="display:flex;justify-content:flex-end;margin-bottom:20px">${window.canAdd('admin')?`<button class="btn btn-pri" onclick="window.admPositionForm(null)">+ เพิ่มตำแหน่ง</button>`:''}</div><div style="display:flex;flex-direction:column;gap:8px;max-width:640px;">`+window.POSITIONS.map(function(p,i){return`<div class="fade" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:14px;transition:all .2s;" onmouseover="this.style.borderColor='var(--violet)';this.style.background='var(--surface2)'" onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--surface)'"><div style="width:28px;height:28px;border-radius:8px;background:var(--violet)18;color:var(--violet);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;">${i+1}</div><div style="flex:1;font-size:14px;font-weight:500;color:var(--txt);">${esc(p.label)}</div><div style="font-size:12px;color:var(--teal);font-weight:600;white-space:nowrap;">${p.dailyRate>0?fc(p.dailyRate)+'/วัน':'—'}</div>${(window.canEdit('admin')||window.canDel('admin'))?`<div style="display:flex;gap:6px;">${window.canEdit('admin')?`<button class="btn btn-ghost btn-sm" onclick="window.admPositionForm('${p.id}')">✏️</button>`:''}${window.canDel('admin')?`<button class="btn btn-red btn-sm" onclick="window.askDel('position','${p.id}','${esc(p.label)}')">🗑</button>`:''}</div>`:''}</div>`;}).join('')+`</div>`;}
   else if(window.admCur==='rates'){
     if(titleEl)titleEl.innerHTML=`💵 อัตราค่าใช้จ่าย`;
     var st=window.SETTINGS;
@@ -84,12 +84,12 @@ function renderAdm(){
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;">
         <div style="font-size:13px;font-weight:700;color:var(--violet);margin-bottom:16px;">📋 อัตราค่าเบี้ยเลี้ยง (฿/วัน)</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-          <div class="f-group"><label class="f-label">วันทำงาน — พื้นที่ปกติ</label><input type="number" class="f-input" id="rt-wn" value="${st.allowance_weekday_normal}" ${window.isAdmin()?'':'disabled'}></div>
-          <div class="f-group"><label class="f-label">วันหยุด — พื้นที่ปกติ</label><input type="number" class="f-input" id="rt-hn" value="${st.allowance_holiday_normal}" ${window.isAdmin()?'':'disabled'}></div>
-          <div class="f-group"><label class="f-label">วันทำงาน — พื้นที่ชายแดน</label><input type="number" class="f-input" id="rt-wb" value="${st.allowance_weekday_border}" ${window.isAdmin()?'':'disabled'}></div>
-          <div class="f-group"><label class="f-label">วันหยุด — พื้นที่ชายแดน</label><input type="number" class="f-input" id="rt-hb" value="${st.allowance_holiday_border}" ${window.isAdmin()?'':'disabled'}></div>
+          <div class="f-group"><label class="f-label">วันทำงาน — พื้นที่ปกติ</label><input type="number" class="f-input" id="rt-wn" value="${st.allowance_weekday_normal}" ${window.canEdit('admin')?'':'disabled'}></div>
+          <div class="f-group"><label class="f-label">วันหยุด — พื้นที่ปกติ</label><input type="number" class="f-input" id="rt-hn" value="${st.allowance_holiday_normal}" ${window.canEdit('admin')?'':'disabled'}></div>
+          <div class="f-group"><label class="f-label">วันทำงาน — พื้นที่ชายแดน</label><input type="number" class="f-input" id="rt-wb" value="${st.allowance_weekday_border}" ${window.canEdit('admin')?'':'disabled'}></div>
+          <div class="f-group"><label class="f-label">วันหยุด — พื้นที่ชายแดน</label><input type="number" class="f-input" id="rt-hb" value="${st.allowance_holiday_border}" ${window.canEdit('admin')?'':'disabled'}></div>
         </div>
-        ${window.isAdmin()?`<button class="btn btn-pri" style="margin-top:12px;" onclick="window.saveAllowanceRates()">💾 บันทึกอัตราเบี้ยเลี้ยง</button>`:''}
+        ${window.canEdit('admin')?`<button class="btn btn-pri" style="margin-top:12px;" onclick="window.saveAllowanceRates()">💾 บันทึกอัตราเบี้ยเลี้ยง</button>`:''}
       </div>
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;">
         <div style="font-size:13px;font-weight:700;color:var(--violet);margin-bottom:4px;">💼 อัตราค่าแรงต่อตำแหน่ง</div>
@@ -98,8 +98,8 @@ function renderAdm(){
       </div>
     </div>`;
   }
-  else if(window.admCur==='stages'){if(titleEl)titleEl.innerHTML=`⚡ PM Stages`;c.innerHTML=`<div style="display:flex;justify-content:flex-end;margin-bottom:20px">${window.isAdmin()?`<button class="btn btn-pri" onclick="window.admStageForm(null)">+ เพิ่ม Stage</button>`:''}</div><div id="stg-list" style="display:flex;flex-direction:column;gap:10px;max-width:700px;margin:0 auto;">`+window.STAGES.map(function(s,i){return`<div class="adm-card fade" draggable="${window.isAdmin()}" ondragstart="window.stgDrag(event,'${s.id}')" ondragover="event.preventDefault()" ondrop="window.stgDrop(event,'${s.id}')" style="animation-delay:${i*30}ms;">${window.isAdmin()?`<div style="color:var(--border2);font-size:20px;cursor:grab;padding-right:10px;">⋮⋮</div>`:''}<div style="width:40px;height:40px;border-radius:10px;background:${s.color};flex-shrink:0;box-shadow:0 4px 12px ${s.color}55;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;">${s.order||i+1}</div><div class="adm-card-info"><div style="font-size:14px;font-weight:600;color:var(--txt)">${esc(s.label)}</div><div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap;"><div style="width:10px;height:10px;border-radius:50%;background:${s.color};"></div><span style="font-size:11px;font-weight:400;color:var(--txt3)">ลำดับที่ ${s.order||i+1}</span>${s.autoRule?`<span style="font-size:10px;font-weight:600;background:var(--violet)15;color:var(--violet);padding:2px 8px;border-radius:10px;">⚡ ${s.autoRule==='before_start'?'ก่อนเริ่ม '+s.autoOffset+'ว':s.autoRule==='on_start'?'เมื่อเริ่มโครงการ':s.autoRule==='on_end'?'เมื่อสิ้นสุดโครงการ':'หลังสิ้นสุด '+s.autoOffset+'ว'}</span>`:''}${s.setProgress>=0?`<span style="font-size:10px;font-weight:600;background:var(--teal)15;color:var(--teal);padding:2px 8px;border-radius:10px;">📊 ${s.setProgress}%</span>`:''}</div></div><div class="adm-card-actions">${window.isAdmin()?`<button class="btn btn-ghost btn-sm" onclick="window.admStageForm('${s.id}')">✏️</button><button class="btn btn-red btn-sm" onclick="window.askDel('stage','${s.id}','${esc(s.label)}')">🗑</button>`:''}</div></div>`;}).join('')+`</div>`;}
-  else if(window.admCur==='users'){if(titleEl)titleEl.innerHTML=`🔑 ผู้ใช้งานระบบ`;c.innerHTML=`<div style="display:flex;justify-content:flex-end;margin-bottom:20px">${window.isAdmin()?`<button class="btn btn-pri" onclick="window.admUserForm(null)">+ เพิ่มบัญชีผู้ใช้</button>`:''}</div><div class="dtable-inner" style="border:1px solid var(--border);"><table><thead><tr><th>Username</th><th>ชื่อ</th><th>Role</th><th style="width:90px"></th></tr></thead><tbody>`+window.USERS.map(function(u,i){var rc={admin:'rgba(255,107,107,.15)',pm:'rgba(255,166,43,.15)',viewer:'rgba(6,214,160,.15)'};var rt={admin:'var(--coral)',pm:'var(--amber)',viewer:'var(--teal)'};return`<tr class="fade"><td style="font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--violet)">${esc(u.username)}</td><td style="font-weight:600;">${esc(u.name)}</td><td><span class="tag" style="background:${rc[u.role]||'var(--surface2)'};color:${rt[u.role]||'var(--txt2)'}">${window.roleLabel(u.role)}</span></td><td><div style="display:flex;gap:6px">${window.isAdmin()?`<button class="btn btn-ghost btn-sm" onclick="window.admUserForm('${u.id}')">✏️</button>`:''} ${window.isAdmin()?`<button class="btn btn-red btn-sm" onclick="window.askDel('user','${u.id}','${esc(u.username)}')">🗑</button>`:''}</div></td></tr>`;}).join('')+`</tbody></table></div>`;}
+  else if(window.admCur==='stages'){if(titleEl)titleEl.innerHTML=`⚡ PM Stages`;c.innerHTML=`<div style="display:flex;justify-content:flex-end;margin-bottom:20px">${window.canAdd('admin')?`<button class="btn btn-pri" onclick="window.admStageForm(null)">+ เพิ่ม Stage</button>`:''}</div><div id="stg-list" style="display:flex;flex-direction:column;gap:10px;max-width:700px;margin:0 auto;">`+window.STAGES.map(function(s,i){return`<div class="adm-card fade" draggable="${window.canEdit('admin')}" ondragstart="window.stgDrag(event,'${s.id}')" ondragover="event.preventDefault()" ondrop="window.stgDrop(event,'${s.id}')" style="animation-delay:${i*30}ms;">${window.canEdit('admin')?`<div style="color:var(--border2);font-size:20px;cursor:grab;padding-right:10px;">⋮⋮</div>`:''}<div style="width:40px;height:40px;border-radius:10px;background:${s.color};flex-shrink:0;box-shadow:0 4px 12px ${s.color}55;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;">${s.order||i+1}</div><div class="adm-card-info"><div style="font-size:14px;font-weight:600;color:var(--txt)">${esc(s.label)}</div><div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap;"><div style="width:10px;height:10px;border-radius:50%;background:${s.color};"></div><span style="font-size:11px;font-weight:400;color:var(--txt3)">ลำดับที่ ${s.order||i+1}</span>${s.autoRule?`<span style="font-size:10px;font-weight:600;background:var(--violet)15;color:var(--violet);padding:2px 8px;border-radius:10px;">⚡ ${s.autoRule==='before_start'?'ก่อนเริ่ม '+s.autoOffset+'ว':s.autoRule==='on_start'?'เมื่อเริ่มโครงการ':s.autoRule==='on_end'?'เมื่อสิ้นสุดโครงการ':'หลังสิ้นสุด '+s.autoOffset+'ว'}</span>`:''}${s.setProgress>=0?`<span style="font-size:10px;font-weight:600;background:var(--teal)15;color:var(--teal);padding:2px 8px;border-radius:10px;">📊 ${s.setProgress}%</span>`:''}</div></div><div class="adm-card-actions">${window.canEdit('admin')?`<button class="btn btn-ghost btn-sm" onclick="window.admStageForm('${s.id}')">✏️</button>`:''}${window.canDel('admin')?`<button class="btn btn-red btn-sm" onclick="window.askDel('stage','${s.id}','${esc(s.label)}')">🗑</button>`:''}</div></div>`;}).join('')+`</div>`;}
+  else if(window.admCur==='users'){if(titleEl)titleEl.innerHTML=`🔑 ผู้ใช้งานระบบ`;c.innerHTML=`<div style="display:flex;justify-content:flex-end;margin-bottom:20px">${window.canAdd('admin')?`<button class="btn btn-pri" onclick="window.admUserForm(null)">+ เพิ่มบัญชีผู้ใช้</button>`:''}</div><div class="dtable-inner" style="border:1px solid var(--border);"><table><thead><tr><th>Username</th><th>ชื่อ</th><th>Role</th><th style="width:90px"></th></tr></thead><tbody>`+window.USERS.map(function(u,i){var rc={admin:'rgba(255,107,107,.15)',pm:'rgba(255,166,43,.15)',viewer:'rgba(6,214,160,.15)'};var rt={admin:'var(--coral)',pm:'var(--amber)',viewer:'var(--teal)'};return`<tr class="fade"><td style="font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--violet)">${esc(u.username)}</td><td style="font-weight:600;">${esc(u.name)}</td><td><span class="tag" style="background:${rc[u.role]||'var(--surface2)'};color:${rt[u.role]||'var(--txt2)'}">${window.roleLabel(u.role)}</span></td><td><div style="display:flex;gap:6px">${window.canEdit('admin')?`<button class="btn btn-ghost btn-sm" onclick="window.admUserForm('${u.id}')">✏️</button>`:''} ${window.canDel('admin')?`<button class="btn btn-red btn-sm" onclick="window.askDel('user','${u.id}','${esc(u.username)}')">🗑</button>`:''}</div></td></tr>`;}).join('')+`</tbody></table></div>`;}
 }
 
 // ── helper: show/hide ID badge in modal header ──
@@ -141,7 +141,7 @@ window.admGroupForm=function(id){
   setTimeout(function(){bindColorPreview('agf-col','agf-preview','agf-lbl');},50);
 }
 window.saveAdmGroup=async function(){
-  if(!window.isAdmin()||!window.auth.currentUser)return;
+  if(!window.canEdit('admin')||!window.auth.currentUser)return;
   var l=(document.getElementById('agf-lbl')||{}).value||'';if(!l.trim())return;
   var gid=window._editGroupId||'GRP'+Date.now();
   window.closeM('m-group');
@@ -162,7 +162,7 @@ window.admTypeForm=function(id){
   setTimeout(function(){bindColorPreview('atf-col','atf-preview','atf-lbl');},50);
 }
 window.saveAdmType=async function(){
-  if(!window.isAdmin()||!window.auth.currentUser)return;
+  if(!window.canEdit('admin')||!window.auth.currentUser)return;
   var l=(document.getElementById('atf-lbl')||{}).value||'';if(!l.trim())return;
   var tid=window._editTypeId||'T'+Date.now();
   window.closeM('m-type');
@@ -182,7 +182,7 @@ window.admPositionForm=function(id){
   window.openM('m-position');
 }
 window.saveAdmPosition=async function(){
-  if(!window.isAdmin()||!window.auth.currentUser)return;
+  if(!window.canEdit('admin')||!window.auth.currentUser)return;
   var l=(document.getElementById('apf-lbl')||{}).value||'';if(!l.trim())return;
   var pid=window._editPositionId||'POS'+Date.now();
   var rate=parseFloat((document.getElementById('apf-rate')||{}).value)||0;
@@ -203,7 +203,7 @@ window.admDeptForm=function(id){
   window.openM('m-department');
 }
 window.saveAdmDept=async function(){
-  if(!window.isAdmin()||!window.auth.currentUser)return;
+  if(!window.canEdit('admin')||!window.auth.currentUser)return;
   var l=(document.getElementById('adf-lbl')||{}).value||'';if(!l.trim())return;
   var did=window._editDeptId||'DEPT'+Date.now();
   window.closeM('m-department');
@@ -212,7 +212,7 @@ window.saveAdmDept=async function(){
 }
 
 window.saveAllowanceRates=async function(){
-  if(!window.isAdmin()||!window.auth.currentUser)return;
+  if(!window.canEdit('admin')||!window.auth.currentUser)return;
   var data={
     allowance_weekday_normal: parseFloat(document.getElementById('rt-wn').value)||350,
     allowance_holiday_normal: parseFloat(document.getElementById('rt-hn').value)||650,
@@ -238,7 +238,7 @@ window.admStageForm=function(id){
   setTimeout(function(){bindColorPreview('asgf-col','asgf-preview','asgf-lbl');},50);
 }
 window.saveAdmStage=async function(){
-  if(!window.isAdmin()||!window.auth.currentUser)return;
+  if(!window.canEdit('admin')||!window.auth.currentUser)return;
   var l=(document.getElementById('asgf-lbl')||{}).value||'';if(!l.trim())return;
   var sid=window._editStageId||'STG'+Date.now();
   var maxOrder=window.STAGES.length>0?Math.max(...window.STAGES.map(s=>s.order||0)):0;
@@ -251,7 +251,7 @@ window.saveAdmStage=async function(){
   setDoc(getDocRef('STAGES',sid),{stage_id:sid,label_th:l.trim(),color_hex:document.getElementById('asgf-col').value,order:order,auto_rule:rule,auto_offset:offset,set_progress:prog},{merge:true}).catch(e=>window.showDbError(e));
 }
 window.stgDragId=null;window.stgDrag=function(e,id){window.stgDragId=id;}
-window.stgDrop=async function(e,targetId){e.preventDefault();if(!window.stgDragId||window.stgDragId===targetId||!window.isAdmin())return;let arr=[...window.STAGES];let fromIdx=arr.findIndex(x=>x.id===window.stgDragId);let toIdx=arr.findIndex(x=>x.id===targetId);if(fromIdx<0||toIdx<0)return;let[moved]=arr.splice(fromIdx,1);arr.splice(toIdx,0,moved);arr.forEach((s,i)=>s.order=i+1);window.STAGES=arr;window.admTab('stages');try{const batch=writeBatch(db);arr.forEach(s=>{batch.update(getDocRef('STAGES',s.id),{order:s.order});});await batch.commit();}catch(err){window.showDbError(err);}window.stgDragId=null;}
+window.stgDrop=async function(e,targetId){e.preventDefault();if(!window.stgDragId||window.stgDragId===targetId||!window.canEdit('admin'))return;let arr=[...window.STAGES];let fromIdx=arr.findIndex(x=>x.id===window.stgDragId);let toIdx=arr.findIndex(x=>x.id===targetId);if(fromIdx<0||toIdx<0)return;let[moved]=arr.splice(fromIdx,1);arr.splice(toIdx,0,moved);arr.forEach((s,i)=>s.order=i+1);window.STAGES=arr;window.admTab('stages');try{const batch=writeBatch(db);arr.forEach(s=>{batch.update(getDocRef('STAGES',s.id),{order:s.order});});await batch.commit();}catch(err){window.showDbError(err);}window.stgDragId=null;}
 window.openStaffImport=function(){
   document.getElementById('import-file').value='';
   document.getElementById('import-msg').innerHTML='รองรับเฉพาะไฟล์ .csv เท่านั้น';
@@ -298,7 +298,7 @@ window.admStaffForm=function(id){
   window.openM('m-staff');
 }
 window.saveAdmStaff=async function(){
-  if(!window.isAdmin()||!window.auth.currentUser)return;
+  if(!window.canEdit('admin')||!window.auth.currentUser)return;
   var nm=(document.getElementById('asf-name')||{}).value||'';if(!nm.trim())return;
   var id=window._editStaffId;
   var sid=id||'S'+Date.now();
@@ -331,7 +331,7 @@ window.admUserForm=function(id){
   window.openM('m-user');
 }
 window.saveAdmUser=async function(){
-  if(!window.isAdmin()||!window.auth.currentUser)return;
+  if(!window.canEdit('admin')||!window.auth.currentUser)return;
   var un=(document.getElementById('auf-u')||{}).value||'';
   var nm=(document.getElementById('auf-n')||{}).value||'';
   if(!un.trim()||!nm.trim())return;
@@ -364,10 +364,10 @@ function renderAdmRoles(c, titleEl) {
     var full={view:true,add:true,edit:true,del:true}, ro={view:true,add:false,edit:false,del:false},
         none={view:false,add:false,edit:false,del:false}, vadd={view:true,add:true,edit:false,del:false};
     var def = role==='pm'
-      ? {overview:ro,kanban:full,projects:full,advance:full,lodging:full,workload:ro,calendar:full,leave:full,timesheet:ro,cost:ro}
+      ? {overview:ro,kanban:full,projects:full,advance:full,lodging:full,workload:ro,calendar:full,leave:full,timesheet:ro,cost:ro,availability:ro,holiday:ro,admin:none}
       : role==='viewer'
-      ? {overview:ro,kanban:ro,projects:none,advance:full,lodging:full,workload:ro,calendar:ro,leave:vadd,timesheet:ro,cost:ro}
-      : {overview:ro,kanban:ro,projects:ro,advance:ro,lodging:ro,workload:ro,calendar:ro,leave:ro,timesheet:ro,cost:ro};
+      ? {overview:ro,kanban:ro,projects:none,advance:full,lodging:full,workload:ro,calendar:ro,leave:vadd,timesheet:ro,cost:ro,availability:ro,holiday:none,admin:none}
+      : {overview:ro,kanban:ro,projects:ro,advance:ro,lodging:ro,workload:ro,calendar:ro,leave:ro,timesheet:ro,cost:ro,availability:ro,holiday:none,admin:none};
     return !!(def[modId]||{})[action];
   }
 
@@ -461,7 +461,7 @@ window._permViewOff = function(cb, role, modId) {
 };
 
 window.saveRolePerms = async function() {
-  if(!window.isAdmin()||!window.auth.currentUser) return;
+  if(!window.canEdit('admin')||!window.auth.currentUser) return;
   var mods = window.PERM_MODULES || [];
   var roles = [...new Set((window.USERS||[]).map(function(u){return u.role;}).filter(function(r){return r&&r!=='admin';}))];
   if(!roles.length) roles=['pm','viewer'];
@@ -483,7 +483,7 @@ window.saveRolePerms = async function() {
 };
 
 window.resetRolePerms = function() {
-  if(!window.isAdmin()) return;
+  if(!window.canEdit('admin')) return;
   if(!confirm('รีเซ็ตสิทธิ์ทั้งหมดเป็นค่าเริ่มต้น?')) return;
   window.ROLE_PERMISSIONS = {};
   window.admTab('roles');

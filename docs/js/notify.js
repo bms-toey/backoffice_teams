@@ -37,25 +37,36 @@ window.renderNotifySettings=function(){
       tokenVar:window.NOTIFY_TOKEN||'',
       saveFunc:'saveNotifyToken',
       testFunc:'testNotify',
-      events:[['📋','บันทึกการลางานใหม่'],['✅','อนุมัติการลา'],['❌','ไม่อนุมัติการลา']]
+      events:[['📋','บันทึกการลางานใหม่'],['✏️','แก้ไขการลางาน'],['✅','อนุมัติการลา'],['❌','ไม่อนุมัติการลา']]
     })
     +_tokenCard({
       id:'notify-advance-token',
       title:'📋 แจ้งเตือน Advance',
-      desc:'Token สำหรับแจ้งเตือนเมื่อโครงการเข้าสู่ PM Stage "plan" และเตือนล่วงหน้า 14 วัน กรณียังไม่มี Advance',
+      desc:'Token สำหรับแจ้งเตือนการสร้าง/อัปเดต Advance, เมื่อโครงการเข้า Stage plan, เตือนล่วงหน้า 14 วัน และอัปเดตสถานะอัตโนมัติ',
       tokenVar:window.NOTIFY_ADVANCE_TOKEN||'',
       saveFunc:'saveNotifyAdvanceToken',
       testFunc:'testNotifyAdvance',
-      events:[['📋','ถึงกำหนดจัดทำ Advance (เข้า Stage plan)'],['⚠️','เตือนซ้ำ: ก่อนเริ่มโครงการ 14 วัน ยังไม่มี Advance']]
+      events:[
+        ['✅','จัดทำ Advance แล้ว (บันทึกใหม่)'],
+        ['🔄','อัปเดตสถานะ Advance (บันทึกแก้ไข) — สถานะ เคลียร์แล้ว จะแสดงสรุปใช้ไป/คงเหลือ'],
+        ['📋','ถึงกำหนดจัดทำ Advance (โครงการเข้า Stage: plan)'],
+        ['⚠️','เตือนซ้ำ: ก่อนเริ่มโครงการ 14 วัน ยังไม่มี Advance'],
+        ['⚡','อัปเดตอัตโนมัติ → เบิกแล้ว (เมื่อถึงวันเริ่มโครงการ)'],
+        ['⚡','อัปเดตอัตโนมัติ → รอเคลียร์ (เมื่อถึงวันสิ้นสุด +3 วัน)']
+      ]
     })
     +_tokenCard({
       id:'notify-project-token',
       title:'🚀 แจ้งเตือนเริ่ม/ปิดโครงการ',
-      desc:'Token สำหรับแจ้งเตือนวันเริ่มต้นและวันสิ้นสุดโครงการ',
+      desc:'Token สำหรับแจ้งเตือนวันเริ่มต้น วันสิ้นสุด และเมื่อโครงการเข้า Stage close',
       tokenVar:window.NOTIFY_PROJECT_TOKEN||'',
       saveFunc:'saveNotifyProjectToken',
       testFunc:'testNotifyProject',
-      events:[['🚀','เริ่มดำเนินการโครงการแล้ว (วันเริ่มต้น)'],['🏁','ปิดโครงการแล้ว (วันสิ้นสุด)'],['💰','ปิดโครงการ/จ่ายเงินแล้ว (Stage: close)']]
+      events:[
+        ['🚀','เริ่มดำเนินการโครงการแล้ว (วันเริ่มต้น)'],
+        ['🏁','ปิดโครงการแล้ว (วันสิ้นสุด)'],
+        ['💰','ปิดโครงการ/จ่ายเงินแล้ว + มูลค่าโครงการ (Stage: close)']
+      ]
     })
     +'</div>';
 };
@@ -156,7 +167,8 @@ window.sendProjectNotify=async function(p,eventType){
   var header=eventType==='start'?'🚀 **เริ่มดำเนินการโครงการแล้ว**'
             :eventType==='close'?'💰 **ปิดโครงการ/จ่ายเงินแล้ว**'
             :'🏁 **ปิดโครงการแล้ว**';
-  var content=header+'\n'+_projNotifyBlock(p);
+  var costLine=(eventType==='close'&&p.cost)?'\n💵 มูลค่าโครงการ: '+fc(p.cost)+' บาท':'';
+  var content=header+'\n'+_projNotifyBlock(p)+costLine;
   try{
     await fetch('https://api.notify.bmscloud.in.th/api/v1/push-notify',{
       method:'POST',headers:{'Token':token,'Content-Type':'application/json'},
@@ -173,13 +185,14 @@ function _notiMark(type,pid){try{localStorage.setItem(_notiKey(type,pid),'1');}c
 
 window.checkDailyNotifications=async function(){
   var today=_todayStr();
-  var in14=new Date();in14.setDate(in14.getDate()+14);
+  var todayD=new Date();todayD.setHours(0,0,0,0);
+  var in14=new Date(todayD.getTime()+14*86400000);
   var in14Str=in14.getFullYear()+'-'+String(in14.getMonth()+1).padStart(2,'0')+'-'+String(in14.getDate()).padStart(2,'0');
 
   for(var p of(window.PROJECTS||[])){
     if(p.status==='cancelled')continue;
 
-    // Advance 14-day reminder: stage='plan', start = today+14, no advance record
+    // ── Advance 14-day reminder ──────────────────────────────────────────────
     if(p.stage==='plan'&&p.start===in14Str){
       var hasAdv=(window.ADVANCES||[]).some(function(a){return a.pid===p.id;});
       if(!hasAdv&&!_notiSent('adv14',p.id)){
@@ -188,13 +201,44 @@ window.checkDailyNotifications=async function(){
       }
     }
 
-    // Project start notification
+    // ── Auto-update Advance status ────────────────────────────────────────────
+    var projAdvs=(window.ADVANCES||[]).filter(function(a){return a.pid===p.id&&a.status!=='cleared';});
+    for(var adv of projAdvs){
+      var newStatus=null;
+
+      // Rule 2: end+3 days reached → set 'clearing' (priority ก่อน)
+      if(p.end){
+        var endD=pd(p.end);endD.setHours(0,0,0,0);
+        var endPlus3=new Date(endD.getTime()+3*86400000);
+        if(todayD>=endPlus3&&adv.status!=='clearing'){
+          newStatus='clearing';
+        }
+      }
+
+      // Rule 1: start reached → set 'disbursed' (ถ้ายังไม่ถึง clearing)
+      if(!newStatus&&p.start){
+        var startD=pd(p.start);startD.setHours(0,0,0,0);
+        if(todayD>=startD&&!['disbursed','clearing','cleared'].includes(adv.status)){
+          newStatus='disbursed';
+        }
+      }
+
+      if(newStatus){
+        adv.status=newStatus;
+        try{
+          await setDoc(getDocRef('ADVANCES',adv.id),{status:newStatus,stage_auto:true},{merge:true});
+          await window.sendAdvanceSavedNotify(adv,false);
+        }catch(e){console.warn('Auto advance status error:',e);}
+      }
+    }
+
+    // ── Project start notification ────────────────────────────────────────────
     if(p.start===today&&!_notiSent('proj_start',p.id)){
       await window.sendProjectNotify(p,'start');
       _notiMark('proj_start',p.id);
     }
 
-    // Project end notification
+    // ── Project end notification ──────────────────────────────────────────────
     if(p.end===today&&!_notiSent('proj_end',p.id)){
       await window.sendProjectNotify(p,'end');
       _notiMark('proj_end',p.id);

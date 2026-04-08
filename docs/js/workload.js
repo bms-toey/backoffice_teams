@@ -3,6 +3,56 @@ const { esc, fd, pd, gT, avC } = window;
 var _WL_THMON_S = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 var _WD = ['อา','จ','อ','พ','พฤ','ศ','ส'];
 
+// store สรุปโครงการต่อคน (เติมทุกครั้ง renderWorkload)
+window._WL_STAFF_PROJS = {};
+
+window.wlStaffClick = function(e, sid) {
+  e.stopPropagation();
+  var data = window._WL_STAFF_PROJS[sid];
+  if (!data) return;
+  var popup = document.getElementById('wl-popup');
+  if (!popup) {
+    popup = document.createElement('div');
+    popup.id = 'wl-popup';
+    popup.style.cssText = 'position:fixed;z-index:9999;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.18);padding:14px 16px;min-width:220px;max-width:340px;display:none;';
+    document.body.appendChild(popup);
+    document.addEventListener('click', function() {
+      var p = document.getElementById('wl-popup'); if (p) p.style.display = 'none';
+    });
+  }
+  var html = '<div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:8px;letter-spacing:.4px;">📋 สรุปภาระงาน · ' + esc(data.name) + '</div>';
+  if (!data.projs.length) {
+    html += '<div style="font-size:12px;color:#06d6a0;font-weight:700;">✅ ว่างทั้งเดือน</div>';
+  } else {
+    data.projs.forEach(function(sp) {
+      var periods = sp.periods || [];
+      html += '<div style="padding:6px 0;border-bottom:1px solid var(--border);">' +
+        '<div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:3px;">● ' + esc(sp.p.name) + '</div>';
+      if (periods.length > 1) {
+        periods.forEach(function(per, idx) {
+          html += '<div style="font-size:11px;color:var(--txt3);padding-left:12px;">ช่วงที่ ' + (idx+1) + ': ' + fd(per.s) + ' – ' + fd(per.e) + '</div>';
+        });
+      } else if (periods.length === 1) {
+        html += '<div style="font-size:11px;color:var(--txt3);padding-left:12px;">' + fd(periods[0].s) + ' – ' + fd(periods[0].e) + '</div>';
+      } else {
+        var ps = sp.p.start, pe = sp.p.end;
+        html += '<div style="font-size:11px;color:var(--txt3);padding-left:12px;">' + (ps ? fd(ps) : '—') + ' – ' + (pe ? fd(pe) : '—') + '</div>';
+      }
+      html += '</div>';
+    });
+  }
+  popup.innerHTML = html;
+  popup.style.display = 'block';
+  var vw = window.innerWidth, vh = window.innerHeight;
+  var x = e.clientX + 10, y = e.clientY + 10;
+  popup.style.left = '0'; popup.style.top = '0';
+  var pw = popup.offsetWidth || 260, ph = popup.offsetHeight || 160;
+  if (x + pw > vw - 8) x = e.clientX - pw - 10;
+  if (y + ph > vh - 8) y = e.clientY - ph - 10;
+  popup.style.left = Math.max(8, x) + 'px';
+  popup.style.top  = Math.max(8, y) + 'px';
+};
+
 // ── Popup ──
 window.wlCellClick = function(e, projsStr, dateLabel, isFree) {
   e.stopPropagation();
@@ -93,26 +143,49 @@ window.renderWorkload = function() {
     var projs = [];
     (window.PROJECTS || []).forEach(function(p) {
       if (p.status === 'cancelled' || p.status === 'completed') return;
+      // ── periods จาก visits (ถ้ามี) ──
+      var visitPeriods = [];
+      if (p.visits && p.visits.length > 0) {
+        p.visits.forEach(function(v) {
+          if (v.team && v.team.includes(s.id) && v.start && v.end) {
+            visitPeriods.push({ sid: s.id, s: v.start, e: v.end });
+          }
+        });
+      }
+      // ── periods จาก members/team ──
       var mems = (p.members && p.members.length > 0)
         ? p.members
         : (p.team || []).map(function(id) { return { sid: id, s: p.start, e: p.end }; });
-      var mine = mems.filter(function(m) { return m.sid === s.id && m.s && m.e; });
+      var memberPeriods = mems.filter(function(m) { return m.sid === s.id && m.s && m.e; });
+      // ใช้ visitPeriods ถ้ามี ไม่งั้น fallback ไป memberPeriods
+      var mine = visitPeriods.length > 0 ? visitPeriods : memberPeriods;
       if (!mine.length) return;
       var ms = new Date(Math.min.apply(null, mine.map(function(m) { return pd(m.s).getTime(); })));
       var me = new Date(Math.max.apply(null, mine.map(function(m) { var dt = pd(m.e); dt.setHours(23,59,59); return dt.getTime(); })));
-      if (ms <= monthEnd && me >= monthStart) projs.push({ p: p, s: ms, e: me });
+      if (ms <= monthEnd && me >= monthStart) projs.push({ p: p, s: ms, e: me, periods: mine });
     });
 
     var dayCount = new Array(dim + 2).fill(0);
     var dayProjs = {};
     projs.forEach(function(sp) {
-      var sd = sp.s < monthStart ? 1 : sp.s.getDate();
-      var ed = sp.e > monthEnd  ? dim : sp.e.getDate();
-      for (var dd = sd; dd <= ed; dd++) {
-        dayCount[dd]++;
-        if (!dayProjs[dd]) dayProjs[dd] = [];
-        dayProjs[dd].push(sp.p.name);
-      }
+      // ใช้แต่ละ period แยกกัน เพื่อไม่ให้ช่วงว่างระหว่าง period ถูกนับว่ามีงาน
+      var segs = (sp.periods && sp.periods.length > 0)
+        ? sp.periods.map(function(per) {
+            var ps = pd(per.s); ps.setHours(0,0,0,0);
+            var pe = pd(per.e); pe.setHours(23,59,59,999);
+            return { s: ps, e: pe };
+          })
+        : [{ s: sp.s, e: sp.e }];
+      segs.forEach(function(seg) {
+        if (seg.s > monthEnd || seg.e < monthStart) return;
+        var sd = seg.s < monthStart ? 1 : seg.s.getDate();
+        var ed = seg.e > monthEnd   ? dim : seg.e.getDate();
+        for (var dd = sd; dd <= ed; dd++) {
+          dayCount[dd]++;
+          if (!dayProjs[dd]) dayProjs[dd] = [];
+          if (!dayProjs[dd].includes(sp.p.name)) dayProjs[dd].push(sp.p.name);
+        }
+      });
     });
 
     var busyDays   = days.filter(function(d) { return !d.we && dayCount[d.d] > 0; }).length;
@@ -124,6 +197,7 @@ window.renderWorkload = function() {
     else cntActive++;
     if (hasOverlap) cntOverlap++;
 
+    window._WL_STAFF_PROJS[s.id] = { name: s.name, projs: projs };
     staffRows.push({ s: s, gi: gi, projs: projs, dayCount: dayCount, dayProjs: dayProjs,
                      busyDays: busyDays, busyPct: busyPct, hasOverlap: hasOverlap });
   });
@@ -238,7 +312,7 @@ window.renderWorkload = function() {
     var olBadge   = r.hasOverlap ? '<span style="font-size:8px;font-weight:700;color:#fff;background:#ff6b6b;padding:1px 5px;border-radius:4px;margin-left:4px;">⚠ซ้อน</span>' : '';
 
     return '<div style="display:flex;align-items:stretch;border-bottom:1px solid var(--border);transition:background .15s;min-width:fit-content;" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">' +
-      '<div style="width:'+NAME_W+'px;flex-shrink:0;padding:6px 14px;display:flex;align-items:center;gap:10px;border-right:1px solid var(--border);">' +
+      '<div style="width:'+NAME_W+'px;flex-shrink:0;padding:6px 14px;display:flex;align-items:center;gap:10px;border-right:1px solid var(--border);cursor:pointer;" onclick="window.wlStaffClick(event,\''+esc(s.id)+'\')">' +
         '<div style="width:30px;height:30px;border-radius:9px;background:'+avC(r.gi)+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">'+initials+'</div>' +
         '<div style="min-width:0;">' +
           '<div style="font-size:12px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="'+esc(s.name+(s.nickname?' ('+s.nickname+')':''))+'">'+displayName+'</div>' +
