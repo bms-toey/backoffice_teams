@@ -381,8 +381,9 @@ function _populateCostFilters() {
   if (!yrSel) return;
 
   const years = [...new Set(window.COSTS.map(r => getYearBE(r.costDate)).filter(Boolean))].sort((a,b)=>b-a);
-  const curYr = yrSel.value;
-  yrSel.innerHTML = '<option value="">ทุกปี พ.ศ.</option>' + years.map(y => `<option value="${y}"${y==curYr?' selected':''}>${y}</option>`).join('');
+  const thisYrBE = new Date().getFullYear() + 543;
+  const curYr = yrSel.value || (years.includes(thisYrBE) ? String(thisYrBE) : (years[0] ? String(years[0]) : ''));
+  yrSel.innerHTML = '<option value="">ทุกปี พ.ศ.</option>' + years.map(y => `<option value="${y}"${y==curYr?' selected':''}>ปี พ.ศ. ${y}</option>`).join('');
 
   // Project types that appear in costs
   if (typeSel && (window.PTYPES || []).length) {

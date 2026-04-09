@@ -287,8 +287,14 @@ window.openProjModal=function(id){
     +'<div class="f-group" style="margin:0;"><label class="f-label">งบประมาณ (฿) *</label><input type="number" class="f-input" id="pf-cost" value="'+(p&&p.cost!=null?Number(p.cost).toFixed(2):'0.00')+'" placeholder="0.00" step="0.01" min="0" '+ceA+'></div>'
     +'</div>'
     +'<div id="pf-revisit-parent-wrap"><div class="f-grid">'
-    +'<div class="f-group"><label class="f-label">โครงการหลัก (Onsite/แถม)</label><select class="f-input" id="pf-parent-proj" '+ceA+'><option value="">-- เลือกโครงการหลัก --</option></select></div>'
-    +'<div class="f-group"><label class="f-label">ครั้งที่</label><select class="f-input" id="pf-revisit-round" '+ceA+'><option value="1"'+(p&&p.revisitRound==1?' selected':'')+'>ครั้งที่ 1</option><option value="2"'+(p&&p.revisitRound==2?' selected':'')+'>ครั้งที่ 2</option></select></div>'
+    +'<div class="f-group"><label class="f-label">โครงการหลัก (Onsite/แถม)</label>'
+    +'<div style="position:relative;">'
+    +'<input type="hidden" id="pf-parent-proj" value="'+(p&&p.parentProjectId?p.parentProjectId:'')+'">'
+    +'<input type="text" class="f-input" id="pf-parent-search" autocomplete="off" placeholder="🔍 พิมพ์ชื่อโครงการ..." '+(ce?'':'disabled ')+' oninput="window.ppSearchFilter()" style="padding-right:28px;">'
+    +'<span id="pf-parent-clear" onclick="window.ppSearchClear()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--txt3);font-size:14px;display:none;">✕</span>'
+    +'<div id="pf-parent-drop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);max-height:220px;overflow-y:auto;margin-top:3px;"></div>'
+    +'</div></div>'
+    +'<div class="f-group"><label class="f-label">ครั้งที่</label><select class="f-input" id="pf-revisit-round" '+(ce?'':' disabled')+'><option value="1"'+(p&&p.revisitRound==1?' selected':'')+'>ครั้งที่ 1</option><option value="2"'+(p&&p.revisitRound==2?' selected':'')+'>ครั้งที่ 2</option></select></div>'
     +'</div></div>'
     +'<div class="f-group"><label class="f-label">หมายเหตุ</label><textarea class="f-input" id="pf-note" '+ceA+'>'+esc(p?p.note:'')+'</textarea></div>'
     +(p&&p.start&&p.end?(function(){var hcnt=window.getProjectHolidayCount(p);return hcnt>0?'<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(255,107,107,.07);border-radius:8px;border:1px solid rgba(255,107,107,.2);font-size:12px;"><span>🎌</span><span style="color:var(--coral);font-weight:600;">มีวันหยุด '+hcnt+' วัน</span><span style="color:var(--txt2);">ในช่วงโครงการนี้</span><a href="#" onclick="event.preventDefault();window.showProjHolidaysPopup(\''+p.id+'\');" style="margin-left:auto;font-size:11px;color:var(--violet);">ดูวันหยุด</a></div>':'';})():'')
@@ -380,13 +386,80 @@ window.updateProjFormByGroup=function(initialParentId){
   var pWrap=document.getElementById('pf-revisit-parent-wrap');
   if(pWrap)pWrap.style.display=(gType==='revisit')?'':'none';
   if(gType==='revisit'){
-    var ppSel=document.getElementById('pf-parent-proj');
-    if(ppSel){
-      ppSel.innerHTML='<option value="">-- เลือกโครงการหลัก --</option>';
-      window.PROJECTS.filter(function(proj){return window.isOnsiteGroup(proj.groupId);})
-        .forEach(function(proj){var o=document.createElement('option');o.value=proj.id;o.textContent=proj.name;if(initialParentId&&proj.id===initialParentId)o.selected=true;ppSel.appendChild(o);});
+    // ตั้งค่า smart search — แสดงชื่อโครงการหลักที่เลือกอยู่ (ถ้ามี)
+    var hidEl=document.getElementById('pf-parent-proj');
+    var txtEl=document.getElementById('pf-parent-search');
+    if(hidEl&&txtEl&&initialParentId){
+      var selProj=window.PROJECTS.find(function(x){return x.id===initialParentId;});
+      if(selProj){
+        hidEl.value=selProj.id;
+        txtEl.value=selProj.name;
+        var clr=document.getElementById('pf-parent-clear');
+        if(clr)clr.style.display='';
+      }
     }
   }
+};
+
+// ── PARENT PROJECT SMART SEARCH ──────────────────────────────────────────────
+window._ppProjects=function(){
+  return window.PROJECTS.filter(function(p){return window.isOnsiteGroup(p.groupId);});
+};
+window.ppSearchOpen=function(){
+  var txt=document.getElementById('pf-parent-search');
+  if(!txt||txt.disabled)return;
+  window.ppSearchFilter();
+  document.addEventListener('click',window._ppOutsideClose,{once:true});
+};
+window._ppOutsideClose=function(e){
+  var wrap=document.getElementById('pf-revisit-parent-wrap');
+  if(wrap&&wrap.contains(e.target))return;
+  var drop=document.getElementById('pf-parent-drop');
+  if(drop)drop.style.display='none';
+};
+window.ppSearchFilter=function(){
+  var txt=document.getElementById('pf-parent-search');
+  var drop=document.getElementById('pf-parent-drop');
+  if(!txt||!drop)return;
+  var q=(txt.value||'').trim().toLowerCase();
+  var projs=window._ppProjects().filter(function(p){
+    return !q||p.name.toLowerCase().includes(q)||(p.siteOwner||'').toLowerCase().includes(q);
+  });
+  if(!projs.length){
+    drop.innerHTML='<div style="padding:10px 14px;font-size:12px;color:var(--txt3);">ไม่พบโครงการ</div>';
+  } else {
+    drop.innerHTML=projs.map(function(p){
+      var grp=window.PGROUPS.find(function(g){return g.id===p.groupId;})||{};
+      return '<div onclick="window.ppSearchSelect(\''+p.id+'\',\''+esc(p.name).replace(/'/g,'&#39;')+'\')" '+
+        'style="padding:8px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:12px;" '+
+        'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">' +
+        '<div style="font-weight:700;color:var(--txt);">'+esc(p.name)+'</div>'+
+        '<div style="font-size:10px;color:var(--txt3);margin-top:2px;">'+esc(grp.label||'')+(p.siteOwner?' · '+esc(p.siteOwner):'')+(p.end?' · สิ้นสุด '+fd(p.end):'')+'</div>'+
+      '</div>';
+    }).join('');
+  }
+  drop.style.display='';
+  var clr=document.getElementById('pf-parent-clear');
+  if(clr)clr.style.display=txt.value?'':'none';
+};
+window.ppSearchSelect=function(id,name){
+  var hid=document.getElementById('pf-parent-proj');
+  var txt=document.getElementById('pf-parent-search');
+  var drop=document.getElementById('pf-parent-drop');
+  var clr=document.getElementById('pf-parent-clear');
+  if(hid)hid.value=id;
+  if(txt)txt.value=name;
+  if(drop)drop.style.display='none';
+  if(clr)clr.style.display='';
+};
+window.ppSearchClear=function(){
+  var hid=document.getElementById('pf-parent-proj');
+  var txt=document.getElementById('pf-parent-search');
+  var clr=document.getElementById('pf-parent-clear');
+  if(hid)hid.value='';
+  if(txt){txt.value='';txt.focus();}
+  if(clr)clr.style.display='none';
+  window.ppSearchFilter();
 };
 window.pfTab=function(tab){
   ['info','team','visits'].forEach(function(t){var el=document.getElementById('pf-pane-'+t);if(el)el.style.display=t===tab?'':'none';});
