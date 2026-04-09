@@ -136,9 +136,19 @@ window.runAutoStage=async function(silent){
     if(finalAutoP>=0)dbUp.progress_pct=finalAutoP;
     await setDoc(getDocRef('PROJECTS',u.p.id),dbUp,{merge:true}).catch(e=>window.showDbError(e));
     // แจ้งเตือน Advance เมื่อ auto-stage เลื่อนโครงการเข้า 'plan'
-    if(u.newStage==='plan'&&prevAutoStage!=='plan'&&window.sendAdvanceNotify){window.sendAdvanceNotify(u.p,false);}
+    if(u.newStage==='plan'&&prevAutoStage!=='plan'&&window.sendAdvanceNotify){
+      if(!window.notiSent||!window.notiSent('adv_plan',u.p.id)){
+        window.sendAdvanceNotify(u.p,false);
+        if(window.notiMark)window.notiMark('adv_plan',u.p.id);
+      }
+    }
     // แจ้งเตือนปิดโครงการ/จ่ายเงินแล้ว เมื่อ auto-stage เลื่อนเข้า 'close'
-    if(u.newStage==='close'&&prevAutoStage!=='close'&&window.sendProjectNotify){window.sendProjectNotify(u.p,'close');}
+    if(u.newStage==='close'&&prevAutoStage!=='close'&&window.sendProjectNotify){
+      if(!window.notiSent||!window.notiSent('proj_close',u.p.id)){
+        window.sendProjectNotify(u.p,'close');
+        if(window.notiMark)window.notiMark('proj_close',u.p.id);
+      }
+    }
   }
   if(!silent)window.showToast(`⚡ อัปเดต Stage อัตโนมัติ ${updates.length} โครงการ`,'info');
   window.renderKanban();window.renderOverview();window.renderProjects();
@@ -187,9 +197,19 @@ window.kbDrop=async function(e,sid){
     var upd={stage_id:sid,stage:sid};if(force100)upd.progress_pct=100;
     setDoc(getDocRef('PROJECTS',p.id),upd,{merge:true}).catch(err=>window.showDbError(err));
     // แจ้งเตือน Advance เมื่อโครงการเข้า stage 'plan'
-    if(sid==='plan'&&prevStage!=='plan'&&window.sendAdvanceNotify){window.sendAdvanceNotify(p,false);}
+    if(sid==='plan'&&prevStage!=='plan'&&window.sendAdvanceNotify){
+      if(!window.notiSent||!window.notiSent('adv_plan',p.id)){
+        window.sendAdvanceNotify(p,false);
+        if(window.notiMark)window.notiMark('adv_plan',p.id);
+      }
+    }
     // แจ้งเตือนปิดโครงการ/จ่ายเงินแล้ว เมื่อเข้า stage 'close'
-    if(sid==='close'&&prevStage!=='close'&&window.sendProjectNotify){window.sendProjectNotify(p,'close');}
+    if(sid==='close'&&prevStage!=='close'&&window.sendProjectNotify){
+      if(!window.notiSent||!window.notiSent('proj_close',p.id)){
+        window.sendProjectNotify(p,'close');
+        if(window.notiMark)window.notiMark('proj_close',p.id);
+      }
+    }
   }
   window.kbPid=null;
 }

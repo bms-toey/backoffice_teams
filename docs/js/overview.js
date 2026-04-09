@@ -48,6 +48,7 @@ window.renderOverview = function(){
       <div style="margin-top:4px;">${s.sub}</div>
     </div>`;
   }).join('');
+  window.renderAnnualTarget(fProjs, yr);
   Chart.defaults.font.family='Plus Jakarta Sans';Chart.defaults.color='#9ba3b8';
   // ── Monthly Workload Trend ──
   if(window.cWLTrend)window.cWLTrend.destroy();
@@ -263,5 +264,279 @@ window.exportOvExcel = function() {
   var fname = 'projects_' + today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0') + '.xlsx';
   window.XLSX.writeFile(wb, fname);
   window.showAlert('Export ' + rows.length + ' โครงการเรียบร้อย ✓', 'success');
+};
+
+// ── ANNUAL TARGET TRACKER ──────────────────────────────────────────────────────
+window.renderAnnualTarget = function(fProjs, yr) {
+  var wrap = document.getElementById('annual-target-wrap');
+  if (!wrap) return;
+
+  var currentBEYear = (new Date().getFullYear() + 543).toString();
+  var displayYr = yr || currentBEYear;
+  var targets = window.YEAR_TARGETS || [];
+  var entry = targets.find(function(t) { return String(t.year) === String(displayYr); });
+  var byType = (entry && entry.byType) ? entry.byType : {};
+
+  // ประเภทที่มีเป้า หรือมีโครงการในปีนี้
+  var typeIds = new Set(Object.keys(byType));
+  fProjs.forEach(function(p) { if (p.typeId) typeIds.add(p.typeId); });
+  var types = (window.PTYPES || []).filter(function(t) { return typeIds.has(t.id); });
+
+  // ถ้าไม่มีเลย
+  if (!types.length) {
+    wrap.innerHTML = '<div class="ov-card" style="padding:16px 20px;">' +
+      '<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">🎯</span>' +
+      '<span style="font-size:14px;font-weight:800;color:var(--txt);">เป้าหมายประจำปี พ.ศ. ' + displayYr + '</span>' +
+      '<span style="font-size:12px;color:var(--txt3);margin-left:4px;">— ยังไม่ได้ตั้งเป้าหมาย</span></div>' +
+      '</div>';
+    return;
+  }
+
+  function miniBar(pct, color) {
+    return '<div style="width:100%;height:6px;background:var(--surface3);border-radius:3px;overflow:hidden;margin-top:3px;">' +
+      '<div style="width:' + Math.min(100, pct) + '%;height:100%;background:' + color + ';border-radius:3px;"></div></div>';
+  }
+  function gapChip(val, label, pos) {
+    var ok = val <= 0;
+    return '<div style="font-size:9px;color:var(--txt3);">' + label + '</div>' +
+      '<div style="font-size:12px;font-weight:800;color:' + (ok ? '#06d6a0' : (pos ? '#4361ee' : '#ff6b6b')) + ';">' +
+      (ok ? '✓ ถึงเป้า' : fc(val)) + '</div>';
+  }
+
+  // คำนวณต่อ type
+  var rows = types.map(function(t) {
+    var tgt = Number(byType[t.id] || 0);
+    var projs = fProjs.filter(function(p) { return p.typeId === t.id; });
+    var total = projs.reduce(function(s, p) { return s + (p.cost || 0); }, 0);
+    var closed = projs.filter(function(p) { return p.stage === 'close'; })
+                      .reduce(function(s, p) { return s + (p.cost || 0); }, 0);
+    var pctTotal  = tgt > 0 ? Math.min(100, Math.round(total / tgt * 100))  : 0;
+    var pctClosed = tgt > 0 ? Math.min(100, Math.round(closed / tgt * 100)) : 0;
+    return { t: t, tgt: tgt, total: total, closed: closed,
+             pctTotal: pctTotal, pctClosed: pctClosed,
+             needFind: Math.max(0, tgt - total), needClose: Math.max(0, tgt - closed) };
+  });
+
+  // แถวรวม
+  var sumTgt    = rows.reduce(function(s, r) { return s + r.tgt; }, 0);
+  var sumTotal  = rows.reduce(function(s, r) { return s + r.total; }, 0);
+  var sumClosed = rows.reduce(function(s, r) { return s + r.closed; }, 0);
+  var sumPctTotal  = sumTgt > 0 ? Math.min(100, Math.round(sumTotal / sumTgt * 100))  : 0;
+  var sumPctClosed = sumTgt > 0 ? Math.min(100, Math.round(sumClosed / sumTgt * 100)) : 0;
+
+  var colH = 'font-size:10px;font-weight:700;color:var(--txt3);padding:6px 10px;border-bottom:2px solid var(--border);white-space:nowrap;';
+  var cell = 'font-size:12px;padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle;';
+  var cellR = cell + 'text-align:right;';
+
+  function typeRow(r) {
+    var color = r.t.color || '#4361ee';
+    return '<tr>' +
+      '<td style="' + cell + 'font-weight:700;color:var(--txt);">' +
+        '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + color + ';margin-right:6px;"></span>' +
+        esc(r.t.label) + '</td>' +
+      '<td style="' + cellR + 'color:var(--violet);font-weight:700;">' + (r.tgt > 0 ? fc(r.tgt) : '<span style="color:var(--txt3);">—</span>') + '</td>' +
+      '<td style="' + cell + '">' +
+        '<div style="font-size:12px;font-weight:700;color:#4361ee;">' + fc(r.total) +
+          (r.tgt > 0 ? ' <span style="font-size:10px;color:var(--txt3);">(' + r.pctTotal + '%)</span>' : '') + '</div>' +
+        (r.tgt > 0 ? miniBar(r.pctTotal, '#4361ee') : '') + '</td>' +
+      '<td style="' + cell + '">' +
+        '<div style="font-size:12px;font-weight:700;color:#06d6a0;">' + fc(r.closed) +
+          (r.tgt > 0 ? ' <span style="font-size:10px;color:var(--txt3);">(' + r.pctClosed + '%)</span>' : '') + '</div>' +
+        (r.tgt > 0 ? miniBar(r.pctClosed, '#06d6a0') : '') + '</td>' +
+      '<td style="' + cellR + '">' + (r.tgt > 0 ? gapChip(r.needFind, 'ต้องหาเพิ่ม', true) : '<span style="color:var(--txt3);font-size:11px;">—</span>') + '</td>' +
+      '<td style="' + cellR + '">' + (r.tgt > 0 ? gapChip(r.needClose, 'ต้องปิดเพิ่ม', false) : '<span style="color:var(--txt3);font-size:11px;">—</span>') + '</td>' +
+    '</tr>';
+  }
+
+  var totalRowStyle = 'background:var(--surface2);font-weight:800;';
+  var sumRow = '<tr style="' + totalRowStyle + '">' +
+    '<td style="' + cell + 'font-weight:800;color:var(--txt);">รวมทุกประเภท</td>' +
+    '<td style="' + cellR + 'color:var(--violet);font-weight:800;">' + (sumTgt > 0 ? fc(sumTgt) : '—') + '</td>' +
+    '<td style="' + cell + '">' +
+      '<div style="font-size:12px;font-weight:800;color:#4361ee;">' + fc(sumTotal) +
+        (sumTgt > 0 ? ' <span style="font-size:10px;color:var(--txt3);">(' + sumPctTotal + '%)</span>' : '') + '</div>' +
+      (sumTgt > 0 ? miniBar(sumPctTotal, '#4361ee') : '') + '</td>' +
+    '<td style="' + cell + '">' +
+      '<div style="font-size:12px;font-weight:800;color:#06d6a0;">' + fc(sumClosed) +
+        (sumTgt > 0 ? ' <span style="font-size:10px;color:var(--txt3);">(' + sumPctClosed + '%)</span>' : '') + '</div>' +
+      (sumTgt > 0 ? miniBar(sumPctClosed, '#06d6a0') : '') + '</td>' +
+    '<td style="' + cellR + '">' + (sumTgt > 0 ? gapChip(Math.max(0, sumTgt - sumTotal), 'ต้องหาเพิ่ม', true) : '—') + '</td>' +
+    '<td style="' + cellR + '">' + (sumTgt > 0 ? gapChip(Math.max(0, sumTgt - sumClosed), 'ต้องปิดเพิ่ม', false) : '—') + '</td>' +
+  '</tr>';
+
+  wrap.innerHTML =
+    '<div class="ov-card" style="padding:16px 20px;">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">' +
+        '<div style="display:flex;align-items:center;gap:8px;">' +
+          '<span style="font-size:18px;">🎯</span>' +
+          '<span style="font-size:14px;font-weight:800;color:var(--txt);">เป้าหมายประจำปี พ.ศ. ' + displayYr + '</span>' +
+        '</div>' +
+        '' +
+      '</div>' +
+      '<div style="overflow-x:auto;">' +
+        '<table style="width:100%;border-collapse:collapse;min-width:600px;">' +
+          '<thead><tr>' +
+            '<th style="' + colH + 'text-align:left;">ประเภทโครงการ</th>' +
+            '<th style="' + colH + 'text-align:right;">🎯 เป้าหมาย</th>' +
+            '<th style="' + colH + '">📁 ยอดโครงการทั้งหมด</th>' +
+            '<th style="' + colH + '">✅ ปิดโครงการแล้ว</th>' +
+            '<th style="' + colH + 'text-align:right;">ต้องหาเพิ่ม</th>' +
+            '<th style="' + colH + 'text-align:right;">ต้องปิดเพิ่ม</th>' +
+          '</tr></thead>' +
+          '<tbody>' + rows.map(typeRow).join('') + sumRow + '</tbody>' +
+        '</table>' +
+      '</div>' +
+    '</div>';
+};
+
+// ── TARGET MODAL ──
+window.openTargetModal = function(yr) {
+  var targets = window.YEAR_TARGETS || [];
+  var entry = targets.find(function(t) { return String(t.year) === String(yr); });
+  var byType = (entry && entry.byType) ? entry.byType : {};
+
+  // ปีที่มีอยู่ในโครงการ (สำหรับ dropdown)
+  var allYears = [...new Set((window.PROJECTS || []).map(function(p) {
+    return p.start ? (new Date(p.start).getFullYear() + 543) : null;
+  }).filter(Boolean))].sort(function(a, b) { return b - a; });
+  var currentBE = new Date().getFullYear() + 543;
+  if (!allYears.includes(currentBE)) allYears.unshift(currentBE);
+  if (!allYears.includes(Number(yr))) allYears.unshift(Number(yr));
+
+  var yrOpts = allYears.map(function(y) {
+    return '<option value="' + y + '"' + (String(y) === String(yr) ? ' selected' : '') + '>พ.ศ. ' + y + '</option>';
+  }).join('');
+
+  var typeRows = (window.PTYPES || []).map(function(t) {
+    var cur = byType[t.id] ? Number(byType[t.id]) : '';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">' +
+      '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + (t.color || '#4361ee') + ';flex-shrink:0;"></span>' +
+      '<span style="flex:1;font-size:13px;font-weight:600;color:var(--txt);">' + esc(t.label) + '</span>' +
+      '<input type="number" id="tgt-inp-' + t.id + '" value="' + cur + '" min="0" placeholder="0" ' +
+        'style="width:160px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt);font-size:13px;text-align:right;">' +
+      '<span style="font-size:12px;color:var(--txt3);">บาท</span>' +
+    '</div>';
+  }).join('');
+
+  var html = '<div style="padding:20px;">' +
+    '<div style="font-size:16px;font-weight:800;color:var(--txt);margin-bottom:16px;">🎯 ตั้งเป้าหมายประจำปี</div>' +
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">' +
+      '<label style="font-size:13px;font-weight:600;color:var(--txt2);">ปี พ.ศ.:</label>' +
+      '<select id="tgt-yr-sel" onchange="window._reloadTargetModal(this.value)" style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt);font-size:13px;">' +
+        yrOpts + '</select>' +
+    '</div>' +
+    '<div style="display:flex;flex-direction:column;gap:0;">' + typeRows + '</div>' +
+    '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;">' +
+      '<button onclick="window.closeM(\'m-target\')" style="padding:8px 18px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt2);font-size:13px;cursor:pointer;">ยกเลิก</button>' +
+      '<button onclick="window.saveAnnualTargets()" style="padding:8px 20px;border:none;border-radius:8px;background:var(--violet);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">💾 บันทึก</button>' +
+    '</div>' +
+  '</div>';
+
+  document.getElementById('m-target-body').innerHTML = html;
+  window._targetModalYr = String(yr);
+  document.getElementById('m-target').classList.add('on');
+};
+
+window._reloadTargetModal = function(newYr) {
+  window.openTargetModal(newYr);
+};
+
+window.saveAnnualTargets = function() {
+  var yr = window._targetModalYr;
+  var byType = {};
+  (window.PTYPES || []).forEach(function(t) {
+    var inp = document.getElementById('tgt-inp-' + t.id);
+    if (inp) {
+      var val = parseFloat(inp.value);
+      if (!isNaN(val) && val > 0) byType[t.id] = val;
+    }
+  });
+  var targets = (window.YEAR_TARGETS || []).filter(function(t) { return String(t.year) !== String(yr); });
+  if (Object.keys(byType).length > 0) targets.push({ year: Number(yr), byType: byType });
+  window.YEAR_TARGETS = targets;
+  window.setDoc(getDocRef('SETTINGS', 'app'), { year_targets: targets }, { merge: true })
+    .then(function() {
+      window.closeM('m-target');
+      window.showAlert('บันทึกเป้าหมายปี ' + yr + ' เรียบร้อย ✓', 'success');
+      window.renderOverview();
+      window.renderTargets && window.renderTargets();
+    })
+    .catch(function(e) { window.showDbError(e); });
+};
+
+// ── TARGETS PAGE ──────────────────────────────────────────────────────────────
+window.renderTargets = function() {
+  var body = document.getElementById('targets-body');
+  if (!body) return;
+  var canEdit = window.isAdmin() || window.canEdit('targets');
+
+  // year selector
+  var allYears = [...new Set([
+    ...(window.PROJECTS || []).map(function(p) { return p.start ? (new Date(p.start).getFullYear() + 543) : null; }).filter(Boolean),
+    new Date().getFullYear() + 543
+  ])].sort(function(a, b) { return b - a; });
+
+  var selYr = window._targetsPageYr || String(allYears[0] || (new Date().getFullYear() + 543));
+  window._targetsPageYr = selYr;
+
+  var yrOpts = allYears.map(function(y) {
+    return '<option value="' + y + '"' + (String(y) === selYr ? ' selected' : '') + '>พ.ศ. ' + y + '</option>';
+  }).join('');
+
+  var targets = window.YEAR_TARGETS || [];
+  var entry = targets.find(function(t) { return String(t.year) === selYr; });
+  var byType = (entry && entry.byType) ? entry.byType : {};
+
+  var typeRows = (window.PTYPES || []).map(function(t) {
+    var cur = byType[t.id] ? Number(byType[t.id]) : '';
+    var readOnly = !canEdit;
+    return '<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">' +
+      '<span style="width:12px;height:12px;border-radius:50%;background:' + (t.color || '#4361ee') + ';flex-shrink:0;display:inline-block;"></span>' +
+      '<span style="flex:1;font-size:13px;font-weight:600;color:var(--txt);">' + esc(t.label) + '</span>' +
+      '<input type="number" id="tpg-inp-' + t.id + '" value="' + cur + '" min="0" placeholder="0" ' +
+        (readOnly ? 'disabled ' : '') +
+        'style="width:180px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:' + (readOnly ? 'var(--surface2)' : 'var(--surface)') + ';color:var(--txt);font-size:13px;text-align:right;' + (readOnly ? 'opacity:.7;' : '') + '">' +
+      '<span style="font-size:12px;color:var(--txt3);width:30px;">บาท</span>' +
+    '</div>';
+  }).join('');
+
+  body.innerHTML =
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px 24px;">' +
+      '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">' +
+        '<span style="font-size:15px;font-weight:800;color:var(--txt);">🎯 ตั้งเป้าหมายประจำปี</span>' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-left:auto;">' +
+          '<label style="font-size:12px;font-weight:600;color:var(--txt3);">ปี พ.ศ.:</label>' +
+          '<select onchange="window._targetsPageYr=this.value;window.renderTargets()" ' +
+            'style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt);font-size:13px;">' +
+            yrOpts +
+          '</select>' +
+        '</div>' +
+      '</div>' +
+      '<div>' + typeRows + '</div>' +
+      (canEdit ?
+        '<div style="display:flex;justify-content:flex-end;margin-top:18px;">' +
+          '<button onclick="window.saveTargetsPage()" style="padding:9px 24px;border:none;border-radius:8px;background:var(--violet);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">💾 บันทึกเป้าหมาย</button>' +
+        '</div>'
+      : '<div style="margin-top:12px;font-size:11px;color:var(--txt3);text-align:right;">— คุณมีสิทธิ์ดูเท่านั้น —</div>') +
+    '</div>';
+};
+
+window.saveTargetsPage = function() {
+  var yr = window._targetsPageYr;
+  if (!yr) return;
+  var byType = {};
+  (window.PTYPES || []).forEach(function(t) {
+    var inp = document.getElementById('tpg-inp-' + t.id);
+    if (inp) { var v = parseFloat(inp.value); if (!isNaN(v) && v > 0) byType[t.id] = v; }
+  });
+  var targets = (window.YEAR_TARGETS || []).filter(function(t) { return String(t.year) !== String(yr); });
+  if (Object.keys(byType).length > 0) targets.push({ year: Number(yr), byType: byType });
+  window.YEAR_TARGETS = targets;
+  window.setDoc(getDocRef('SETTINGS', 'app'), { year_targets: targets }, { merge: true })
+    .then(function() {
+      window.showAlert('บันทึกเป้าหมายปี ' + yr + ' เรียบร้อย ✓', 'success');
+      window.renderOverview();
+    })
+    .catch(function(e) { window.showDbError(e); });
 };
 

@@ -103,6 +103,9 @@
         <span class="ni">🏖</span><span class="nl">การลางาน</span>
         <span class="nb" id="leave-nb" style="display:none">0</span>
       </div>
+      <div class="nav-btn targets-only" style="display:none" onclick="window.goView('targets',this)">
+        <span class="ni">🎯</span><span class="nl">เป้าหมายทีม</span>
+      </div>
 
       <div class="sb-sec admin-only" style="display:none">ระบบ</div>
       <div class="nav-btn admin-only" style="display:none" onclick="window.openAdminModal()">
@@ -152,6 +155,8 @@
         </div>
         <!-- KPI cards -->
         <div id="stat-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:16px 24px;"></div>
+        <!-- Annual Target Tracker -->
+        <div style="padding:0 24px 16px;" id="annual-target-wrap"></div>
         <!-- Row 1: Workload trend + Resource ring -->
         <div style="display:grid;grid-template-columns:1fr 340px;gap:16px;padding:0 24px 16px;">
           <div class="ov-card">
@@ -470,6 +475,14 @@
           </div>
           <div id="leave-list" style="padding:14px 24px 28px;"></div>
         </div>
+      </div>
+
+      <!-- TARGETS -->
+      <div class="view" id="view-targets" style="overflow-y:auto;">
+        <div style="padding:14px 24px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;">
+          <div style="font-size:16px;font-weight:800;color:var(--txt);">🎯 เป้าหมายทีม</div>
+        </div>
+        <div id="targets-body" style="padding:24px;max-width:680px;margin:0 auto;"></div>
       </div>
 
       <!-- TIMESHEET -->
@@ -1150,6 +1163,14 @@
       <button class="btn btn-ghost" onclick="window.closeM('m-import')">ยกเลิก</button>
       <button class="btn btn-pri" onclick="window.execImport()">🚀 นำเข้าข้อมูล</button>
     </div>
+  </div>
+</div>
+
+<!-- ── Annual Target Modal ── -->
+<div class="modal" id="m-target">
+  <div class="modal-box" style="max-width:520px;">
+    <button class="modal-close" onclick="window.closeM('m-target')">✕</button>
+    <div id="m-target-body"></div>
   </div>
 </div>
 

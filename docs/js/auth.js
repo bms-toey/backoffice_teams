@@ -2,6 +2,7 @@ import { getFirestore, onSnapshot, getDocs, writeBatch, setDoc } from "https://w
 import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 const db = getFirestore();
 const auth = window.auth;
+window.setDoc = setDoc;
 const { esc, fd, fc, fca, pd, gS, gT, gG, gSt, gC, avC, uid, getFY, getYearBE, getStaffOverlaps, overlapWarnText, getStaffLeaveConflicts, getColRef, getDocRef } = window;
 // ── FIREBASE AUTH ──
 async function initAuth(){
@@ -199,6 +200,7 @@ onAuthStateChanged(auth, async (user) => {
         window.NOTIFY_TOKEN=d.notify_token||'';
         window.NOTIFY_ADVANCE_TOKEN=d.notify_advance_token||'';
         window.NOTIFY_PROJECT_TOKEN=d.notify_project_token||'';
+        window.YEAR_TARGETS=d.year_targets||[];
         window.SETTINGS = {
           allowance_weekday_normal:  Number(d.allowance_weekday_normal)  || 350,
           allowance_holiday_normal:  Number(d.allowance_holiday_normal)  || 650,
@@ -313,13 +315,14 @@ window.setupUser = function(){
   document.querySelectorAll('.admin-only').forEach(function(el){el.style.display=(window.isAdmin()||window.canView('admin'))?'':'none';});
   document.querySelectorAll('.ce-only').forEach(function(el){el.style.display=window.ce()?'':'none';});
   document.querySelectorAll('.cl-only').forEach(function(el){el.style.display=window.cl()?'':'none'});
+  document.querySelectorAll('.targets-only').forEach(function(el){el.style.display=(window.isAdmin()||window.canView('targets'))?'':'none';});
   // import button in topbar — admin only
   var btnImport=document.getElementById('btn-import-top');
   if(btnImport) btnImport.style.display=window.isAdmin()?'':'none';
   var uTab=document.getElementById('at-users');
   if(uTab) uTab.style.display=(window.cu.role==='admin')?'':'none';
   // ── apply nav visibility per role permissions ──
-  var navModules=['overview','kanban','projects','advance','lodging','workload','calendar','leave','timesheet','cost'];
+  var navModules=['overview','kanban','projects','advance','lodging','workload','calendar','leave','timesheet','cost','targets'];
   navModules.forEach(function(m){
     var btn=document.querySelector('.nav-btn[onclick*="\''+m+'\'"]');
     if(!btn) return;
@@ -353,7 +356,7 @@ window.setupUser = function(){
 
 window.goView = function(id,el){
   // ตรวจสิทธิ์ view ก่อนนำทาง
-  var _navMods=['overview','kanban','projects','advance','lodging','workload','calendar','leave','timesheet','cost'];
+  var _navMods=['overview','kanban','projects','advance','lodging','workload','calendar','leave','timesheet','cost','targets'];
   if(_navMods.indexOf(id)>=0 && !window.canView(id)){
     window.showAlert('คุณไม่มีสิทธิ์เข้าถึง Module นี้','warn'); return;
   }
@@ -362,7 +365,7 @@ window.goView = function(id,el){
   document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on');});
   var v=document.getElementById('view-'+id);
   if(v){v.style.display='';v.classList.add('on');}
-  var labels={overview:'Overview',kanban:'Delivery Board',projects:'โครงการทั้งหมด',advance:'Advance',lodging:'ระบบจัดหาที่พัก',workload:'สรุปภาระงาน',availability:'ทีมว่าง',calendar:'ปฏิทินทีม',holidays:'วันหยุด',leave:'การลางาน',timesheet:'Timesheet',cost:'Cost Tracking'};
+  var labels={overview:'Overview',kanban:'Delivery Board',projects:'โครงการทั้งหมด',advance:'Advance',lodging:'ระบบจัดหาที่พัก',workload:'สรุปภาระงาน',availability:'ทีมว่าง',calendar:'ปฏิทินทีม',holidays:'วันหยุด',leave:'การลางาน',timesheet:'Timesheet',cost:'Cost Tracking',targets:'เป้าหมายทีม'};
   document.getElementById('tp-title').textContent=labels[id]||id;
   var actions={};
   document.getElementById('tp-actions').innerHTML=actions[id]||'';
@@ -381,6 +384,7 @@ window.goView = function(id,el){
     window.renderAvailability&&window.renderAvailability();
   }
   if(id==='calendar') window.renderCalendar();
+  if(id==='targets') window.renderTargets&&window.renderTargets();
   if(id==='holidays') window.renderHolidays();
   if(id==='leave') window.renderLeave();
   if(id==='timesheet') window.renderTimesheet();

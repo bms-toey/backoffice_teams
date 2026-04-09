@@ -182,6 +182,8 @@ function _todayStr(){var d=new Date();return d.getFullYear()+'-'+String(d.getMon
 function _notiKey(type,pid){return'noti_sent_'+type+'_'+pid+'_'+_todayStr();}
 function _notiSent(type,pid){return!!localStorage.getItem(_notiKey(type,pid));}
 function _notiMark(type,pid){try{localStorage.setItem(_notiKey(type,pid),'1');}catch(e){}}
+window.notiSent=_notiSent;
+window.notiMark=_notiMark;
 
 window.checkDailyNotifications=async function(){
   var today=_todayStr();

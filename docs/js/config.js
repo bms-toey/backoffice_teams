@@ -242,6 +242,7 @@ window.PERM_MODULES = [
   { id:'availability',  label:'ทีมว่าง',         icon:'👥' },
   { id:'holiday',       label:'วันหยุด',         icon:'🎌' },
   { id:'admin',         label:'Admin Panel',    icon:'⚙️' },
+  { id:'targets',       label:'เป้าหมายทีม',    icon:'🎯' },
 ];
 
 // Default permissions when not configured (backward-compat)
@@ -265,6 +266,7 @@ function _roleDefaultPerms(role) {
       availability: ro,    // ดูอย่างเดียว
       holiday:      ro,    // ดูอย่างเดียว
       admin:        none,  // ไม่มีสิทธิ์
+      targets:      none,  // ไม่มีสิทธิ์
     };
   }
   if (role === 'viewer') {
@@ -282,10 +284,11 @@ function _roleDefaultPerms(role) {
       availability: ro,    // ดูอย่างเดียว
       holiday:      none,  // ไม่มีสิทธิ์
       admin:        none,  // ไม่มีสิทธิ์
+      targets:      none,  // ไม่มีสิทธิ์
     };
   }
   // fallback: view-only all
-  return {overview:ro,kanban:ro,projects:ro,advance:ro,lodging:ro,workload:ro,calendar:ro,leave:ro,timesheet:ro,cost:ro,availability:ro,holiday:none,admin:none};
+  return {overview:ro,kanban:ro,projects:ro,advance:ro,lodging:ro,workload:ro,calendar:ro,leave:ro,timesheet:ro,cost:ro,availability:ro,holiday:none,admin:none,targets:none};
 }
 
 // Main permission check
