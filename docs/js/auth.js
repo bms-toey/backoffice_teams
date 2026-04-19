@@ -1,8 +1,11 @@
-import { getFirestore, onSnapshot, getDocs, writeBatch, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, onSnapshot, getDocs, writeBatch, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 const db = getFirestore();
 const auth = window.auth;
 window.setDoc = setDoc;
+window.deleteDoc = deleteDoc;
+window.writeBatch = writeBatch;
+window.getDb = () => db;
 const { esc, fd, fc, fca, pd, gS, gT, gG, gSt, gC, avC, uid, getFY, getYearBE, getStaffOverlaps, overlapWarnText, getStaffLeaveConflicts, getColRef, getDocRef } = window;
 // ── FIREBASE AUTH ──
 async function initAuth(){
@@ -116,6 +119,15 @@ function setupRealtimeListeners(){
       return{id:d.project_id||d.id,name:d.project_name||d.name||'',groupId:d.group_id||d.groupId||'',siteOwner:d.site_owner||d.siteOwner||'',installer:d.installer_name||d.installer||'',typeId:d.type_id||d.typeId||'',stage:d.stage_id||d.stage||'init',cost:Number(d.budget||d.cost)||0,start:tsToStr(rawStart),end:tsToStr(rawEnd),revisit1:tsToStr(rawR1),revisit2:tsToStr(rawR2),parentProjectId:d.parentProjectId||d.parent_project_id||'',revisitRound:Number(d.revisitRound||d.revisit_round)||0,progress:Number(d.progress_pct||d.progress)||0,note:d.note||'',status:d.status||'active',pm:d.pm_staff_id||d.pm||'',team:d.team||[],members:d.members||[],isBorder:d.is_border===true||d.is_border==='TRUE',visits:(d.visits||[]).map(function(v){return{id:v.id||('V'+Math.random().toString(36).slice(2,7)),no:v.no||1,start:tsToStr(v.start||v.start_date||''),end:tsToStr(v.end||v.end_date||''),purpose:v.purpose||'',team:v.team||[],status:v.status||'planned',note:v.note||''};})};
     });
     checkLoaded();
+    if(window.cu){
+      var _von=function(id){var el=document.getElementById(id);return el&&el.classList.contains('on');};
+      if(_von('view-overview'))  window.renderOverview&&window.renderOverview();
+      if(_von('view-kanban'))    window.renderKanban&&window.renderKanban();
+      if(_von('view-projects'))  window.renderProjects&&window.renderProjects();
+      if(_von('view-workload'))  window.renderWorkload&&window.renderWorkload();
+      if(_von('view-calendar'))  window.renderCalendar&&window.renderCalendar();
+      if(_von('view-availability')) window.renderAvailability&&window.renderAvailability();
+    }
   }, e=>window.showDbError(e));
 
   onSnapshot(getColRef('ADVANCES'), s => {
@@ -186,6 +198,14 @@ function setupRealtimeListeners(){
     window.DEPT_LIST = s.docs.map(doc=>{let d=doc.data();return{id:d.dept_id||d.id,label:d.label_th||d.label||''};}).sort((a,b)=>a.label.localeCompare(b.label,'th'));
     if(window.DEPT_LIST.length>0) window.DEPARTMENTS=window.DEPT_LIST.map(d=>d.label);
     checkLoaded();
+  }, e=>window.showDbError(e));
+
+  onSnapshot(getColRef('HOSPITALS'), s => {
+    window.HOSPITALS = s.docs.map(doc=>{let d=doc.data();return{id:d.hospital_id||doc.id,code:d.code||'',name:d.name||'',type:d.type||'other',beds:Number(d.beds)||0,province:d.province||'',district:d.district||'',tambon:d.tambon||'',address:d.address||'',tel:d.tel||'',website:d.website||'',affiliation:d.affiliation||'',note:d.note||'',contacts:Array.isArray(d.contacts)?d.contacts:[]};});
+    if(window.cu&&document.getElementById('view-hospital')&&document.getElementById('view-hospital').classList.contains('on')){
+      window._hspPopulateFilters&&window._hspPopulateFilters();
+      window.renderHospital&&window.renderHospital();
+    }
   }, e=>window.showDbError(e));
 }
 
@@ -322,7 +342,7 @@ window.setupUser = function(){
   var uTab=document.getElementById('at-users');
   if(uTab) uTab.style.display=(window.cu.role==='admin')?'':'none';
   // ── apply nav visibility per role permissions ──
-  var navModules=['overview','kanban','projects','advance','lodging','workload','calendar','leave','timesheet','cost','targets'];
+  var navModules=['overview','kanban','projects','advance','lodging','workload','calendar','leave','timesheet','cost','targets','hospital'];
   navModules.forEach(function(m){
     var btn=document.querySelector('.nav-btn[onclick*="\''+m+'\'"]');
     if(!btn) return;
@@ -356,7 +376,7 @@ window.setupUser = function(){
 
 window.goView = function(id,el){
   // ตรวจสิทธิ์ view ก่อนนำทาง
-  var _navMods=['overview','kanban','projects','advance','lodging','workload','calendar','leave','timesheet','cost','targets'];
+  var _navMods=['overview','kanban','projects','advance','lodging','workload','calendar','leave','timesheet','cost','targets','hospital'];
   if(_navMods.indexOf(id)>=0 && !window.canView(id)){
     window.showAlert('คุณไม่มีสิทธิ์เข้าถึง Module นี้','warn'); return;
   }
@@ -365,7 +385,7 @@ window.goView = function(id,el){
   document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on');});
   var v=document.getElementById('view-'+id);
   if(v){v.style.display='';v.classList.add('on');}
-  var labels={overview:'Overview',kanban:'Delivery Board',projects:'โครงการทั้งหมด',advance:'Advance',lodging:'ระบบจัดหาที่พัก',workload:'สรุปภาระงาน',availability:'ทีมว่าง',calendar:'ปฏิทินทีม',holidays:'วันหยุด',leave:'การลางาน',timesheet:'Timesheet',cost:'Cost Tracking',targets:'เป้าหมายทีม'};
+  var labels={overview:'Overview',kanban:'Delivery Board',projects:'โครงการทั้งหมด',advance:'Advance',lodging:'ระบบจัดหาที่พัก',workload:'สรุปภาระงาน',availability:'ทีมว่าง',calendar:'ปฏิทินทีม',holidays:'วันหยุด',leave:'การลางาน',timesheet:'Timesheet',cost:'Cost Tracking',targets:'เป้าหมายทีม',hospital:'รายชื่อ รพ.'};
   document.getElementById('tp-title').textContent=labels[id]||id;
   var actions={};
   document.getElementById('tp-actions').innerHTML=actions[id]||'';
@@ -389,6 +409,7 @@ window.goView = function(id,el){
   if(id==='leave') window.renderLeave();
   if(id==='timesheet') window.renderTimesheet();
   if(id==='cost') window.renderCost();
+  if(id==='hospital'){window._hspPopulateFilters&&window._hspPopulateFilters();window.renderHospital&&window.renderHospital();}
 }
 
 window.toggleSB = function(){

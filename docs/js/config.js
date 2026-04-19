@@ -201,6 +201,25 @@ window.getProjPeriods = function(proj) {
   return [];
 };
 
+// ── VISIT TEAM HELPERS ──────────────────────────────────────────────────────
+// รองรับทั้ง team เก่า (string[]) และใหม่ ({sid,s,e}[])
+window._vtMember = function(team, staffId, fallbackStart, fallbackEnd) {
+  if (!team || !team.length) return null;
+  if (typeof team[0] === 'object') {
+    var found = team.find(function(t) { return t.sid === staffId; });
+    if (!found) return null;
+    return { sid: found.sid, s: found.s || fallbackStart || '', e: found.e || fallbackEnd || '' };
+  }
+  return team.includes(staffId) ? { sid: staffId, s: fallbackStart || '', e: fallbackEnd || '' } : null;
+};
+window._vtMembers = function(team, fallbackStart, fallbackEnd) {
+  if (!team || !team.length) return [];
+  return team.map(function(t) {
+    if (typeof t === 'object') return { sid: t.sid, s: t.s || fallbackStart || '', e: t.e || fallbackEnd || '' };
+    return { sid: t, s: fallbackStart || '', e: fallbackEnd || '' };
+  }).filter(function(m) { return m.sid; });
+};
+
 window.advFilter = '';
 window.calY = new Date().getFullYear();
 window.calM = new Date().getMonth();
@@ -243,6 +262,7 @@ window.PERM_MODULES = [
   { id:'holiday',       label:'วันหยุด',         icon:'🎌' },
   { id:'admin',         label:'Admin Panel',    icon:'⚙️' },
   { id:'targets',       label:'เป้าหมายทีม',    icon:'🎯' },
+  { id:'hospital',      label:'รายชื่อ รพ.',     icon:'🏥' },
 ];
 
 // Default permissions when not configured (backward-compat)
@@ -267,6 +287,7 @@ function _roleDefaultPerms(role) {
       holiday:      ro,    // ดูอย่างเดียว
       admin:        none,  // ไม่มีสิทธิ์
       targets:      none,  // ไม่มีสิทธิ์
+      hospital:     ro,    // ดูอย่างเดียว
     };
   }
   if (role === 'viewer') {
@@ -285,10 +306,11 @@ function _roleDefaultPerms(role) {
       holiday:      none,  // ไม่มีสิทธิ์
       admin:        none,  // ไม่มีสิทธิ์
       targets:      none,  // ไม่มีสิทธิ์
+      hospital:     ro,    // ดูอย่างเดียว
     };
   }
   // fallback: view-only all
-  return {overview:ro,kanban:ro,projects:ro,advance:ro,lodging:ro,workload:ro,calendar:ro,leave:ro,timesheet:ro,cost:ro,availability:ro,holiday:none,admin:none,targets:none};
+  return {overview:ro,kanban:ro,projects:ro,advance:ro,lodging:ro,workload:ro,calendar:ro,leave:ro,timesheet:ro,cost:ro,availability:ro,holiday:none,admin:none,targets:none,hospital:ro};
 }
 
 // Main permission check

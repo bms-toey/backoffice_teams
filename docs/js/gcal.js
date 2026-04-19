@@ -117,9 +117,9 @@ function _nextDay(ds) {
 
 // ── Build Google Calendar event body for a project visit ──
 function _visitBody(proj, visit, idx) {
-  var teamNames = (visit.team || []).map(function(sid) {
-    var st = (window.STAFF || []).find(function(s) { return s.id === sid; });
-    return st ? (st.nickname || st.name.split(' ')[0]) : sid;
+  var teamNames = window._vtMembers(visit.team || [], visit.start, visit.end).map(function(m) {
+    var st = (window.STAFF || []).find(function(s) { return s.id === m.sid; });
+    return st ? (st.nickname || st.name.split(' ')[0]) : m.sid;
   }).filter(Boolean).join(', ');
   var roundLabel = visit.no ? ' (รอบ ' + visit.no + ')' : (idx > 0 ? ' (รอบ ' + (idx + 1) + ')' : '');
   return {
@@ -253,7 +253,7 @@ window.gcalSync = async function() {
       if (proj.visits && proj.visits.length > 0) {
         proj.visits.forEach(function(v, vi) {
           if (!v.start || !v.end) return;
-          if (myStaffId && !(v.team || []).includes(myStaffId)) return;
+          if (myStaffId && !window._vtMember(v.team || [], myStaffId, v.start, v.end)) return;
           tasks.push(_gcalUpsert('proj_' + proj.id + '_v' + vi, _visitBody(proj, v, vi)));
         });
       } else {

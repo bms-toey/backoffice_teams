@@ -88,7 +88,7 @@ window.renderCalendar=function(){
       var mn=null;
       (window.PROJECTS||[]).forEach(function(p){
         if(p.status==='cancelled')return;
-        if(p.visits&&p.visits.length>0){p.visits.forEach(function(v){if(v.team&&v.team.includes(s.id)&&v.start&&(!mn||v.start<mn))mn=v.start;});}
+        if(p.visits&&p.visits.length>0){p.visits.forEach(function(v){var vm=window._vtMember(v.team,s.id,v.start,v.end);if(vm&&vm.s&&(!mn||vm.s<mn))mn=vm.s;});}
         else{var ms=(p.members&&p.members.length>0?p.members:p.team.map(function(id){return{sid:id,s:p.start};})).filter(function(m){return m.sid===s.id&&m.s;});ms.forEach(function(m){if(!mn||m.s<mn)mn=m.s;});}
       });
       _eSt[s.id]=mn||'9999-99';
@@ -100,7 +100,7 @@ window.renderCalendar=function(){
       var _rS=tCols[0].s,_rE=tCols[tCols.length-1].e,_hasEvt=new Set();
       (window.PROJECTS||[]).forEach(function(p){
         if(p.status==='cancelled'||p.status==='completed')return;
-        if(p.visits&&p.visits.length>0){p.visits.forEach(function(v){if(!v.start||!v.end||!v.team)return;var vs=pd(v.start),ve=pd(v.end);ve.setHours(23,59,59);if(ve>=_rS&&vs<=_rE)v.team.forEach(function(id){_hasEvt.add(id);});});}
+        if(p.visits&&p.visits.length>0){p.visits.forEach(function(v){if(!v.team)return;window._vtMembers(v.team,v.start,v.end).forEach(function(m){if(!m.s||!m.e)return;var ms=pd(m.s),me=pd(m.e);me.setHours(23,59,59);if(me>=_rS&&ms<=_rE)_hasEvt.add(m.sid);});});}
         else{var _ms=p.members&&p.members.length>0?p.members:p.team.map(function(id){return{sid:id,s:p.start,e:p.end};});_ms.forEach(function(m){if(!m.s||!m.e)return;var ms=pd(m.s),me=pd(m.e);me.setHours(23,59,59);if(me>=_rS&&ms<=_rE)_hasEvt.add(m.sid);});}
       });
       (window.LEAVES||[]).forEach(function(lv){if(!lv.startDate||!lv.endDate||lv.status==='rejected')return;var ls=pd(lv.startDate),le=pd(lv.endDate);le.setHours(23,59,59);if(le>=_rS&&ls<=_rE)_hasEvt.add(lv.staffId);});
@@ -123,9 +123,9 @@ window.renderCalendar=function(){
       // ถ้ามี visits ใช้ visits แทน members ปกติ
       if(p.visits&&p.visits.length>0){
         p.visits.forEach((v,vi)=>{
-          if(!v.team||!v.team.includes(r.id))return;
-          if(!v.start||!v.end)return;
-          let ms=pd(v.start),me=pd(v.end);me.setHours(23,59,59);
+          var vm=window._vtMember(v.team,r.id,v.start,v.end);
+          if(!vm)return;
+          let ms=pd(vm.s||v.start),me=pd(vm.e||v.end);me.setHours(23,59,59);
           let idxs=getColIndices(ms,me,tCols);
           if(idxs)rawEvents.push({sIdx:idxs.sIdx,eIdx:idxs.eIdx,text:`${p.name} (รอบ${v.no||vi+1})`,color:gC(window.PROJECTS.indexOf(p)),p:p});
         });
@@ -146,7 +146,7 @@ window.renderCalendar=function(){
         p.visits.forEach((v,vi)=>{
           if(!v.start||!v.end)return;
           let ms=pd(v.start),me=pd(v.end);me.setHours(23,59,59);
-          let team=v.team&&v.team.length>0?v.team.map(sid=>{let st=window.STAFF.find(s=>s.id===sid);return st?(st.nickname||st.name.split(' ')[0]):'';}).filter(Boolean):[];
+          let team=v.team&&v.team.length>0?window._vtMembers(v.team,v.start,v.end).map(m=>{let st=window.STAFF.find(s=>s.id===m.sid);return st?(st.nickname||st.name.split(' ')[0]):'';}).filter(Boolean):[];
           let label=(team.length>0?team.join(', '):'ยังไม่มีทีม')+` (รอบ${v.no||vi+1})`;
           let idxs=getColIndices(ms,me,tCols);
           let vColor={'planned':gS(p.stage).color,'ongoing':'#7c5cfc','done':'#06d6a0'}[v.status]||gS(p.stage).color;
@@ -175,7 +175,7 @@ window.renderCalendar=function(){
         p.visits.forEach((v,vi)=>{
           if(!v.start||!v.end)return;
           let ms=pd(v.start),me=pd(v.end);me.setHours(23,59,59);
-          let team=v.team&&v.team.length>0?v.team.map(sid=>{let st=window.STAFF.find(s=>s.id===sid);return st?(st.nickname||st.name.split(' ')[0]):'';}).filter(Boolean):[];
+          let team=v.team&&v.team.length>0?window._vtMembers(v.team,v.start,v.end).map(m=>{let st=window.STAFF.find(s=>s.id===m.sid);return st?(st.nickname||st.name.split(' ')[0]):'';}).filter(Boolean):[];
           let label=`${team.join(', ')||'ไม่มีทีม'} (${p.name} รอบ${v.no||vi+1})`;
           let idxs=getColIndices(ms,me,tCols);
           if(idxs)rawEvents.push({sIdx:idxs.sIdx,eIdx:idxs.eIdx,text:label,color:gC(window.PROJECTS.indexOf(p)),p:p});

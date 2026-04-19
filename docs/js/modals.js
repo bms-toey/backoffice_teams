@@ -31,12 +31,60 @@ window.execDelete=async function(){
 }
 
 // ── IMPORT ──
-window.updateImportPreview=function(){const type=document.getElementById('import-type').value;const schema=window.IMPORT_SCHEMAS[type];if(schema)document.getElementById('import-format-preview').textContent=schema.headers.join(', ');}
-window.openImportModal=function(){document.getElementById('import-file').value='';document.getElementById('import-msg').innerHTML='รองรับเฉพาะไฟล์ .csv เท่านั้น';document.getElementById('import-type').value='PROJECTS';window.updateImportPreview();window.openM('m-import');}
-window.downloadTemplate=function(){const type=document.getElementById('import-type').value;const schema=window.IMPORT_SCHEMAS[type];if(!schema)return;const csvContent="data:text/csv;charset=utf-8,\uFEFF"+schema.headers.join(",")+"\n"+schema.example.join(",");const link=document.createElement("a");link.setAttribute("href",encodeURI(csvContent));link.setAttribute("download",`Template_${type}.csv`);document.body.appendChild(link);link.click();document.body.removeChild(link);}
+window.updateImportPreview=function(){
+  const type=document.getElementById('import-type').value;
+  const fileInput=document.getElementById('import-file');
+  const fileLabel=document.getElementById('import-file-label');
+  const msgEl=document.getElementById('import-msg');
+  const formatBox=document.getElementById('import-format-preview');
+  const templateBtn=document.getElementById('import-template-btn');
+  const titleEl=document.getElementById('import-modal-title');
+  if(type==='HOSPITALS'){
+    if(fileInput)fileInput.accept='.xlsx,.xls,.csv';
+    if(fileLabel)fileLabel.textContent='2. เลือกไฟล์ Excel (.xlsx / .xls / .csv)';
+    if(msgEl)msgEl.innerHTML='รองรับ .xlsx / .xls / .csv · ใส่แค่รหัส รพ. ก็พอ หากเชื่อมต่อ MOPH API';
+    if(formatBox)formatBox.textContent='hospital_code, hospital_name, province, district, tambon, type, tel, beds, affiliation (ดูคำอธิบายในไฟล์ Template)';
+    if(templateBtn)templateBtn.textContent='📄 โหลดไฟล์ Template (.xlsx)';
+    if(titleEl)titleEl.textContent='นำเข้าข้อมูล (Excel)';
+    return;
+  }
+  if(type==='HOSPITAL_CONTACTS'){
+    if(fileInput)fileInput.accept='.xlsx,.xls,.csv';
+    if(fileLabel)fileLabel.textContent='2. เลือกไฟล์ Excel (.xlsx / .xls / .csv)';
+    if(msgEl)msgEl.innerHTML='1 แถว = 1 ผู้ติดต่อ · ระบุรหัส รพ. ทุกแถว · รพ. เดียวกันใส่หลายแถวได้';
+    if(formatBox)formatBox.textContent='hospital_code, contact_name, phone, position, email, note';
+    if(templateBtn)templateBtn.textContent='📄 โหลดไฟล์ Template (.xlsx)';
+    if(titleEl)titleEl.textContent='นำเข้าผู้ติดต่อ รพ. (Excel)';
+    return;
+  }
+  if(fileInput)fileInput.accept='.csv';
+  if(fileLabel)fileLabel.textContent='2. เลือกไฟล์ CSV';
+  if(msgEl)msgEl.innerHTML='รองรับเฉพาะไฟล์ .csv เท่านั้น';
+  if(templateBtn)templateBtn.textContent='📥 โหลดไฟล์ Template (.csv)';
+  if(titleEl)titleEl.textContent='นำเข้าข้อมูล (CSV)';
+  const schema=window.IMPORT_SCHEMAS[type];
+  if(schema&&formatBox)formatBox.textContent=schema.headers.join(', ');
+}
+window.openImportModal=function(){
+  document.getElementById('import-file').value='';
+  var activeView=document.querySelector('.view.on');
+  var viewId=activeView?activeView.id.replace('view-',''):'';
+  var typeMap={hospital:'HOSPITALS',staff:'STAFF',advance:'ADVANCES'};
+  document.getElementById('import-type').value=typeMap[viewId]||'PROJECTS';
+  window.updateImportPreview();
+  window.openM('m-import');
+}
+window.downloadTemplate=function(){
+  const type=document.getElementById('import-type').value;
+  if(type==='HOSPITALS'){window.downloadHospitalTemplate();return;}
+  if(type==='HOSPITAL_CONTACTS'){window.downloadHospitalContactsTemplate();return;}
+  const schema=window.IMPORT_SCHEMAS[type];if(!schema)return;const csvContent="data:text/csv;charset=utf-8,\uFEFF"+schema.headers.join(",")+"\n"+schema.example.join(",");const link=document.createElement("a");link.setAttribute("href",encodeURI(csvContent));link.setAttribute("download",`Template_${type}.csv`);document.body.appendChild(link);link.click();document.body.removeChild(link);
+}
 window.execImport=async function(){
   const fileInput=document.getElementById('import-file');const selType=document.getElementById('import-type').value;const schema=window.IMPORT_SCHEMAS[selType];const isClearFirst=document.getElementById('import-clear-first').checked;
   if(!fileInput.files.length){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">⚠ กรุณาเลือกไฟล์ก่อน</span>';return;}
+  if(selType==='HOSPITALS'){window.closeM('m-import');await window.importHospitalsFromFile(fileInput.files[0]);return;}
+  if(selType==='HOSPITAL_CONTACTS'){window.closeM('m-import');await window.importHospitalContactsFromFile(fileInput.files[0]);return;}
   if(!window.auth.currentUser){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">⚠ กรุณาเชื่อมต่อก่อน</span>';return;}
   const file=fileInput.files[0];const reader=new FileReader();
   reader.onload=async function(e){

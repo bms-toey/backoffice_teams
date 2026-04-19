@@ -348,21 +348,23 @@ window.tsSyncProject = async function(pid, members) {
   if (visits.length > 0) {
     // สร้าง 1 record ต่อคนต่อ visit — ID: TS-{pid}-V{vi}-{sid}
     visits.forEach(function(v, vi) {
-      v.team.forEach(function(sid) {
-        if (!sid) return;
-        var info = window.countWorkDaysExcLeave(sid, v.start, v.end);
+      window._vtMembers(v.team, v.start, v.end).forEach(function(mem) {
+        if (!mem.sid) return;
+        var ms = mem.s || v.start;
+        var me = mem.e || v.end;
+        var info = window.countWorkDaysExcLeave(mem.sid, ms, me);
         var wd   = info.workDays;
         if (wd <= 0) return;
-        var tsId      = 'TS-' + pid + '-V' + vi + '-' + sid;
+        var tsId      = 'TS-' + pid + '-V' + vi + '-' + mem.sid;
         var leaveNote = info.leaveDays > 0 ? ' (หักลา ' + info.leaveDays + ' วัน)' : '';
         var roundLabel = v.no ? ' รอบที่ ' + v.no : ' ช่วงที่ ' + (vi + 1);
         batch.set(getDocRef('TIMESHEETS', tsId), {
           timesheet_id: tsId,
           project_id:   pid,
-          staff_id:     sid,
-          work_date:    v.start,
-          visit_start:  v.start,
-          visit_end:    v.end,
+          staff_id:     mem.sid,
+          work_date:    ms,
+          visit_start:  ms,
+          visit_end:    me,
           hours:        wd * 8,
           category:     'fieldwork',
           description:  'ชั่วโมงทำงาน' + roundLabel + ' ' + wd + ' วัน' + leaveNote + ' (อัตโนมัติจากโครงการ)',

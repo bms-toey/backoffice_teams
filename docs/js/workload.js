@@ -147,8 +147,9 @@ window.renderWorkload = function() {
       var visitPeriods = [];
       if (p.visits && p.visits.length > 0) {
         p.visits.forEach(function(v) {
-          if (v.team && v.team.includes(s.id) && v.start && v.end) {
-            visitPeriods.push({ sid: s.id, s: v.start, e: v.end });
+          var vm = window._vtMember(v.team, s.id, v.start, v.end);
+          if (vm && vm.s && vm.e) {
+            visitPeriods.push({ sid: s.id, s: vm.s, e: vm.e });
           }
         });
       }

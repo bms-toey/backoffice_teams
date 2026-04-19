@@ -310,8 +310,8 @@ window.advInitLaborTable = function(pid, workStart, workEnd, isBorder, existingI
         var ms = '', me = '', visitLabel = '';
         // หาวันจาก visit ที่มีคนนี้อยู่ก่อน
         if(visits.length) {
-          var v = visits.find(function(v){ return v.team.includes(it.staffId); });
-          if(v){ ms = v.start; me = v.end; visitLabel = v.no ? 'ช่วงที่ '+v.no : ''; }
+          var v = visits.find(function(v){ return window._vtMember(v.team, it.staffId, v.start, v.end); });
+          if(v){ var vm=window._vtMember(v.team,it.staffId,v.start,v.end); ms=vm.s; me=vm.e; visitLabel=v.no?'ช่วงที่ '+v.no:''; }
         }
         if(!ms || !me) {
           var mem = mems.find(function(m){ return m.sid === it.staffId; });
@@ -320,7 +320,9 @@ window.advInitLaborTable = function(pid, workStart, workEnd, isBorder, existingI
         }
         if(ms && me) {
           var info = window.countLaborDaysInfo ? window.countLaborDaysInfo(it.staffId, ms, me) : {workDays:0, holidayDays:0, leaveDays:0};
-          enriched = Object.assign({}, it, { workStart:ms, workEnd:me, workDays:info.workDays, holidayDays:info.holidayDays, leaveDays:info.leaveDays, visitLabel:visitLabel });
+          // holidayDays: ใช้ค่าที่บันทึกไว้ก่อน ถ้ายังไม่เคยบันทึกให้เริ่มที่ 0 (user กรอกเอง)
+          var savedHd = it.holidayDays != null ? it.holidayDays : 0;
+          enriched = Object.assign({}, it, { workStart:ms, workEnd:me, workDays:info.workDays, holidayDays:savedHd, leaveDays:info.leaveDays, visitLabel:visitLabel });
         }
       }
       window.advAddLaborRow(enriched, 0, isBorder);
@@ -329,10 +331,11 @@ window.advInitLaborTable = function(pid, workStart, workEnd, isBorder, existingI
     // มี visits → 1 แถวต่อคนต่อช่วง
     visits.forEach(function(v){
       var visitLabel = v.no ? 'ช่วงที่ '+v.no : '';
-      v.team.forEach(function(sid){
-        if(!sid) return;
-        var info = window.countLaborDaysInfo(sid, v.start, v.end);
-        window.advAddLaborRow({staffId:sid, workStart:v.start, workEnd:v.end, workDays:info.workDays, holidayDays:info.holidayDays, leaveDays:info.leaveDays, dailyRate:null, included:true, visitLabel:visitLabel}, info.workDays, isBorder);
+      window._vtMembers(v.team, v.start, v.end).forEach(function(mem){
+        if(!mem.sid) return;
+        var info = window.countLaborDaysInfo(mem.sid, mem.s, mem.e);
+        // holidayDays เริ่มที่ 0 — user กรอกเองว่าทำงานวันหยุดกี่วัน
+        window.advAddLaborRow({staffId:mem.sid, workStart:mem.s, workEnd:mem.e, workDays:info.workDays, holidayDays:0, leaveDays:info.leaveDays, dailyRate:null, included:true, visitLabel:visitLabel}, info.workDays, isBorder);
       });
     });
   } else {
@@ -341,7 +344,8 @@ window.advInitLaborTable = function(pid, workStart, workEnd, isBorder, existingI
       var ms = m.s || workStart || '';
       var me = m.e || workEnd   || '';
       var info = (ms && me) ? window.countLaborDaysInfo(m.sid, ms, me) : {workDays:0, holidayDays:0, leaveDays:0};
-      window.advAddLaborRow({staffId:m.sid, workStart:ms, workEnd:me, workDays:info.workDays, holidayDays:info.holidayDays, leaveDays:info.leaveDays, dailyRate:null, included:true}, info.workDays, isBorder);
+      // holidayDays เริ่มที่ 0 — user กรอกเองว่าทำงานวันหยุดกี่วัน
+      window.advAddLaborRow({staffId:m.sid, workStart:ms, workEnd:me, workDays:info.workDays, holidayDays:0, leaveDays:info.leaveDays, dailyRate:null, included:true}, info.workDays, isBorder);
     });
   }
   window.advCalcTotal();
@@ -529,7 +533,7 @@ window.advBuildClearedSection = function(a, pid) {
             <th style="padding:5px 6px;text-align:left;min-width:150px;">พนักงาน</th>
             <th style="padding:5px 4px;text-align:right;white-space:nowrap;min-width:80px;">฿/วัน</th>
             <th style="padding:5px 4px;text-align:center;white-space:nowrap;min-width:56px;">วันทำงาน</th>
-            <th style="padding:5px 4px;text-align:center;white-space:nowrap;min-width:56px;">วันหยุด</th>
+            <th style="padding:5px 4px;text-align:center;white-space:nowrap;min-width:56px;" title="กรอกเองว่าทำงานวันหยุดกี่วัน">วันหยุด <span style="font-size:9px;font-weight:400;color:var(--txt3);">(กรอกเอง)</span></th>
             <th style="padding:5px 4px;text-align:right;white-space:nowrap;">ค่าแรง</th>
             <th style="padding:5px 4px;text-align:right;white-space:nowrap;">เบี้ยเลี้ยง</th>
             <th style="padding:5px 4px;text-align:right;white-space:nowrap;">รวม</th>

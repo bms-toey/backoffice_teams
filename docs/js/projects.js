@@ -146,6 +146,7 @@ window.showAlert=function(msg,type){
     +'</div>';
   ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
   document.body.appendChild(ov);
+  if(type==='success'){setTimeout(function(){if(ov.parentNode)ov.remove();},2000);}
 };
 
 window.showConfirm=function(msg,onOk,opts){
@@ -192,12 +193,23 @@ window.checkMemOverlap=function(mid){
 }
 
 window.updateAllMemDates=function(){
-  var sdt=(document.getElementById('pf-start')||{}).value||'';var edt=(document.getElementById('pf-end')||{}).value||'';
-  document.querySelectorAll('#mem-list > .m-row[id^="mr-"]').forEach(div=>{
-    var mid=div.id.slice(3);var ms=document.getElementById('ms-'+mid);var me=document.getElementById('me-'+mid);
-    if(ms&&!ms.value)ms.value=sdt;if(me&&!me.value)me.value=edt;
+  var sdt=(document.getElementById('pf-start')||{}).value||'';
+  var edt=(document.getElementById('pf-end')||{}).value||'';
+  var ml=document.getElementById('mem-list');
+  // ใช้ค่าที่เก็บไว้ใน data-proj-s/e แทน — อัพเดททันทีหลังแต่ละ sync
+  var origS=ml?ml.getAttribute('data-proj-s')||'':'';
+  var origE=ml?ml.getAttribute('data-proj-e')||'':'';
+  document.querySelectorAll('#mem-list > .m-row[id^="mr-"]').forEach(function(div){
+    var mid=div.id.slice(3);
+    var ms=document.getElementById('ms-'+mid);
+    var me=document.getElementById('me-'+mid);
+    if(ms&&sdt&&(!ms.value||ms.value===origS))ms.value=sdt;
+    if(me&&edt&&(!me.value||me.value===origE))me.value=edt;
     if(ms&&me)window.checkMemOverlap(mid);
   });
+  // อัพเดท baseline เพื่อให้ sync ครั้งถัดไปทำงานได้ถูก (กรณีเปลี่ยนวันซ้ำหลายรอบ)
+  if(ml&&sdt)ml.setAttribute('data-proj-s',sdt);
+  if(ml&&edt)ml.setAttribute('data-proj-e',edt);
 }
 
 window.openProjModal=function(id){
@@ -306,7 +318,7 @@ window.openProjModal=function(id){
   var visitsPane='<div id="pf-pane-visits" style="display:none">'+window.buildVisitsSection(p)+'</div>';
   document.getElementById('m-proj-body').innerHTML=tabBar+infoPane+teamPane+visitsPane;
   // Inject member rows into right panel (mem-list inside pickerHtml)
-  if(ce){var ml=document.getElementById('mem-list');if(ml)ml.innerHTML=memberRows;}
+  if(ce){var ml=document.getElementById('mem-list');if(ml){ml.innerHTML=memberRows;ml.setAttribute('data-proj-s',p?p.start||'':'');ml.setAttribute('data-proj-e',p?p.end||'':'');}}
   document.getElementById('m-proj-foot').style.display=window.canEdit('projects')?'':'none';
   window.openM('m-proj');
   window.updateProjFormByGroup(p?p.parentProjectId:'');
@@ -635,7 +647,7 @@ window.buildVisitsSection = function(p) {
     p.visits.forEach(function(v,i){
       var stColor={'planned':'var(--amber)','ongoing':'var(--violet)','done':'var(--teal)'}[v.status]||'var(--txt3)';
       var stLabel={'planned':'วางแผน','ongoing':'กำลังดำเนินการ','done':'เสร็จแล้ว'}[v.status]||v.status;
-      var team=v.team.map(function(sid){var s=window.STAFF.find(function(x){return x.id===sid;});return s?s.nickname||s.name.split(' ')[0]:'';}).filter(Boolean).join(', ');
+      var team=window._vtMembers(v.team||[],v.start,v.end).map(function(m){var s=window.STAFF.find(function(x){return x.id===m.sid;});return s?s.nickname||s.name.split(' ')[0]:'';}).filter(Boolean).join(', ');
       html+=`<div style="background:var(--surface2);border-radius:10px;padding:12px 14px;border-left:3px solid ${stColor}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
           <span style="font-size:12px;font-weight:600;color:var(--txt)">รอบที่ ${i+1}${v.purpose?' — '+esc(v.purpose):''}</span>
@@ -667,7 +679,9 @@ window.buildVisitsSection = function(p) {
 
 window._buildVisitRow = function(v, no) {
   var vid = v?v.id:('V'+Date.now()+(window._visitCounter++));
-  var preSelIds=v&&v.team&&v.team.length>0?v.team:[];
+  // normalize team to [{sid,s,e}]
+  var preSel = window._vtMembers(v&&v.team||[], v&&v.start||'', v&&v.end||'');
+  var preSelIds = preSel.map(function(m){ return m.sid; });
   // build available staff list
   var staffSorted=window.STAFF.filter(function(s){return s.active!==false;}).slice().sort(function(a,b){var da=a.dept||'zzz',db=b.dept||'zzz';if(da!==db)return da.localeCompare(db,'th');return(a.name||'').localeCompare(b.name||'','th');});
   var depts=[...new Set(staffSorted.map(function(s){return s.dept||'ไม่ระบุทีม';}))];
@@ -684,26 +698,37 @@ window._buildVisitRow = function(v, no) {
         +'</div>';
     });
   });
-  // build pre-selected tags
-  var selHtml=preSelIds.map(function(sid){
+  // build pre-selected tags with individual date inputs
+  var selHtml=preSel.map(function(mem){
+    var sid=mem.sid;
     var s=window.STAFF.find(function(x){return x.id===sid;});
+    if(!s)return '';
     var j=window.STAFF.indexOf(s);
-    return s?'<div class="v-team-tag" data-sid="'+sid+'" style="display:flex;align-items:center;gap:5px;padding:4px 7px;border-radius:7px;background:var(--surface);border:1px solid var(--border);margin-bottom:3px;font-size:10px;">'
-      +'<div style="width:20px;height:20px;border-radius:50%;background:'+avC(j<0?0:j)+';color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'+s.name.charAt(0)+'</div>'
-      +'<span style="flex:1;font-weight:600;">'+esc(s.name)+(s.nickname?' <span style="color:var(--txt3);font-weight:400;">('+esc(s.nickname)+')</span>':'')+'</span>'
-      +'<span style="cursor:pointer;color:var(--coral);font-size:11px;" onclick="window.vtPkuRemove(\''+vid+'\',\''+sid+'\')">✕</span>'
-      +'</div>':'';
+    var ms=mem.s||(v&&v.start)||'';
+    var me=mem.e||(v&&v.end)||'';
+    return '<div class="v-team-tag" data-sid="'+sid+'" data-s="'+ms+'" data-e="'+me+'" style="display:flex;flex-direction:column;padding:5px 7px;border-radius:7px;background:var(--surface);border:1px solid var(--border);margin-bottom:4px;">'
+      +'<div style="display:flex;align-items:center;gap:5px;">'
+        +'<div style="width:20px;height:20px;border-radius:50%;background:'+avC(j<0?0:j)+';color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'+s.name.charAt(0)+'</div>'
+        +'<span style="flex:1;font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(s.name)+(s.nickname?'<span style="color:var(--txt3);font-weight:400;"> ('+esc(s.nickname)+')</span>':'')+'</span>'
+        +'<span style="cursor:pointer;color:var(--coral);font-size:11px;flex-shrink:0;" onclick="window.vtPkuRemove(\''+vid+'\',\''+sid+'\')">✕</span>'
+      +'</div>'
+      +'<div style="display:flex;gap:3px;margin-top:4px;align-items:center;">'
+        +'<input type="date" class="v-mem-s f-input" value="'+ms+'" oninput="this.closest(\'.v-team-tag\').setAttribute(\'data-s\',this.value)" style="flex:1;padding:2px 4px;font-size:9px;height:22px;min-width:0;" title="วันเริ่มงาน">'
+        +'<span style="color:var(--txt3);font-size:9px;flex-shrink:0;">→</span>'
+        +'<input type="date" class="v-mem-e f-input" value="'+me+'" oninput="this.closest(\'.v-team-tag\').setAttribute(\'data-e\',this.value)" style="flex:1;padding:2px 4px;font-size:9px;height:22px;min-width:0;" title="วันสิ้นสุดงาน">'
+      +'</div>'
+    +'</div>';
   }).join('');
-  var cntTxt=preSelIds.length>0?'('+preSelIds.length+')':'';
-  return `<div class="visit-row" id="vr-${vid}" style="background:var(--surface2);border-radius:10px;padding:14px;border:1px solid var(--border);">
+  var cntTxt=preSel.length>0?'('+preSel.length+')':'';
+  return `<div class="visit-row" id="vr-${vid}" data-orig-s="${v&&v.start?v.start:''}" data-orig-e="${v&&v.end?v.end:''}" style="background:var(--surface2);border-radius:10px;padding:14px;border:1px solid var(--border);">
     <input type="hidden" class="v-id" value="${vid}">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
       <span style="font-size:12px;font-weight:600;color:var(--violet)">รอบที่ ${no}</span>
       <button class="btn btn-red btn-sm" type="button" onclick="this.closest('.visit-row').remove();window.reNumberVisits()">✕ ลบรอบ</button>
     </div>
     <div class="f-grid" style="gap:8px;">
-      <div class="f-group"><label class="f-label" style="font-size:11px">วันเริ่ม</label><input type="date" class="f-input v-start" value="${v&&v.start?v.start:''}"></div>
-      <div class="f-group"><label class="f-label" style="font-size:11px">วันสิ้นสุด</label><input type="date" class="f-input v-end" value="${v&&v.end?v.end:''}"></div>
+      <div class="f-group"><label class="f-label" style="font-size:11px">วันเริ่มรอบ</label><input type="date" class="f-input v-start" value="${v&&v.start?v.start:''}" onchange="window.vtSyncMemDates('${vid}',this,'s')"></div>
+      <div class="f-group"><label class="f-label" style="font-size:11px">วันสิ้นสุดรอบ</label><input type="date" class="f-input v-end" value="${v&&v.end?v.end:''}" onchange="window.vtSyncMemDates('${vid}',this,'e')"></div>
       <div class="f-group"><label class="f-label" style="font-size:11px">วัตถุประสงค์</label><input type="text" class="f-input v-purpose" value="${esc(v&&v.purpose?v.purpose:'')}" placeholder="เช่น สำรวจพื้นที่, ติดตั้ง..."></div>
       <div class="f-group"><label class="f-label" style="font-size:11px">สถานะ</label>
         <select class="f-input v-status">
@@ -713,7 +738,7 @@ window._buildVisitRow = function(v, no) {
         </select>
       </div>
       <div class="f-group" style="grid-column:span 2">
-        <label class="f-label" style="font-size:11px">ทีมงานรอบนี้</label>
+        <label class="f-label" style="font-size:11px">ทีมงานรอบนี้ <span style="font-weight:400;color:var(--txt3)">(ระบุวันเริ่ม-สิ้นสุดของแต่ละคนได้)</span></label>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px;">
           <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;display:flex;flex-direction:column;">
             <div style="padding:4px 8px;background:var(--surface);border-bottom:1px solid var(--border);font-size:10px;font-weight:600;color:var(--txt3);">รายชื่อทั้งหมด</div>
@@ -722,7 +747,7 @@ window._buildVisitRow = function(v, no) {
           </div>
           <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;display:flex;flex-direction:column;">
             <div style="padding:4px 8px;background:var(--surface);border-bottom:1px solid var(--border);font-size:10px;font-weight:600;color:var(--txt3);">ทีมงานที่เลือก <span id="vt-cnt-${vid}" style="color:var(--violet);font-weight:400;">${cntTxt}</span></div>
-            <div id="vt-sel-${vid}" style="flex:1;max-height:155px;overflow-y:auto;padding:4px 5px;">${selHtml}</div>
+            <div id="vt-sel-${vid}" style="flex:1;max-height:220px;overflow-y:auto;padding:4px 5px;">${selHtml}</div>
           </div>
         </div>
       </div>
@@ -744,11 +769,23 @@ window.vtPkuAdd=function(vid,sid){
   if(selBox.querySelector('.v-team-tag[data-sid="'+sid+'"]'))return;
   var s=window.STAFF.find(function(x){return x.id===sid;});if(!s)return;
   var j=window.STAFF.indexOf(s);
-  var tag=document.createElement('div');tag.className='v-team-tag';tag.setAttribute('data-sid',sid);
-  tag.style.cssText='display:flex;align-items:center;gap:5px;padding:4px 7px;border-radius:7px;background:var(--surface);border:1px solid var(--border);margin-bottom:3px;font-size:10px;';
-  tag.innerHTML='<div style="width:20px;height:20px;border-radius:50%;background:'+avC(j<0?0:j)+';color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'+s.name.charAt(0)+'</div>'
-    +'<span style="flex:1;font-weight:600;">'+esc(s.name)+(s.nickname?' <span style="color:var(--txt3);font-weight:400;">('+esc(s.nickname)+')</span>':'')+'</span>'
-    +'<span style="cursor:pointer;color:var(--coral);font-size:11px;" onclick="window.vtPkuRemove(\''+vid+'\',\''+sid+'\')">✕</span>';
+  // default dates from visit's current start/end
+  var row=document.getElementById('vr-'+vid);
+  var vs=row?((row.querySelector('.v-start')||{}).value||''):'';
+  var ve=row?((row.querySelector('.v-end')||{}).value||''):'';
+  var tag=document.createElement('div');tag.className='v-team-tag';
+  tag.setAttribute('data-sid',sid);tag.setAttribute('data-s',vs);tag.setAttribute('data-e',ve);
+  tag.style.cssText='display:flex;flex-direction:column;padding:5px 7px;border-radius:7px;background:var(--surface);border:1px solid var(--border);margin-bottom:4px;';
+  tag.innerHTML='<div style="display:flex;align-items:center;gap:5px;">'
+    +'<div style="width:20px;height:20px;border-radius:50%;background:'+avC(j<0?0:j)+';color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'+s.name.charAt(0)+'</div>'
+    +'<span style="flex:1;font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(s.name)+(s.nickname?' <span style="color:var(--txt3);font-weight:400;">('+esc(s.nickname)+')</span>':'')+'</span>'
+    +'<span style="cursor:pointer;color:var(--coral);font-size:11px;flex-shrink:0;" onclick="window.vtPkuRemove(\''+vid+'\',\''+sid+'\')">✕</span>'
+  +'</div>'
+  +'<div style="display:flex;gap:3px;margin-top:4px;align-items:center;">'
+    +'<input type="date" class="v-mem-s f-input" value="'+vs+'" oninput="this.closest(\'.v-team-tag\').setAttribute(\'data-s\',this.value)" style="flex:1;padding:2px 4px;font-size:9px;height:22px;min-width:0;" title="วันเริ่มงาน">'
+    +'<span style="color:var(--txt3);font-size:9px;flex-shrink:0;">→</span>'
+    +'<input type="date" class="v-mem-e f-input" value="'+ve+'" oninput="this.closest(\'.v-team-tag\').setAttribute(\'data-e\',this.value)" style="flex:1;padding:2px 4px;font-size:9px;height:22px;min-width:0;" title="วันสิ้นสุดงาน">'
+  +'</div>';
   selBox.appendChild(tag);
   var avItem=document.querySelector('#vt-avail-'+vid+' .vt-avail-item[data-sid="'+sid+'"]');
   if(avItem){avItem.style.opacity='0.3';avItem.style.pointerEvents='none';avItem.querySelector('span:last-child').textContent='✓';}
@@ -799,6 +836,29 @@ window.reNumberVisits = function(){
   });
 };
 
+// เมื่อเปลี่ยนวันเริ่ม/สิ้นสุดของ visit → อัพเดท member tags ที่ยังใช้วันเดิม
+window.vtSyncMemDates = function(vid, input, field) {
+  var row = document.getElementById('vr-'+vid);
+  if (!row) return;
+  var newVal = input.value;
+  var origKey = field === 's' ? 'data-orig-s' : 'data-orig-e';
+  var tagAttr  = field === 's' ? 'data-s' : 'data-e';
+  var memInput = field === 's' ? '.v-mem-s' : '.v-mem-e';
+  var origVal  = row.getAttribute(origKey) || '';
+  var selBox   = document.getElementById('vt-sel-'+vid);
+  if (!selBox) return;
+  selBox.querySelectorAll('.v-team-tag').forEach(function(tag) {
+    var cur = tag.getAttribute(tagAttr) || '';
+    if (!cur || cur === origVal) {
+      tag.setAttribute(tagAttr, newVal);
+      var inp = tag.querySelector(memInput);
+      if (inp) inp.value = newVal;
+    }
+  });
+  // อัพเดท orig ให้ตรงกับค่าใหม่
+  row.setAttribute(origKey, newVal);
+};
+
 window.collectVisits = function(){
   var rows=document.querySelectorAll('#visits-list .visit-row');
   if(!rows||rows.length===0) return [];
@@ -808,7 +868,9 @@ window.collectVisits = function(){
     var start=(row.querySelector('.v-start')||{}).value||'';
     var end=(row.querySelector('.v-end')||{}).value||'';
     if(!start&&!end) return; // ข้ามรอบที่ไม่มีวัน
-    var team=[...row.querySelectorAll('.v-team-tag[data-sid]')].map(function(t){return t.getAttribute('data-sid');}).filter(Boolean);
+    var team=[...row.querySelectorAll('.v-team-tag[data-sid]')].map(function(t){
+      return {sid:t.getAttribute('data-sid'), s:t.getAttribute('data-s')||'', e:t.getAttribute('data-e')||''};
+    }).filter(function(t){return t.sid;});
     result.push({
       id:vid, no:i+1,
       start:start, end:end,
