@@ -99,6 +99,50 @@ function renderAdm(){
     </div>`;
   }
   else if(window.admCur==='stages'){if(titleEl)titleEl.innerHTML=`⚡ PM Stages`;c.innerHTML=`<div style="display:flex;justify-content:flex-end;margin-bottom:20px">${window.canAdd('admin')?`<button class="btn btn-pri" onclick="window.admStageForm(null)">+ เพิ่ม Stage</button>`:''}</div><div id="stg-list" style="display:flex;flex-direction:column;gap:10px;max-width:700px;margin:0 auto;">`+window.STAGES.map(function(s,i){return`<div class="adm-card fade" draggable="${window.canEdit('admin')}" ondragstart="window.stgDrag(event,'${s.id}')" ondragover="event.preventDefault()" ondrop="window.stgDrop(event,'${s.id}')" style="animation-delay:${i*30}ms;">${window.canEdit('admin')?`<div style="color:var(--border2);font-size:20px;cursor:grab;padding-right:10px;">⋮⋮</div>`:''}<div style="width:40px;height:40px;border-radius:10px;background:${s.color};flex-shrink:0;box-shadow:0 4px 12px ${s.color}55;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;">${s.order||i+1}</div><div class="adm-card-info"><div style="font-size:14px;font-weight:600;color:var(--txt)">${esc(s.label)}</div><div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap;"><div style="width:10px;height:10px;border-radius:50%;background:${s.color};"></div><span style="font-size:11px;font-weight:400;color:var(--txt3)">ลำดับที่ ${s.order||i+1}</span>${s.autoRule?`<span style="font-size:10px;font-weight:600;background:var(--violet)15;color:var(--violet);padding:2px 8px;border-radius:10px;">⚡ ${s.autoRule==='before_start'?'ก่อนเริ่ม '+s.autoOffset+'ว':s.autoRule==='on_start'?'เมื่อเริ่มโครงการ':s.autoRule==='on_end'?'เมื่อสิ้นสุดโครงการ':'หลังสิ้นสุด '+s.autoOffset+'ว'}</span>`:''}${s.setProgress>=0?`<span style="font-size:10px;font-weight:600;background:var(--teal)15;color:var(--teal);padding:2px 8px;border-radius:10px;">📊 ${s.setProgress}%</span>`:''}</div></div><div class="adm-card-actions">${window.canEdit('admin')?`<button class="btn btn-ghost btn-sm" onclick="window.admStageForm('${s.id}')">✏️</button>`:''}${window.canDel('admin')?`<button class="btn btn-red btn-sm" onclick="window.askDel('stage','${s.id}','${esc(s.label)}')">🗑</button>`:''}</div></div>`;}).join('')+`</div>`;}
+  else if(window.admCur==='hsp_products'){
+    var prods=window.HSP_PRODUCTS||[];
+    if(titleEl)titleEl.innerHTML=`📦 Product <span class="tag" style="background:var(--surface2);color:var(--txt3);margin-left:10px;font-size:11px;">${prods.length} รายการ</span>`;
+    var HSP_GRP=[{id:'his_front',label:'HIS Front Office',color:'#2563eb'},{id:'his_back',label:'HIS Back Office',color:'#7c3aed'},{id:'interconnect',label:'Interconnection',color:'#0891b2'},{id:'application',label:'Application',color:'#059669'},{id:'smart',label:'Smart Hospital',color:'#d97706'}];
+    var canE=window.canEdit&&window.canEdit('admin');
+    var canA=window.canAdd&&window.canAdd('admin');
+    var canD=window.canDel&&window.canDel('admin');
+    var rows='';
+    HSP_GRP.forEach(function(g){
+      var gp=prods.filter(function(p){return p.group===g.id;});
+      if(!gp.length)return;
+      rows+=`<div style="margin-bottom:16px;max-width:640px;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${g.color};padding:4px 0 8px;border-bottom:2px solid ${g.color}33;margin-bottom:8px;">${esc(g.label)}</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">`+
+        gp.map(function(p){
+          return`<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 16px;display:flex;align-items:center;gap:12px;" onmouseover="this.style.borderColor='${p.color}'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="width:12px;height:12px;border-radius:50%;background:${p.color};flex-shrink:0;display:inline-block;"></span>
+            <span style="flex:1;font-size:13px;font-weight:600;color:var(--txt);">${esc(p.name)}</span>
+            ${p.note?`<span style="font-size:11px;color:var(--txt-muted);">${esc(p.note)}</span>`:''}
+            <div style="display:flex;gap:6px;flex-shrink:0;">
+              ${canE?`<button class="btn btn-ghost btn-sm" onclick="window.openHspProductEdit('${p.id}');window.openM('m-hsp-products')">✏️</button>`:''}
+              ${canD?`<button class="btn btn-red btn-sm" onclick="window.deleteHspProduct('${p.id}')">🗑</button>`:''}
+            </div>
+          </div>`;
+        }).join('')+
+        `</div></div>`;
+    });
+    var noGrp=prods.filter(function(p){return!HSP_GRP.some(function(g){return g.id===p.group;});});
+    if(noGrp.length){
+      rows+=`<div style="margin-bottom:16px;max-width:640px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txt-muted);padding:4px 0 8px;border-bottom:2px solid var(--border);margin-bottom:8px;">ยังไม่ได้กำหนดกลุ่ม</div><div style="display:flex;flex-direction:column;gap:6px;">`+
+        noGrp.map(function(p){
+          return`<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 16px;display:flex;align-items:center;gap:12px;">
+            <span style="width:12px;height:12px;border-radius:50%;background:${p.color};flex-shrink:0;display:inline-block;"></span>
+            <span style="flex:1;font-size:13px;font-weight:600;color:var(--txt);">${esc(p.name)}</span>
+            <div style="display:flex;gap:6px;flex-shrink:0;">
+              ${canE?`<button class="btn btn-ghost btn-sm" onclick="window.openHspProductEdit('${p.id}');window.openM('m-hsp-products')">✏️</button>`:''}
+              ${canD?`<button class="btn btn-red btn-sm" onclick="window.deleteHspProduct('${p.id}')">🗑</button>`:''}
+            </div>
+          </div>`;
+        }).join('')+`</div></div>`;
+    }
+    if(!rows)rows=`<div style="text-align:center;color:var(--txt-muted);padding:64px 24px;font-size:14px;border:1px dashed var(--border);border-radius:12px;max-width:640px;">ยังไม่มี Product · กด + เพิ่ม Product</div>`;
+    c.innerHTML=`<div style="display:flex;justify-content:flex-end;max-width:640px;margin-bottom:20px;">${canA?`<button class="btn btn-pri" onclick="window.openHspProductEdit(null);window.openM('m-hsp-products')">+ เพิ่ม Product</button>`:''}</div>`+rows;
+  }
   else if(window.admCur==='users'){if(titleEl)titleEl.innerHTML=`🔑 ผู้ใช้งานระบบ`;c.innerHTML=`<div style="display:flex;justify-content:flex-end;margin-bottom:20px">${window.canAdd('admin')?`<button class="btn btn-pri" onclick="window.admUserForm(null)">+ เพิ่มบัญชีผู้ใช้</button>`:''}</div><div class="dtable-inner" style="border:1px solid var(--border);"><table><thead><tr><th>Username</th><th>ชื่อ</th><th>Role</th><th style="width:90px"></th></tr></thead><tbody>`+window.USERS.map(function(u,i){var rc={admin:'rgba(255,107,107,.15)',pm:'rgba(255,166,43,.15)',viewer:'rgba(6,214,160,.15)'};var rt={admin:'var(--coral)',pm:'var(--amber)',viewer:'var(--teal)'};return`<tr class="fade"><td style="font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--violet)">${esc(u.username)}</td><td style="font-weight:600;">${esc(u.name)}</td><td><span class="tag" style="background:${rc[u.role]||'var(--surface2)'};color:${rt[u.role]||'var(--txt2)'}">${window.roleLabel(u.role)}</span></td><td><div style="display:flex;gap:6px">${window.canEdit('admin')?`<button class="btn btn-ghost btn-sm" onclick="window.admUserForm('${u.id}')">✏️</button>`:''} ${window.canDel('admin')?`<button class="btn btn-red btn-sm" onclick="window.askDel('user','${u.id}','${esc(u.username)}')">🗑</button>`:''}</div></td></tr>`;}).join('')+`</tbody></table></div>`;}
 }
 

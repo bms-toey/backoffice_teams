@@ -549,10 +549,10 @@
       <!-- HOSPITAL LIST -->
       <div class="view" id="view-hospital" style="overflow-y:auto;">
         <div class="toolbar" style="position:sticky;top:0;z-index:10;background:var(--surface);">
-          <div class="t-search"><input id="hsp-q" placeholder="ค้นหาจากรหัส / ชื่อ รพ. / อำเภอ..." oninput="window._hspPage=1;window.renderHospital()"></div>
+          <div class="t-search"><input id="hsp-q" placeholder="ค้นหาจากรหัส / ชื่อ รพ. / อำเภอ..." oninput="window._hspPage=1;window.renderHospital();if(window._hspViewMode==='analysis')window.renderHspAnalysis&&window.renderHspAnalysis();"></div>
           <select class="t-sel" id="hsp-prov" onchange="window._hspProvChanged()"><option value="">ทุกจังหวัด</option></select>
           <select class="t-sel" id="hsp-dist" onchange="window._hspDistChanged()"><option value="">ทุกอำเภอ</option></select>
-          <select class="t-sel" id="hsp-type" onchange="window._hspPage=1;window.renderHospital()">
+          <select class="t-sel" id="hsp-type" onchange="window._hspPage=1;window.renderHospital();if(window._hspViewMode==='analysis')window.renderHspAnalysis&&window.renderHspAnalysis();">
             <option value="">ทุกระดับ</option>
             <option value="A">A – ระดับสูงสุด</option>
             <option value="S">S – ศูนย์/ทั่วไปใหญ่</option>
@@ -566,13 +566,35 @@
           </select>
           <span id="hsp-count" style="color:var(--txt-muted);font-size:12px;white-space:nowrap;align-self:center;"></span>
           <div style="flex:1"></div>
+          <select class="t-sel" id="hsp-product-filter" onchange="window._hspPage=1;window.renderHospital();if(window._hspViewMode==='analysis')window.renderHspAnalysis&&window.renderHspAnalysis();" style="display:none;">
+            <option value="">ทุก Product</option>
+          </select>
           <button class="btn btn-ghost btn-sm admin-only" style="display:none" onclick="window.openHspApiSettings()" title="ตั้งค่าการเชื่อมต่อ MOPH API">⚙️ MOPH API</button>
           <button class="btn btn-ghost btn-sm admin-only" style="display:none" onclick="window.openHspAutoEnrich()" title="เติมข้อมูลที่ไม่ครบถ้วนจาก MOPH API อัตโนมัติ">🔄 เติมข้อมูล API</button>
+
           <button class="btn btn-pri btn-sm admin-only" style="display:none" onclick="window.openHospitalModal(null)">➕ เพิ่ม รพ.</button>
         </div>
+        <!-- View toggle tabs -->
+        <div style="display:flex;gap:0;border-bottom:2px solid var(--border);padding:0 24px;background:var(--surface);">
+          <button id="hsp-vtab-list" onclick="window.goHspView('list')"
+            style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;color:var(--violet);border-bottom:2px solid var(--violet);margin-bottom:-2px;transition:all .15s;">
+            📋 รายชื่อ รพ.
+          </button>
+          <button id="hsp-vtab-analysis" onclick="window.goHspView('analysis')"
+            style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;color:var(--txt-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;">
+            📊 วิเคราะห์ Product
+          </button>
+        </div>
         <div id="hsp-import-progress" style="text-align:center;padding:6px 24px;font-size:12px;color:var(--primary);display:block;min-height:0;"></div>
-        <div id="hsp-body" style="padding:0 24px 16px;"></div>
-        <div id="hsp-pager" style="padding:12px 24px 28px;"></div>
+        <!-- List view -->
+        <div id="hsp-list-area">
+          <div id="hsp-body" style="padding:0 24px 16px;"></div>
+          <div id="hsp-pager" style="padding:12px 24px 28px;"></div>
+        </div>
+        <!-- Analysis view -->
+        <div id="hsp-analysis-area" style="display:none;padding:20px 24px;">
+          <div id="hsp-analysis-body"></div>
+        </div>
       </div>
 
     </div>
@@ -641,6 +663,7 @@
           <div class="adm-nav-item" id="at-positions" onclick="window.admTab('positions')"><span class="adm-nav-icon">💼</span> ตำแหน่ง</div>
           <div class="adm-nav-item" id="at-stages" onclick="window.admTab('stages')"><span class="adm-nav-icon">⚡</span> PM Stages</div>
           <div class="adm-nav-item" id="at-rates" onclick="window.admTab('rates')"><span class="adm-nav-icon">💵</span> อัตราค่าใช้จ่าย</div>
+          <div class="adm-nav-item" id="at-hsp_products" onclick="window.admTab('hsp_products')"><span class="adm-nav-icon">📦</span> Product</div>
           <div class="adm-nav-item" id="at-notify" onclick="window.admTab('notify')" style="margin-top:auto; border-top:1px dashed var(--border); border-radius:0; padding-top:16px;"><span class="adm-nav-icon">🔔</span> การแจ้งเตือน</div>
           <div class="adm-nav-item admin-only" id="at-users" onclick="window.admTab('users')" style="display:none;"><span class="adm-nav-icon">🔑</span> ผู้ใช้งานระบบ</div>
           <div class="adm-nav-item admin-only" id="at-roles" onclick="window.admTab('roles')" style="display:none;"><span class="adm-nav-icon">🔐</span> สิทธิ์การใช้งาน</div>
@@ -1306,11 +1329,18 @@
         📋 ผู้ติดต่อ
         <span id="m-hsp-dtab-contacts-badge" style="display:none;background:var(--violet);color:#fff;border-radius:10px;font-size:11px;padding:1px 7px;margin-left:4px;"></span>
       </button>
+      <button id="m-hsp-dtab-products" onclick="window._hspDetailTab('products')"
+        style="background:none;border:none;padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600;color:var(--txt-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s;">
+        📦 Product
+        <span id="m-hsp-dtab-products-badge" style="display:none;background:var(--teal);color:#fff;border-radius:10px;font-size:11px;padding:1px 7px;margin-left:4px;"></span>
+      </button>
     </div>
     <!-- Panel: ข้อมูลทั่วไป -->
     <div id="m-hsp-detail-panel-info" style="flex:1;overflow-y:auto;padding:20px 24px;"></div>
     <!-- Panel: ผู้ติดต่อ -->
     <div id="m-hsp-detail-panel-contacts" style="display:none;flex:1;overflow-y:auto;padding:20px 24px;"></div>
+    <!-- Panel: Product -->
+    <div id="m-hsp-detail-panel-products" style="display:none;flex:1;overflow-y:auto;padding:20px 24px;"></div>
     <!-- Footer -->
     <div class="m-foot" style="flex-shrink:0;">
       <button class="btn btn-ghost" onclick="window.closeM('m-hsp-detail')">ปิด</button>
@@ -1343,6 +1373,9 @@
 
       <!-- Error box -->
       <div id="hsp-api-err" style="display:none;background:#ff6b6b18;border:1px solid #ff6b6b44;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#ff6b6b;line-height:1.5;word-break:break-word;"></div>
+
+      <!-- Saved accounts -->
+      <div id="hsp-api-saved-accounts" style="margin-bottom:12px;"></div>
 
       <!-- Login form -->
       <div style="font-size:12px;color:var(--txt-muted);margin-bottom:12px;">
@@ -1387,6 +1420,11 @@
         style="padding:10px 20px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;
                color:var(--txt-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;">
         📋 ข้อมูลการติดต่อ <span id="m-hsp-tab-contacts-badge" style="display:none;background:var(--violet);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;"></span>
+      </button>
+      <button id="m-hsp-tab-products" onclick="window._hspTab('products')"
+        style="padding:10px 20px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;
+               color:var(--txt-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;">
+        📦 Product <span id="m-hsp-tab-products-badge" style="display:none;background:var(--teal);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;"></span>
       </button>
     </div>
 
@@ -1485,10 +1523,73 @@
       </div>
     </div>
 
+    <!-- Panel 3: Product -->
+    <div id="m-hsp-panel-products" style="display:none;flex:1;overflow-y:auto;padding:20px 24px;">
+      <div style="font-size:12px;color:var(--txt-muted);margin-bottom:14px;">เลือก Product ที่ รพ. นี้ใช้งานอยู่</div>
+      <div id="hsp-products-cb-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+      <div id="hsp-products-cb-empty" style="display:none;text-align:center;padding:32px 0;font-size:13px;color:var(--txt-muted);border:1px dashed var(--border);border-radius:8px;">
+        ยังไม่มี Product ในระบบ · ให้ Admin กด "📦 จัดการ Product" เพื่อเพิ่ม
+      </div>
+    </div>
     <!-- Footer -->
     <div class="m-foot" style="flex-shrink:0;">
       <button class="btn btn-ghost" onclick="window.closeM('m-hsp')">ยกเลิก</button>
       <button class="btn btn-pri" id="m-hsp-save" onclick="window.saveHospital()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- PRODUCT MANAGEMENT MODAL -->
+<div class="overlay" id="m-hsp-products">
+  <div class="modal sm" style="max-height:85vh;display:flex;flex-direction:column;">
+    <div class="m-head" style="flex-shrink:0;">
+      <div class="m-icon" style="background:rgba(124,58,237,.12)">📦</div>
+      <div class="m-title">จัดการ Product</div>
+      <button class="m-x" onclick="window.closeM('m-hsp-products')">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px 24px;">
+      <!-- Form เพิ่ม/แก้ไข -->
+      <div id="hsp-prod-edit-area" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:16px;">
+        <input type="hidden" id="hsp-prod-edit-id">
+        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end;margin-bottom:8px;">
+          <div class="f-group" style="margin:0;">
+            <label class="f-label">ชื่อ Product <span style="color:var(--coral)">*</span></label>
+            <input class="f-input" id="hsp-prod-edit-name" placeholder="เช่น HIS, LIS, PACS..." autocomplete="off">
+          </div>
+          <div class="f-group" style="margin:0;">
+            <label class="f-label">สี</label>
+            <input type="color" id="hsp-prod-edit-color" value="#7c3aed" style="width:44px;height:38px;border:1px solid var(--border);border-radius:8px;cursor:pointer;padding:2px 4px;background:var(--surface);">
+          </div>
+        </div>
+        <div class="f-group" style="margin-bottom:8px;">
+          <label class="f-label">กลุ่ม Product <span style="color:var(--coral)">*</span></label>
+          <select class="f-input" id="hsp-prod-edit-group">
+            <option value="">— เลือกกลุ่ม —</option>
+            <option value="his_front">HIS Front Office</option>
+            <option value="his_back">HIS Back Office</option>
+            <option value="interconnect">Interconnection</option>
+            <option value="application">Application</option>
+            <option value="smart">Smart Hospital</option>
+          </select>
+        </div>
+        <div class="f-group" style="margin-bottom:10px;">
+          <label class="f-label">หมายเหตุ</label>
+          <input class="f-input" id="hsp-prod-edit-note" placeholder="คำอธิบายเพิ่มเติม (ไม่บังคับ)">
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button class="btn btn-ghost btn-sm" onclick="window.cancelHspProductEdit()">ยกเลิก</button>
+          <button class="btn btn-pri btn-sm" onclick="window.saveHspProduct()">💾 บันทึก</button>
+        </div>
+      </div>
+      <!-- รายการ Products -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-size:13px;font-weight:700;color:var(--txt);">รายการ Product</span>
+        <button class="btn btn-ghost btn-sm" onclick="window.openHspProductEdit(null)">➕ เพิ่มใหม่</button>
+      </div>
+      <div id="hsp-prod-list"></div>
+    </div>
+    <div class="m-foot" style="flex-shrink:0;">
+      <button class="btn btn-ghost" onclick="window.closeM('m-hsp-products')">ปิด</button>
     </div>
   </div>
 </div>

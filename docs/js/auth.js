@@ -200,11 +200,21 @@ function setupRealtimeListeners(){
     checkLoaded();
   }, e=>window.showDbError(e));
 
+  onSnapshot(getColRef('HSP_PRODUCTS'), s => {
+    window.HSP_PRODUCTS = s.docs.map(doc=>{let d=doc.data();return{id:d.product_id||doc.id,name:d.name||'',color:d.color||'#7c3aed',note:d.note||'',group:d.group||''};}).sort((a,b)=>a.name.localeCompare(b.name,'th'));
+    if(window.cu&&document.getElementById('view-hospital')&&document.getElementById('view-hospital').classList.contains('on')){
+      window.renderHspProductMgmt&&window.renderHspProductMgmt();
+      if(window._hspViewMode==='analysis')window.renderHspAnalysis&&window.renderHspAnalysis();
+    }
+    if(window.cu&&window.admCur==='hsp_products')window.admTab&&window.admTab('hsp_products');
+  }, e=>window.showDbError(e));
+
   onSnapshot(getColRef('HOSPITALS'), s => {
-    window.HOSPITALS = s.docs.map(doc=>{let d=doc.data();return{id:d.hospital_id||doc.id,code:d.code||'',name:d.name||'',type:d.type||'other',beds:Number(d.beds)||0,province:d.province||'',district:d.district||'',tambon:d.tambon||'',address:d.address||'',tel:d.tel||'',website:d.website||'',affiliation:d.affiliation||'',note:d.note||'',contacts:Array.isArray(d.contacts)?d.contacts:[]};});
+    window.HOSPITALS = s.docs.map(doc=>{let d=doc.data();return{id:d.hospital_id||doc.id,code:d.code||'',name:d.name||'',type:d.type||'other',beds:Number(d.beds)||0,province:d.province||'',district:d.district||'',tambon:d.tambon||'',address:d.address||'',tel:d.tel||'',website:d.website||'',affiliation:d.affiliation||'',note:d.note||'',contacts:Array.isArray(d.contacts)?d.contacts:[],products:Array.isArray(d.products)?d.products:[]};});
     if(window.cu&&document.getElementById('view-hospital')&&document.getElementById('view-hospital').classList.contains('on')){
       window._hspPopulateFilters&&window._hspPopulateFilters();
-      window.renderHospital&&window.renderHospital();
+      if(window._hspViewMode==='analysis')window.renderHspAnalysis&&window.renderHspAnalysis();
+      else window.renderHospital&&window.renderHospital();
     }
   }, e=>window.showDbError(e));
 }

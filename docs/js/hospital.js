@@ -4,10 +4,11 @@ const { esc, fc, uid, getColRef, getDocRef } = window;
 window.HOSPITALS = window.HOSPITALS || [];
 
 // ── MOPH HCODE API ─────────────────────────────────────────────────────────
-const HCODE_BASE = 'https://hcode.moph.go.th/api';
+const HCODE_BASE        = 'https://hcode.moph.go.th/api';
 const HCODE_TOKEN_KEY   = 'hcode_access';
 const HCODE_EXPIRY_KEY  = 'hcode_expiry';
 const HCODE_REFRESH_KEY = 'hcode_refresh';
+const HCODE_USER_KEY    = 'hcode_username';
 
 async function _hspGetToken() {
   var access  = localStorage.getItem(HCODE_TOKEN_KEY);
@@ -36,10 +37,22 @@ async function _hspGetToken() {
   return null;
 }
 
+// per-user token cache key prefix
+function _hspUserTokBase(u) { return 'hcode_tok_' + u; }
+
 function _hspSaveToken(access, refresh) {
+  var expiry = String(Date.now() + 225 * 60 * 1000); // 225 min
   localStorage.setItem(HCODE_TOKEN_KEY,   access);
-  localStorage.setItem(HCODE_EXPIRY_KEY,  String(Date.now() + 225 * 60 * 1000)); // 225 min
+  localStorage.setItem(HCODE_EXPIRY_KEY,  expiry);
   if (refresh) localStorage.setItem(HCODE_REFRESH_KEY, refresh);
+  // บันทึกแยกต่อ user เพื่อ switch account โดยไม่ต้องเรียก /token/ ซ้ำ
+  var u = localStorage.getItem(HCODE_USER_KEY);
+  if (u) {
+    var b = _hspUserTokBase(u);
+    localStorage.setItem(b + '_a', access);
+    localStorage.setItem(b + '_e', expiry);
+    if (refresh) localStorage.setItem(b + '_r', refresh);
+  }
 }
 
 // Login ด้วย username/password
@@ -54,13 +67,56 @@ window.hspApiLogin = async function() {
     if (errBox) { errBox.textContent = msg; errBox.style.display = ''; }
     if (stat) stat.innerHTML = '<span style="color:#ff6b6b;">❌ เชื่อมต่อไม่สำเร็จ</span>';
   }
-  if (errBox) errBox.style.display = 'none';
+  function applyToken(access, refresh, fromCache) {
+    localStorage.setItem(HCODE_USER_KEY, u);
+    _hspSaveToken(access, refresh);
+    _hspApiRateLimited = false;  // login ใหม่สำเร็จ → reset flag เสมอ
+    document.getElementById('hsp-api-pass').value = '';
+    _hspApiUpdateStatus();
+    _hspRenderSavedAccounts();
+    _hspApiUpdateQuota();
+    window.showAlert('เชื่อมต่อ MOPH API สำเร็จ' + (fromCache ? ' (ใช้ token ที่บันทึกไว้)' : ''), 'success');
+  }
 
+  if (errBox) errBox.style.display = 'none';
   if (!u || !p) { showErr('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน'); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'กำลังเชื่อมต่อ...'; }
   if (stat) stat.innerHTML = '<span style="color:var(--txt-muted);">⏳ กำลังตรวจสอบ...</span>';
 
   try {
+    // ── ตรวจ token cache ของ user นี้ก่อน (ไม่ต้องเรียก /token/ ซ้ำ) ────────
+    var b       = _hspUserTokBase(u);
+    var cachedA = localStorage.getItem(b + '_a');
+    var cachedE = Number(localStorage.getItem(b + '_e') || 0);
+    var cachedR = localStorage.getItem(b + '_r');
+
+    if (cachedA && cachedE > Date.now()) {
+      applyToken(cachedA, cachedR, true);
+      return;
+    }
+
+    // มี refresh token → ลอง refresh โดยไม่ต้องใช้ password (ประหยัด quota /token/)
+    if (cachedR) {
+      try {
+        var rr = await fetch(HCODE_BASE + '/token/refresh/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh: cachedR })
+        });
+        if (rr.ok) {
+          var dd = await rr.json();
+          applyToken(dd.access, cachedR, true);
+          return;
+        }
+        if (rr.status === 401) {
+          localStorage.removeItem(b + '_r');
+          localStorage.removeItem(b + '_a');
+          localStorage.removeItem(b + '_e');
+        }
+      } catch(_) {}
+    }
+
+    // ── ไม่มี cache — เรียก /token/ ด้วย password ────────────────────────────
     var r = await fetch(HCODE_BASE + '/token/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -75,6 +131,14 @@ window.hspApiLogin = async function() {
       try { var j = JSON.parse(bodyText); detail = j.detail || j.message || JSON.stringify(j); } catch(_) { detail = bodyText; }
       if (r.status === 401 || r.status === 400) {
         showErr('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' + (detail ? '  (' + detail + ')' : ''));
+      } else if (r.status === 429) {
+        // หา reset time จาก quota ของ user ปัจจุบัน
+        var curUser = localStorage.getItem(HCODE_USER_KEY) || '';
+        var qReset  = Number(localStorage.getItem('hcode_quota_' + curUser + '_reset') || 0);
+        var resetStr = qReset > Date.now()
+          ? ' · รีเซ็ตเวลา ' + new Date(qReset).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
+          : '';
+        showErr('เซิร์ฟเวอร์จำกัด request (429) จาก IP นี้ เปลี่ยนบัญชีไม่ช่วย เพราะใช้ IP เดียวกัน' + resetStr);
       } else {
         showErr('เซิร์ฟเวอร์ตอบกลับ HTTP ' + r.status + (detail ? ': ' + detail : ''));
       }
@@ -84,10 +148,7 @@ window.hspApiLogin = async function() {
     var d = JSON.parse(bodyText);
     if (!d.access) { showErr('API ตอบกลับแต่ไม่มี access token — โปรดตรวจสอบ endpoint'); return; }
 
-    _hspSaveToken(d.access, d.refresh);
-    document.getElementById('hsp-api-pass').value = '';
-    _hspApiUpdateStatus();
-    window.showAlert('เชื่อมต่อ MOPH API สำเร็จ', 'success');
+    applyToken(d.access, d.refresh, false);
 
   } catch(e) {
     if (e.name === 'TypeError' && e.message.toLowerCase().includes('fetch')) {
@@ -167,35 +228,167 @@ function _hspApiUpdateStatus() {
   }
 }
 
+// แสดงบัญชีที่บันทึกไว้ใน localStorage ให้กด switch ได้โดยไม่ต้องเรียก /token/
+function _hspRenderSavedAccounts() {
+  var wrap = document.getElementById('hsp-api-saved-accounts');
+  if (!wrap) return;
+
+  var curUser = localStorage.getItem(HCODE_USER_KEY) || '';
+  var users = [];
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if (k && k.endsWith('_a') && k.startsWith('hcode_tok_')) {
+      var name = k.slice('hcode_tok_'.length, -2);
+      if (!users.includes(name)) users.push(name);
+    }
+  }
+
+  if (!users.length) { wrap.innerHTML = ''; return; }
+
+  var now = Date.now();
+  var html = '<div style="margin-bottom:10px;">' +
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt-muted);margin-bottom:6px;">บัญชีที่บันทึกไว้</div>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+
+  users.forEach(function(u) {
+    var b     = _hspUserTokBase(u);
+    var expiry = Number(localStorage.getItem(b + '_e') || 0);
+    var hasR  = !!localStorage.getItem(b + '_r');
+    var isCur = u === curUser;
+    var valid = expiry > now || hasR;
+    var qBase  = 'hcode_quota_' + u;
+    var qCount = Number(localStorage.getItem(qBase + '_count') || 0);
+    var qReset = Number(localStorage.getItem(qBase + '_reset') || 0);
+    var remaining = qReset > now ? Math.max(0, _HSP_API_LIMIT - qCount) : _HSP_API_LIMIT;
+    var quotaColor = remaining < 20 ? '#ff6b6b' : remaining < 50 ? '#ffa62b' : '#06d6a0';
+
+    html +=
+      '<div onclick="' + (isCur ? '' : 'window._hspSwitchCachedUser(\'' + esc(u) + '\')') + '" ' +
+      'style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:10px;cursor:' + (isCur ? 'default' : 'pointer') + ';' +
+      'border:1.5px solid ' + (isCur ? 'var(--primary)' : 'var(--border)') + ';' +
+      'background:' + (isCur ? 'rgba(67,97,238,.08)' : 'var(--surface)') + ';' +
+      (isCur ? '' : 'transition:border-color .15s;') + '" ' +
+      (isCur ? '' : 'onmouseover="this.style.borderColor=\'var(--primary)\'" onmouseout="this.style.borderColor=\'var(--border)\'"') + '>' +
+        '<span style="font-size:13px;font-weight:700;color:' + (isCur ? 'var(--primary)' : 'var(--txt)') + ';">' + esc(u) + '</span>' +
+        (isCur ? '<span style="font-size:10px;background:var(--primary);color:#fff;padding:1px 6px;border-radius:8px;">ใช้งานอยู่</span>' : '') +
+        '<span style="font-size:11px;color:' + quotaColor + ';margin-left:auto;">' + remaining + '/' + _HSP_API_LIMIT + '</span>' +
+        (!valid ? '<span style="font-size:10px;color:#ff6b6b;" title="token หมดอายุ กรุณา login ใหม่">⚠️</span>' : '') +
+      '</div>';
+  });
+
+  html += '</div></div>';
+  wrap.innerHTML = html;
+}
+
+window._hspSwitchCachedUser = function(u) {
+  var b      = _hspUserTokBase(u);
+  var access  = localStorage.getItem(b + '_a');
+  var expiry  = Number(localStorage.getItem(b + '_e') || 0);
+  var refresh = localStorage.getItem(b + '_r');
+  var now     = Date.now();
+
+  if (access && expiry > now) {
+    // access token ยังใช้ได้
+    localStorage.setItem(HCODE_USER_KEY, u);
+    _hspSaveToken(access, refresh);
+    _hspApiRateLimited = false;  // switch account → reset flag เสมอ
+    _hspApiUpdateStatus();
+    _hspRenderSavedAccounts();
+    _hspApiUpdateQuota();
+    window.showAlert('เปลี่ยนบัญชีเป็น ' + u + ' สำเร็จ', 'success');
+    return;
+  }
+
+  if (refresh) {
+    // ลอง refresh
+    (async function() {
+      try {
+        var r = await fetch(HCODE_BASE + '/token/refresh/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh: refresh })
+        });
+        if (r.ok) {
+          var d = await r.json();
+          localStorage.setItem(HCODE_USER_KEY, u);
+          _hspSaveToken(d.access, refresh);
+          _hspApiRateLimited = false;
+          _hspApiUpdateStatus();
+          _hspRenderSavedAccounts();
+          _hspApiUpdateQuota();
+          window.showAlert('เปลี่ยนบัญชีเป็น ' + u + ' สำเร็จ', 'success');
+          return;
+        }
+        if (r.status === 401) {
+          localStorage.removeItem(b + '_r');
+          localStorage.removeItem(b + '_a');
+          localStorage.removeItem(b + '_e');
+        }
+      } catch(_) {}
+      // refresh ใช้ไม่ได้ → แจ้งให้ login ใหม่
+      document.getElementById('hsp-api-user').value = u;
+      document.getElementById('hsp-api-pass').value = '';
+      document.getElementById('hsp-api-pass').focus();
+      var errBox = document.getElementById('hsp-api-err');
+      if (errBox) { errBox.textContent = 'token ของ ' + u + ' หมดอายุ — กรุณากรอก Password ใหม่'; errBox.style.display = ''; }
+      _hspRenderSavedAccounts();
+    })();
+    return;
+  }
+
+  // ไม่มี token เลย
+  document.getElementById('hsp-api-user').value = u;
+  document.getElementById('hsp-api-pass').value = '';
+  document.getElementById('hsp-api-pass').focus();
+};
+
 window.openHspApiSettings = function() {
   document.getElementById('hsp-api-user').value = '';
   document.getElementById('hsp-api-pass').value = '';
   var errBox = document.getElementById('hsp-api-err');
   if (errBox) errBox.style.display = 'none';
   _hspApiUpdateStatus();
+  _hspRenderSavedAccounts();
+  _hspApiUpdateQuota();
   window.openM('m-hsp-api');
 };
 
 // ── API Rate-limit tracker & cache ───────────────────────────────────────────
-var _hspApiCache     = {};          // code5 → mapped result (session memory)
-var _hspApiCallCount = 0;           // นับ request ในชั่วโมงนี้
-var _hspApiCallReset = 0;           // timestamp ที่จะ reset นับ
+var _hspApiCache       = {};        // code5 → mapped result (session memory)
 var _hspApiRateLimited = false;     // flag: ถูก 429 อยู่
-var _HSP_API_LIMIT = 100;           // limit จาก server
+var _HSP_API_LIMIT     = 100;       // limit จาก server (req/hr per account)
+
+// อ่านและ normalize quota จาก localStorage ตาม MOPH username
+function _hspApiQuota() {
+  var user  = localStorage.getItem(HCODE_USER_KEY) || '_';
+  var base  = 'hcode_quota_' + user;
+  var now   = Date.now();
+  var reset = Number(localStorage.getItem(base + '_reset') || 0);
+  var count = Number(localStorage.getItem(base + '_count') || 0);
+  if (now > reset) {
+    count = 0; reset = now + 3600000;
+    localStorage.setItem(base + '_count', '0');
+    localStorage.setItem(base + '_reset', String(reset));
+    _hspApiRateLimited = false;
+  }
+  return { user: user === '_' ? '' : user, count: count, reset: reset, remaining: Math.max(0, _HSP_API_LIMIT - count) };
+}
 
 function _hspApiTrackCall() {
-  var now = Date.now();
-  if (now > _hspApiCallReset) { _hspApiCallCount = 0; _hspApiCallReset = now + 3600000; _hspApiRateLimited = false; }
-  _hspApiCallCount++;
+  var user  = localStorage.getItem(HCODE_USER_KEY) || '_';
+  var base  = 'hcode_quota_' + user;
+  var q     = _hspApiQuota();
+  localStorage.setItem(base + '_count', String(q.count + 1));
   _hspApiUpdateQuota();
 }
 
 function _hspApiUpdateQuota() {
   var el = document.getElementById('hsp-api-quota');
   if (!el) return;
-  var remaining = Math.max(0, _HSP_API_LIMIT - _hspApiCallCount);
-  el.textContent = 'quota: ' + remaining + '/' + _HSP_API_LIMIT + ' req/hr';
-  el.style.color = remaining < 20 ? '#ff6b6b' : remaining < 50 ? '#ffa62b' : 'var(--txt-muted)';
+  var q  = _hspApiQuota();
+  var userStr = q.user ? ' (' + q.user + ')' : '';
+  el.textContent = 'quota' + userStr + ': ' + q.remaining + '/' + _HSP_API_LIMIT + ' req/hr';
+  el.style.color = q.remaining < 20 ? '#ff6b6b' : q.remaining < 50 ? '#ffa62b' : 'var(--txt-muted)';
 }
 
 // Lookup รพ. จาก MOPH API ด้วย code5
@@ -204,8 +397,11 @@ async function _hspApiLookup(code5) {
   // ดึงจาก cache ก่อน
   if (_hspApiCache[code5] !== undefined) return _hspApiCache[code5];
 
-  // ถูก rate-limit อยู่ — ไม่เรียกซ้ำ
-  if (_hspApiRateLimited) return { _rateLimited: true };
+  // ถูก rate-limit อยู่ — ให้ _hspApiQuota() ตรวจก่อนว่าหน้าต่างเวลาหมดหรือยัง
+  if (_hspApiRateLimited) {
+    _hspApiQuota(); // side-effect: reset flag ถ้าครบชั่วโมงแล้ว
+    if (_hspApiRateLimited) return { _rateLimited: true };
+  }
 
   var token = await _hspGetToken();
   if (!token) return null;
@@ -385,11 +581,13 @@ function _hspFiltered() {
   var prov = document.getElementById('hsp-prov')?.value || '';
   var dist = document.getElementById('hsp-dist')?.value || '';
   var typ  = document.getElementById('hsp-type')?.value || '';
+  var prod = document.getElementById('hsp-product-filter')?.value || '';
 
   return (window.HOSPITALS || []).filter(h => {
     if (prov && h.province !== prov) return false;
     if (dist && h.district !== dist) return false;
     if (typ  && h.type    !== typ)   return false;
+    if (prod && !(h.products||[]).includes(prod)) return false;
     if (q) {
       var hay = (h.code + ' ' + h.name + ' ' + (h.district||'') + ' ' + (h.tambon||'') + ' ' + (h.affiliation||'')).toLowerCase();
       if (!hay.includes(q)) return false;
@@ -437,6 +635,7 @@ window.renderHospital = function() {
             <th style="padding:8px 12px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;">เตียง</th>
             <th style="padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;">โทรศัพท์</th>
             <th style="padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;">สังกัด</th>
+            <th style="padding:8px 12px;text-align:center;border-bottom:1px solid var(--border);white-space:nowrap;">Product</th>
             <th style="padding:8px 12px;text-align:center;border-bottom:1px solid var(--border);white-space:nowrap;">ผู้ติดต่อ</th>
             ${canEdit ? '<th style="padding:8px 12px;border-bottom:1px solid var(--border);"></th>' : ''}
           </tr>
@@ -457,6 +656,13 @@ window.renderHospital = function() {
               <td style="padding:9px 12px;text-align:right;color:var(--txt-muted);">${h.beds ? Number(h.beds).toLocaleString() : '—'}</td>
               <td style="padding:9px 12px;color:var(--txt-muted);white-space:nowrap;">${esc(h.tel||'—')}</td>
               <td style="padding:9px 12px;color:var(--txt-muted);font-size:12px;">${esc(h.affiliation||'—')}</td>
+              <td style="padding:9px 12px;text-align:center;">
+                ${(function(){
+                  var cnt = (h.products||[]).length;
+                  if(!cnt) return '<span style="color:var(--txt-muted);font-size:12px;">—</span>';
+                  return '<span style="background:var(--teal)22;color:var(--teal);padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;">'+cnt+'</span>';
+                })()}
+              </td>
               <td style="padding:9px 12px;text-align:center;">
                 ${cCount > 0
                   ? `<span style="background:var(--violet)22;color:var(--violet);padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;">${cCount}</span>`
@@ -505,17 +711,19 @@ window._hspDetailId = null;
 window._hspDetailTab = function(name) {
   var panels = {
     info:     document.getElementById('m-hsp-detail-panel-info'),
-    contacts: document.getElementById('m-hsp-detail-panel-contacts')
+    contacts: document.getElementById('m-hsp-detail-panel-contacts'),
+    products: document.getElementById('m-hsp-detail-panel-products'),
   };
   var tabs = {
     info:     document.getElementById('m-hsp-dtab-info'),
-    contacts: document.getElementById('m-hsp-dtab-contacts')
+    contacts: document.getElementById('m-hsp-dtab-contacts'),
+    products: document.getElementById('m-hsp-dtab-products'),
   };
   Object.keys(panels).forEach(function(k) {
     if (!panels[k] || !tabs[k]) return;
     var active = k === name;
     panels[k].style.display = active ? '' : 'none';
-    tabs[k].style.color = active ? 'var(--violet)' : 'var(--txt-muted)';
+    tabs[k].style.color             = active ? 'var(--violet)' : 'var(--txt-muted)';
     tabs[k].style.borderBottomColor = active ? 'var(--violet)' : 'transparent';
   });
 };
@@ -580,11 +788,48 @@ window.openHospitalDetail = function(id) {
       `<div style="text-align:center;color:var(--txt-muted);padding:48px 24px;font-size:13px;">ยังไม่มีข้อมูลผู้ติดต่อ</div>`;
   }
 
+  // ── Panel: Product ──
+  var prodPanel = document.getElementById('m-hsp-detail-panel-products');
+  if (prodPanel) {
+    var allProds = window.HSP_PRODUCTS || [];
+    var selIds   = h.products || [];
+    var myProds  = allProds.filter(function(p) { return selIds.includes(p.id); });
+    if (!myProds.length) {
+      prodPanel.innerHTML = '<div style="text-align:center;color:var(--txt-muted);padding:48px 24px;font-size:13px;">ยังไม่มี Product ที่ใช้งาน</div>';
+    } else {
+      var dpHtml = '';
+      HSP_PROD_GROUPS.forEach(function(g) {
+        var gProds = myProds.filter(function(p) { return p.group === g.id; });
+        if (!gProds.length) return;
+        dpHtml += '<div style="margin-bottom:14px;">' +
+          '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:' + g.color + ';margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid ' + g.color + '33;">' + esc(g.label) + '</div>' +
+          '<div style="display:flex;flex-wrap:wrap;gap:6px;">' +
+          gProds.map(function(p) {
+            return '<span style="background:' + p.color + '22;color:' + p.color + ';border:1px solid ' + p.color + '44;padding:5px 14px;border-radius:20px;font-size:13px;font-weight:700;">' + esc(p.name) + '</span>';
+          }).join('') + '</div></div>';
+      });
+      var noGrp2 = myProds.filter(function(p) { return !HSP_PROD_GROUPS.some(function(g){return g.id===p.group;}); });
+      if (noGrp2.length) {
+        dpHtml += '<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;color:var(--txt-muted);margin-bottom:8px;">อื่นๆ</div>' +
+          '<div style="display:flex;flex-wrap:wrap;gap:6px;">' +
+          noGrp2.map(function(p) {
+            return '<span style="background:' + p.color + '22;color:' + p.color + ';border:1px solid ' + p.color + '44;padding:5px 14px;border-radius:20px;font-size:13px;font-weight:700;">' + esc(p.name) + '</span>';
+          }).join('') + '</div></div>';
+      }
+      prodPanel.innerHTML = dpHtml;
+    }
+  }
+
   // ── Badge & edit button ──
   var badge = document.getElementById('m-hsp-dtab-contacts-badge');
   if (badge) {
     if (cs.length) { badge.textContent = cs.length; badge.style.display = ''; }
     else badge.style.display = 'none';
+  }
+  var prodBadge = document.getElementById('m-hsp-dtab-products-badge');
+  if (prodBadge) {
+    var pCount = (h.products || []).length;
+    prodBadge.textContent = pCount; prodBadge.style.display = pCount ? '' : 'none';
   }
   var editBtn = document.getElementById('m-hsp-detail-edit-btn');
   if (editBtn) editBtn.style.display = canEdit ? '' : 'none';
@@ -603,13 +848,13 @@ function _detailRow(icon, label, val) {
 
 // ── MODAL TABS ──────────────────────────────────────────────────────────────
 window._hspTab = function(name) {
-  var panels = { info: document.getElementById('m-hsp-panel-info'), contacts: document.getElementById('m-hsp-panel-contacts') };
-  var tabs   = { info: document.getElementById('m-hsp-tab-info'),   contacts: document.getElementById('m-hsp-tab-contacts') };
+  var panels = { info: document.getElementById('m-hsp-panel-info'), contacts: document.getElementById('m-hsp-panel-contacts'), products: document.getElementById('m-hsp-panel-products') };
+  var tabs   = { info: document.getElementById('m-hsp-tab-info'),   contacts: document.getElementById('m-hsp-tab-contacts'),   products: document.getElementById('m-hsp-tab-products') };
   Object.keys(panels).forEach(function(k) {
     if (!panels[k] || !tabs[k]) return;
     var active = k === name;
     panels[k].style.display = active ? '' : 'none';
-    tabs[k].style.color       = active ? 'var(--violet)' : 'var(--txt-muted)';
+    tabs[k].style.color             = active ? 'var(--violet)' : 'var(--txt-muted)';
     tabs[k].style.borderBottomColor = active ? 'var(--violet)' : 'transparent';
   });
 };
@@ -704,6 +949,61 @@ window.openHospitalModal = function(id) {
   window._hspFormProvinceChanged(false);
   window._hspFormDistrictChanged(false);
 
+  // ── Product checkboxes ───────────────────────────────────────────────────
+  var cbList  = document.getElementById('hsp-products-cb-list');
+  var cbEmpty = document.getElementById('hsp-products-cb-empty');
+  var prods   = window.HSP_PRODUCTS || [];
+  var selProds = h?.products || [];
+  if (cbList) {
+    if (!prods.length) {
+      cbList.innerHTML = '';
+      if (cbEmpty) cbEmpty.style.display = '';
+    } else {
+      if (cbEmpty) cbEmpty.style.display = 'none';
+      var cbHtml = '';
+      HSP_PROD_GROUPS.forEach(function(g) {
+        var gProds = prods.filter(function(p) { return p.group === g.id; });
+        if (!gProds.length) return;
+        cbHtml += '<div style="width:100%;margin:10px 0 6px;">' +
+          '<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;' +
+          'color:' + g.color + ';padding:2px 10px 2px 0;border-bottom:2px solid ' + g.color + '44;">' + esc(g.label) + '</span>' +
+          '</div>' +
+          '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;">' +
+          gProds.map(function(p) {
+            var checked = selProds.includes(p.id);
+            return '<label style="display:flex;align-items:center;gap:6px;padding:6px 13px;border-radius:20px;border:2px solid ' +
+              (checked ? p.color : 'var(--border)') + ';background:' + (checked ? p.color + '22' : 'var(--bg)') +
+              ';cursor:pointer;font-size:12px;font-weight:600;transition:all .15s;" ' +
+              'onchange="window._hspProdCbChange(this.querySelector(\'input\'),\'' + esc(p.color) + '\')">' +
+              '<input type="checkbox" class="hsp-prod-cb" data-pid="' + esc(p.id) + '" ' + (checked ? 'checked' : '') +
+              ' style="accent-color:' + p.color + ';width:13px;height:13px;">' +
+              '<span style="width:7px;height:7px;border-radius:50%;background:' + p.color + ';display:inline-block;"></span>' +
+              esc(p.name) + '</label>';
+          }).join('') + '</div>';
+      });
+      // ungrouped
+      var noGrp = prods.filter(function(p) { return !HSP_PROD_GROUPS.some(function(g){return g.id===p.group;}); });
+      if (noGrp.length) {
+        cbHtml += '<div style="width:100%;margin:10px 0 6px;"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txt-muted);">อื่นๆ</span></div>' +
+          '<div style="display:flex;flex-wrap:wrap;gap:6px;">' +
+          noGrp.map(function(p) {
+            var checked = selProds.includes(p.id);
+            return '<label style="display:flex;align-items:center;gap:6px;padding:6px 13px;border-radius:20px;border:2px solid ' +
+              (checked ? p.color : 'var(--border)') + ';background:' + (checked ? p.color + '22' : 'var(--bg)') +
+              ';cursor:pointer;font-size:12px;font-weight:600;transition:all .15s;" ' +
+              'onchange="window._hspProdCbChange(this.querySelector(\'input\'),\'' + esc(p.color) + '\')">' +
+              '<input type="checkbox" class="hsp-prod-cb" data-pid="' + esc(p.id) + '" ' + (checked ? 'checked' : '') +
+              ' style="accent-color:' + p.color + ';width:13px;height:13px;">' +
+              esc(p.name) + '</label>';
+          }).join('') + '</div>';
+      }
+      cbList.innerHTML = cbHtml;
+    }
+  }
+  // badge
+  var prodBadge = document.getElementById('m-hsp-tab-products-badge');
+  if (prodBadge) { prodBadge.textContent = selProds.length; prodBadge.style.display = selProds.length ? '' : 'none'; }
+
   window._hspTab('info');
   window.openM('m-hsp');
 };
@@ -736,6 +1036,7 @@ window.saveHospital = async function() {
     var fAffiliation = document.getElementById('m-hsp-affiliation').value.trim();
     var fNote        = document.getElementById('m-hsp-note').value.trim();
     var fContacts    = _hspGetContacts();
+    var fProducts    = Array.from(document.querySelectorAll('#hsp-products-cb-list .hsp-prod-cb:checked')).map(cb => cb.getAttribute('data-pid'));
 
     // ── ดึง MOPH API เมื่อมี field ที่ว่าง ───────────────────────────────
     var missingFields = !fProvince || !fDistrict || !fType || !fTel || !fAffiliation;
@@ -808,6 +1109,7 @@ window.saveHospital = async function() {
       affiliation: fAffiliation,
       note:        fNote,
       contacts:    fContacts,
+      products:    fProducts,
     };
 
     await window.setDoc(getDocRef('HOSPITALS', data.hospital_id), data);
@@ -1794,6 +2096,15 @@ window._hspPopulateFilters = function() {
   provSel.innerHTML = '<option value="">ทุกจังหวัด</option>' +
     usedProvs.map(p => `<option value="${esc(p)}"${p===curProv?' selected':''}>${esc(p)}</option>`).join('');
   _hspUpdateDistrictFilter();
+
+  // populate product filter (toolbar)
+  var prods = window.HSP_PRODUCTS || [];
+  var prodSel = document.getElementById('hsp-product-filter');
+  if (prodSel) {
+    var curProd = prodSel.value;
+    prodSel.innerHTML = '<option value="">ทุก Product</option>' + prods.map(p => `<option value="${esc(p.id)}"${p.id===curProd?' selected':''}>${esc(p.name)}</option>`).join('');
+    prodSel.style.display = prods.length ? '' : 'none';
+  }
 };
 
 // อัปเดต dropdown อำเภอใน toolbar ตามจังหวัดที่เลือก
@@ -1817,12 +2128,13 @@ window._hspProvChanged = function() {
   _hspUpdateDistrictFilter();
   window._hspPage = 1;
   window.renderHospital();
+  if (window._hspViewMode === 'analysis') window.renderHspAnalysis && window.renderHspAnalysis();
 };
 
-// District filter เปลี่ยน → render ใหม่
 window._hspDistChanged = function() {
   window._hspPage = 1;
   window.renderHospital();
+  if (window._hspViewMode === 'analysis') window.renderHspAnalysis && window.renderHspAnalysis();
 };
 
 // ── CASCADE ในฟอร์ม Add/Edit ─────────────────────────────────────────────────
@@ -1873,18 +2185,17 @@ window._hspFormDistrictChanged = function(clearTambon) {
 // ตรวจว่า รพ. รายนี้ข้อมูลไม่ครบถ้วนหรือไม่
 function _hspIsIncomplete(h) {
   return !h.province || !h.district || !h.type || h.type === 'other' ||
-         !h.tel || !h.affiliation || !h.beds || !h.tambon;
+         !h.affiliation || !h.beds || !h.tambon;
 }
 
 // สร้าง badge แสดง field ที่หายไปของแต่ละ รพ.
 function _hspMissingBadges(h) {
   var missing = [];
-  if (!h.province || !h.district) missing.push('ที่ตั้ง');
-  if (!h.tambon)                   missing.push('ตำบล');
+  if (!h.province || !h.district)    missing.push('ที่ตั้ง');
+  if (!h.tambon)                     missing.push('ตำบล');
   if (!h.type || h.type === 'other') missing.push('ระดับ');
-  if (!h.tel)                      missing.push('โทร');
-  if (!h.affiliation)              missing.push('สังกัด');
-  if (!h.beds)                     missing.push('เตียง');
+  if (!h.affiliation)                missing.push('สังกัด');
+  if (!h.beds)                       missing.push('เตียง');
   return missing.map(function(m) {
     return '<span style="background:var(--border);color:var(--txt-muted);font-size:10px;padding:1px 6px;border-radius:8px;margin-right:3px;">' + m + '</span>';
   }).join('');
@@ -1919,50 +2230,78 @@ window.openHspAutoEnrich = async function() {
     return;
   }
 
-  // ── สแกน รพ. ที่ข้อมูลไม่ครบ ────────────────────────────────────────────
-  var all        = window.HOSPITALS || [];
-  var incomplete = all.filter(function(h) { return h.code && _hspIsIncomplete(h); });
-  var complete   = all.length - incomplete.length;
+  // ── สแกน รพ. ที่ข้อมูลไม่ครบทั้งหมด ─────────────────────────────────────
+  var all = window.HOSPITALS || [];
+  window._hspEnrichAllIncomplete = all.filter(function(h) { return h.code && _hspIsIncomplete(h); });
 
-  var remaining  = Math.max(0, _HSP_API_LIMIT - _hspApiCallCount);
-  // หักรายที่ cache ไปแล้ว (ไม่ต้องเรียก API)
-  var needCall   = incomplete.filter(function(h) { return _hspApiCache[h.code] === undefined; }).length;
-  var fromCache  = incomplete.length - needCall;
-  var quotaWarn  = needCall > remaining;
+  if (!body) return;
+
+  // render province select + preview (เริ่มต้นทุกจังหวัด)
+  var usedProvs = [...new Set(window._hspEnrichAllIncomplete.map(function(h){return h.province;}).filter(Boolean))].sort(function(a,b){return a.localeCompare(b,'th');});
+  var provSelectHtml =
+    '<div style="padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+      '<span style="font-size:12px;font-weight:600;color:var(--txt-muted);white-space:nowrap;">เลือกจังหวัด:</span>' +
+      '<select id="hsp-enrich-prov" class="t-sel" style="min-width:180px;" onchange="window._hspEnrichRenderPreview(this.value)">' +
+        '<option value="">ทุกจังหวัด (' + window._hspEnrichAllIncomplete.length + ' รพ.)</option>' +
+        usedProvs.map(function(p) {
+          var cnt = window._hspEnrichAllIncomplete.filter(function(h){return h.province===p;}).length;
+          return '<option value="' + esc(p) + '">' + esc(p) + ' (' + cnt + ' รพ.)</option>';
+        }).join('') +
+      '</select>' +
+      '<span style="font-size:11px;color:var(--txt-muted);">เติมเฉพาะ field ที่ว่างเท่านั้น · ไม่เขียนทับข้อมูลที่มีอยู่แล้ว</span>' +
+    '</div>' +
+    '<div id="hsp-enrich-preview"></div>';
+
+  body.innerHTML = provSelectHtml;
+  window._hspEnrichRenderPreview('');
+};
+
+window._hspEnrichRenderPreview = function(prov) {
+  var preview    = document.getElementById('hsp-enrich-preview');
+  var confirmBtn = document.getElementById('m-hsp-enrich-confirm-btn');
+  var footNote   = document.getElementById('m-hsp-enrich-foot-note');
+  if (!preview) return;
+
+  var allInc    = window._hspEnrichAllIncomplete || [];
+  var incomplete = prov ? allInc.filter(function(h) { return h.province === prov; }) : allInc;
+  var complete   = (window.HOSPITALS || []).length - allInc.length;
+
+  var _q        = _hspApiQuota();
+  var remaining = _q.remaining;
+  var needCall  = incomplete.filter(function(h) { return _hspApiCache[h.code] === undefined; }).length;
+  var fromCache = incomplete.length - needCall;
+  var quotaWarn = needCall > remaining;
 
   window._hspEnrichPending = { incomplete };
-
-  // ── render preview ───────────────────────────────────────────────────────
-  if (!body) return;
 
   var summaryHtml =
     '<div style="padding:16px 20px;border-bottom:1px solid var(--border);background:var(--bg);">' +
       '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;">' +
-        '<div style="background:var(--surface);border-radius:10px;padding:10px 16px;flex:1;min-width:100px;text-align:center;">' +
+        '<div style="background:var(--surface);border-radius:10px;padding:10px 16px;flex:1;min-width:90px;text-align:center;">' +
           '<div style="font-size:22px;font-weight:800;color:#ff6b6b;">' + incomplete.length + '</div>' +
           '<div style="font-size:11px;color:var(--txt-muted);">ข้อมูลไม่ครบ</div>' +
         '</div>' +
-        '<div style="background:var(--surface);border-radius:10px;padding:10px 16px;flex:1;min-width:100px;text-align:center;">' +
+        '<div style="background:var(--surface);border-radius:10px;padding:10px 16px;flex:1;min-width:90px;text-align:center;">' +
           '<div style="font-size:22px;font-weight:800;color:#06d6a0;">' + complete + '</div>' +
           '<div style="font-size:11px;color:var(--txt-muted);">ครบถ้วนแล้ว</div>' +
         '</div>' +
-        '<div style="background:var(--surface);border-radius:10px;padding:10px 16px;flex:1;min-width:100px;text-align:center;">' +
+        '<div style="background:var(--surface);border-radius:10px;padding:10px 16px;flex:1;min-width:90px;text-align:center;">' +
           '<div style="font-size:22px;font-weight:800;color:var(--primary);">' + needCall + '</div>' +
           '<div style="font-size:11px;color:var(--txt-muted);">เรียก API' + (fromCache ? ' (+' + fromCache + ' cache)' : '') + '</div>' +
         '</div>' +
-        '<div style="background:var(--surface);border-radius:10px;padding:10px 16px;flex:1;min-width:100px;text-align:center;">' +
+        '<div style="background:var(--surface);border-radius:10px;padding:10px 16px;flex:1;min-width:90px;text-align:center;">' +
           '<div style="font-size:22px;font-weight:800;' + (remaining < 20 ? 'color:#ff6b6b' : remaining < 50 ? 'color:#ffa62b' : 'color:var(--txt)') + ';">' + remaining + '</div>' +
-          '<div style="font-size:11px;color:var(--txt-muted);">quota คงเหลือ/hr</div>' +
+          '<div style="font-size:11px;color:var(--txt-muted);">quota คงเหลือ/hr' + (_q.user ? ' · ' + _q.user : '') + '</div>' +
         '</div>' +
       '</div>' +
       (quotaWarn
         ? '<div style="background:#ffa62b18;border:1px solid #ffa62b44;border-radius:8px;padding:8px 12px;font-size:12px;color:#ffa62b;margin-bottom:8px;">' +
-            '⚠️ ต้องการ <b>' + needCall + '</b> req แต่ quota เหลือ <b>' + remaining + '</b> · ระบบจะหยุดเรียก API เมื่อถึงขีดจำกัด แต่ยังบันทึกข้อมูลที่ได้มาก่อน' +
+            '⚠️ ต้องการ <b>' + needCall + '</b> req แต่ quota เหลือ <b>' + remaining + '</b> · ระบบจะหยุดเรียก API เมื่อถึงขีดจำกัด' +
           '</div>'
         : '') +
       (incomplete.length === 0
         ? '<div style="color:#06d6a0;font-weight:600;font-size:13px;">✅ ข้อมูลทุกรายการครบถ้วนแล้ว ไม่มีรายการที่ต้องเติม</div>'
-        : '<div style="font-size:12px;color:var(--txt-muted);">ระบบจะเติมเฉพาะ field ที่ว่างเท่านั้น ไม่เขียนทับข้อมูลที่มีอยู่แล้ว</div>') +
+        : '') +
     '</div>';
 
   var tableHtml = '';
@@ -1973,24 +2312,29 @@ window.openHspAutoEnrich = async function() {
       '<thead><tr style="background:var(--bg);color:var(--txt-muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;position:sticky;top:0;z-index:1;">' +
         '<th style="padding:7px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;">รหัส</th>' +
         '<th style="padding:7px 12px;text-align:left;border-bottom:1px solid var(--border);">ชื่อโรงพยาบาล</th>' +
-        '<th style="padding:7px 12px;text-align:left;border-bottom:1px solid var(--border);">จังหวัด</th>' +
-        '<th style="padding:7px 12px;text-align:left;border-bottom:1px solid var(--border);">field ที่หายไป</th>' +
+        '<th style="padding:7px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;">จังหวัด</th>' +
+        '<th style="padding:7px 12px;text-align:left;border-bottom:1px solid var(--border);">ระดับ</th>' +
       '</tr></thead><tbody>' +
       incomplete.map(function(h) {
         var cached = _hspApiCache[h.code] !== undefined;
+        var t = _hspType(h.type);
         return '<tr style="border-bottom:1px solid var(--border);">' +
           '<td style="padding:7px 12px;font-family:monospace;font-weight:700;color:var(--primary);white-space:nowrap;">' +
             esc(h.code) + (cached ? ' <span title="มีใน cache" style="font-size:10px;opacity:.5;">📦</span>' : '') +
           '</td>' +
-          '<td style="padding:7px 12px;color:var(--txt);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(h.name) + '</td>' +
+          '<td style="padding:7px 12px;color:var(--txt);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(h.name) + '</td>' +
           '<td style="padding:7px 12px;color:var(--txt-muted);white-space:nowrap;">' + esc(h.province || '—') + '</td>' +
-          '<td style="padding:7px 12px;">' + _hspMissingBadges(h) + '</td>' +
+          '<td style="padding:7px 12px;">' +
+            (h.type && h.type !== 'other'
+              ? '<span style="background:' + t.color + '22;color:' + t.color + ';padding:1px 7px;border-radius:8px;font-size:11px;font-weight:700;">' + esc(h.type) + '</span>'
+              : '<span style="color:var(--txt-muted);font-size:11px;">—</span>') +
+          '</td>' +
         '</tr>';
       }).join('') +
       '</tbody></table></div>';
   }
 
-  body.innerHTML = summaryHtml + tableHtml;
+  preview.innerHTML = summaryHtml + tableHtml;
 
   if (confirmBtn) confirmBtn.disabled = incomplete.length === 0;
   if (footNote)   footNote.textContent = incomplete.length > 0 ? 'เติมข้อมูล ' + incomplete.length + ' รายการ' : '';
@@ -2004,6 +2348,7 @@ window.confirmHspAutoEnrich = async function() {
 
   var incomplete = pending.incomplete;
   var total      = incomplete.length;
+  var savedProv  = (document.getElementById('hsp-enrich-prov') || {}).value || '';
 
   // ── สลับ body → progress view ────────────────────────────────────────────
   var body = document.getElementById('m-hsp-enrich-body');
@@ -2036,7 +2381,7 @@ window.confirmHspAutoEnrich = async function() {
           '</div>' +
           '<div style="background:var(--bg);border-radius:8px;padding:8px 14px;flex:1;min-width:80px;">' +
             '<div style="font-size:10px;color:var(--txt-muted);margin-bottom:2px;">🌐 quota เหลือ</div>' +
-            '<div id="_enrich-quota" style="font-size:20px;font-weight:800;color:var(--txt);">' + Math.max(0, _HSP_API_LIMIT - _hspApiCallCount) + '</div>' +
+            '<div id="_enrich-quota" style="font-size:20px;font-weight:800;color:var(--txt);">' + _hspApiQuota().remaining + '</div>' +
           '</div>' +
         '</div>' +
         '<div id="_enrich-err-wrap" style="display:none;">' +
@@ -2068,7 +2413,7 @@ window.confirmHspAutoEnrich = async function() {
     if (eOk) eOk.textContent   = ok;
     if (eCa) eCa.textContent   = cache;
     if (eSk) eSk.textContent   = skip;
-    var rem = Math.max(0, _HSP_API_LIMIT - _hspApiCallCount);
+    var rem = _hspApiQuota().remaining;
     if (eQu) { eQu.textContent = rem; eQu.style.color = rem < 20 ? '#ff6b6b' : rem < 50 ? '#ffa62b' : 'var(--txt)'; }
   }
   function addNote(msg) {
@@ -2090,21 +2435,52 @@ window.confirmHspAutoEnrich = async function() {
     if (skip)  txt += '  ·  ไม่พบข้อมูล ' + skip;
     if (rateLimited) txt += '  ·  หยุดเพราะ quota หมด';
     setLabel(txt);
-    var fn = document.getElementById('_enrich-foot-note');
-    if (fn) fn.textContent = 'บันทึกลง Firestore เรียบร้อย';
-    var cb = document.getElementById('_enrich-close-btn');
-    if (cb) cb.disabled = false;
     window._hspEnrichPending = null;
+
+    // คืน footer + province selector ให้รันอีกรอบได้
+    var foot2 = document.getElementById('m-hsp-enrich-foot');
+    if (foot2) {
+      foot2.innerHTML =
+        '<div style="flex:1;font-size:12px;color:var(--teal);font-weight:600;">' + txt + '</div>' +
+        '<button class="btn btn-ghost" onclick="window.closeM(\'m-hsp-enrich\')">ปิด</button>' +
+        '<button class="btn btn-teal" id="m-hsp-enrich-confirm-btn" onclick="window.confirmHspAutoEnrich()">🔄 เติมข้อมูลอีกรอบ</button>';
+    }
+    // ลบเฉพาะรายการที่ถูกอัปเดตจริงๆ (ไม่ลบที่ skip / ไม่พบข้อมูล)
+    var remainList = (window._hspEnrichAllIncomplete || []).filter(function(x) {
+      return !actuallyUpdated.includes(x.id || x.code);
+    });
+    window._hspEnrichAllIncomplete = remainList;
+    var curProv = savedProv;
+    // re-render province select + preview
+    var body2 = document.getElementById('m-hsp-enrich-body');
+    if (body2) {
+      var uProvs = [...new Set(remainList.map(function(h){return h.province;}).filter(Boolean))].sort(function(a,b){return a.localeCompare(b,'th');});
+      body2.innerHTML =
+        '<div style="padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+          '<span style="font-size:12px;font-weight:600;color:var(--txt-muted);white-space:nowrap;">เลือกจังหวัด:</span>' +
+          '<select id="hsp-enrich-prov" class="t-sel" style="min-width:180px;" onchange="window._hspEnrichRenderPreview(this.value)">' +
+            '<option value="">ทุกจังหวัด (' + remainList.length + ' รพ.)</option>' +
+            uProvs.map(function(p) {
+              var cnt = remainList.filter(function(h){return h.province===p;}).length;
+              return '<option value="' + esc(p) + '"' + (p===curProv?' selected':'') + '>' + esc(p) + ' (' + cnt + ' รพ.)</option>';
+            }).join('') +
+          '</select>' +
+          '<span style="font-size:11px;color:var(--txt-muted);">เติมเฉพาะ field ที่ว่างเท่านั้น · ไม่เขียนทับข้อมูลที่มีอยู่แล้ว</span>' +
+        '</div>' +
+        '<div id="hsp-enrich-preview"></div>';
+      window._hspEnrichRenderPreview(curProv);
+    }
   }
 
   try {
-    var db           = window.getDb();
-    var okCount      = 0;
-    var cacheCount   = 0;
-    var skipCount    = 0;
-    var rateLimited  = false;
-    var batch        = null;
-    var batchCount   = 0;
+    var db             = window.getDb();
+    var okCount        = 0;
+    var cacheCount     = 0;
+    var skipCount      = 0;
+    var rateLimited    = false;
+    var batch          = null;
+    var batchCount     = 0;
+    var actuallyUpdated = [];
 
     for (var i = 0; i < total; i++) {
       var h    = incomplete[i];
@@ -2141,7 +2517,6 @@ window.confirmHspAutoEnrich = async function() {
       _fill('district',    api.district);
       _fill('tambon',      api.tambon);
       _fill('address',     api.address);
-      _fill('tel',         api.tel);
       _fill('affiliation', api.affiliation);
       if ((!updated.type || updated.type === 'other') && api.type && api.type !== 'other') { updated.type = api.type; changed = true; }
       if ((!updated.beds || updated.beds === 0) && api.beds > 0)                           { updated.beds = api.beds; changed = true; }
@@ -2155,6 +2530,10 @@ window.confirmHspAutoEnrich = async function() {
         batch.set(getDocRef('HOSPITALS', updated.id), docData);
         batchCount++;
         if (fromCache) cacheCount++; else okCount++;
+
+        // อัปเดต in-memory ทันที ป้องกันถูกนับซ้ำใน "เติมอีกรอบ"
+        Object.assign(h, updated);
+        actuallyUpdated.push(h.id || h.code);
 
         if (batchCount % 400 === 0) { await batch.commit(); batch = null; batchCount = 0; }
       } else {
@@ -2173,4 +2552,399 @@ window.confirmHspAutoEnrich = async function() {
     var cb2 = document.getElementById('_enrich-close-btn');
     if (cb2) cb2.disabled = false;
   }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRODUCT MANAGEMENT
+// ─────────────────────────────────────────────────────────────────────────────
+window.HSP_PRODUCTS = window.HSP_PRODUCTS || [];
+
+const HSP_PROD_GROUPS = [
+  { id: 'his_front',    label: 'HIS Front Office',  color: '#2563eb' },
+  { id: 'his_back',     label: 'HIS Back Office',   color: '#7c3aed' },
+  { id: 'interconnect', label: 'Interconnection',   color: '#0891b2' },
+  { id: 'application',  label: 'Application',       color: '#059669' },
+  { id: 'smart',        label: 'Smart Hospital',    color: '#d97706' },
+];
+
+window.openHspProductMgmt = function() {
+  window.renderHspProductMgmt();
+  // ซ่อน form เพิ่ม/แก้ไข ตอนเปิด
+  var editArea = document.getElementById('hsp-prod-edit-area');
+  if (editArea) editArea.style.display = 'none';
+  document.getElementById('hsp-prod-edit-id') && (document.getElementById('hsp-prod-edit-id').value = '');
+  window.openM('m-hsp-products');
+};
+
+window.renderHspProductMgmt = function() {
+  var body = document.getElementById('hsp-prod-list');
+  if (!body) return;
+  var prods = window.HSP_PRODUCTS || [];
+  if (!prods.length) {
+    body.innerHTML = '<div style="text-align:center;color:var(--txt-muted);padding:32px 0;font-size:13px;border:1px dashed var(--border);border-radius:8px;">ยังไม่มี Product · กด ➕ เพิ่มใหม่</div>';
+    return;
+  }
+  var html = '';
+  HSP_PROD_GROUPS.forEach(function(g) {
+    var gProds = prods.filter(function(p) { return p.group === g.id; });
+    if (!gProds.length) return;
+    html += '<div style="margin-bottom:12px;">' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:' + g.color + ';padding:4px 0 6px;border-bottom:2px solid ' + g.color + '33;margin-bottom:4px;">' + esc(g.label) + '</div>' +
+      gProds.map(function(p) {
+        return '<div style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid var(--border);">' +
+          '<span style="width:10px;height:10px;border-radius:50%;background:' + p.color + ';flex-shrink:0;"></span>' +
+          '<span style="flex:1;font-size:13px;font-weight:600;color:var(--txt);">' + esc(p.name) + '</span>' +
+          (p.note ? '<span style="font-size:11px;color:var(--txt-muted);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(p.note) + '</span>' : '') +
+          '<button class="btn btn-ghost btn-sm" onclick="window.openHspProductEdit(\'' + esc(p.id) + '\')" title="แก้ไข">✏️</button>' +
+          '<button class="btn btn-ghost btn-sm" onclick="window.deleteHspProduct(\'' + esc(p.id) + '\')" style="color:var(--coral);" title="ลบ">🗑</button>' +
+          '</div>';
+      }).join('') + '</div>';
+  });
+  // product ที่ยังไม่ได้กำหนดกลุ่ม
+  var noGroup = prods.filter(function(p) { return !HSP_PROD_GROUPS.some(function(g){return g.id===p.group;}); });
+  if (noGroup.length) {
+    html += '<div style="margin-bottom:12px;">' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txt-muted);padding:4px 0 6px;border-bottom:2px solid var(--border);margin-bottom:4px;">ยังไม่ได้กำหนดกลุ่ม</div>' +
+      noGroup.map(function(p) {
+        return '<div style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid var(--border);">' +
+          '<span style="width:10px;height:10px;border-radius:50%;background:' + p.color + ';flex-shrink:0;"></span>' +
+          '<span style="flex:1;font-size:13px;font-weight:600;color:var(--txt);">' + esc(p.name) + '</span>' +
+          '<button class="btn btn-ghost btn-sm" onclick="window.openHspProductEdit(\'' + esc(p.id) + '\')" title="แก้ไข">✏️</button>' +
+          '<button class="btn btn-ghost btn-sm" onclick="window.deleteHspProduct(\'' + esc(p.id) + '\')" style="color:var(--coral);" title="ลบ">🗑</button>' +
+          '</div>';
+      }).join('') + '</div>';
+  }
+  body.innerHTML = html || '<div style="text-align:center;color:var(--txt-muted);padding:32px 0;font-size:13px;border:1px dashed var(--border);border-radius:8px;">ยังไม่มี Product · กด ➕ เพิ่มใหม่</div>';
+};
+
+window.openHspProductEdit = function(id) {
+  var p = id ? (window.HSP_PRODUCTS || []).find(function(x) { return x.id === id; }) : null;
+  document.getElementById('hsp-prod-edit-id').value    = id || '';
+  document.getElementById('hsp-prod-edit-name').value  = p ? p.name  : '';
+  document.getElementById('hsp-prod-edit-color').value = p ? p.color : '#7c3aed';
+  document.getElementById('hsp-prod-edit-group').value = p ? p.group : '';
+  document.getElementById('hsp-prod-edit-note').value  = p ? p.note  : '';
+  var editArea = document.getElementById('hsp-prod-edit-area');
+  if (editArea) editArea.style.display = '';
+  var nameInput = document.getElementById('hsp-prod-edit-name');
+  if (nameInput) nameInput.focus();
+};
+
+window.cancelHspProductEdit = function() {
+  var editArea = document.getElementById('hsp-prod-edit-area');
+  if (editArea) editArea.style.display = 'none';
+  document.getElementById('hsp-prod-edit-id').value = '';
+};
+
+window.saveHspProduct = async function() {
+  var id    = document.getElementById('hsp-prod-edit-id').value;
+  var name  = (document.getElementById('hsp-prod-edit-name').value || '').trim();
+  var color = document.getElementById('hsp-prod-edit-color').value || '#7c3aed';
+  var group = document.getElementById('hsp-prod-edit-group').value || '';
+  var note  = (document.getElementById('hsp-prod-edit-note').value || '').trim();
+  if (!name)  { window.showAlert('กรุณากรอกชื่อ Product', 'warn');  return; }
+  if (!group) { window.showAlert('กรุณาเลือกกลุ่ม Product', 'warn'); return; }
+  var pid = id || uid();
+  try {
+    await window.setDoc(getDocRef('HSP_PRODUCTS', pid), { product_id: pid, name, color, group, note });
+    window.cancelHspProductEdit();
+    window.showAlert(id ? 'อัปเดต Product แล้ว' : 'เพิ่ม Product แล้ว', 'success');
+  } catch(e) {
+    window.showAlert('บันทึกไม่สำเร็จ: ' + e.message, 'warn');
+  }
+};
+
+window.deleteHspProduct = function(id) {
+  var p = (window.HSP_PRODUCTS || []).find(function(x) { return x.id === id; });
+  if (!p) return;
+  window.showConfirm('ลบ Product "' + p.name + '" ?\nข้อมูล รพ. ที่เชื่อมกับ Product นี้จะไม่ถูกลบ', async function() {
+    try {
+      await window.deleteDoc(getDocRef('HSP_PRODUCTS', id));
+      window.showAlert('ลบแล้ว', 'success');
+    } catch(e) {
+      window.showAlert('ลบไม่สำเร็จ: ' + e.message, 'warn');
+    }
+  }, { icon: '📦', title: 'ยืนยันลบ Product', okColor: 'var(--coral)', okText: 'ลบ' });
+};
+
+// helper: อัพเดท label style เมื่อ toggle checkbox
+window._hspProdCbChange = function(cb, color) {
+  var label = cb ? cb.closest('label') : null;
+  if (!label) return;
+  label.style.borderColor = cb.checked ? color : 'var(--border)';
+  label.style.background  = cb.checked ? color + '22' : 'var(--bg)';
+  // อัพเดท badge จำนวน product ที่เลือก
+  var count = document.querySelectorAll('#hsp-products-cb-list .hsp-prod-cb:checked').length;
+  var badge = document.getElementById('m-hsp-tab-products-badge');
+  if (badge) { badge.textContent = count; badge.style.display = count ? '' : 'none'; }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VIEW TOGGLE: รายชื่อ ↔ วิเคราะห์ Product
+// ─────────────────────────────────────────────────────────────────────────────
+window._hspViewMode = 'list';
+window._hspAnalysisTier = '';
+
+window.goHspView = function(mode) {
+  window._hspViewMode = mode;
+  var listArea  = document.getElementById('hsp-list-area');
+  var analyArea = document.getElementById('hsp-analysis-area');
+  var tabList   = document.getElementById('hsp-vtab-list');
+  var tabAnaly  = document.getElementById('hsp-vtab-analysis');
+  if (listArea)  listArea.style.display  = mode === 'list'     ? '' : 'none';
+  if (analyArea) analyArea.style.display = mode === 'analysis' ? '' : 'none';
+  if (tabList)  { tabList.style.color  = mode === 'list'     ? 'var(--violet)' : 'var(--txt-muted)'; tabList.style.borderBottomColor  = mode === 'list'     ? 'var(--violet)' : 'transparent'; }
+  if (tabAnaly) { tabAnaly.style.color = mode === 'analysis' ? 'var(--violet)' : 'var(--txt-muted)'; tabAnaly.style.borderBottomColor = mode === 'analysis' ? 'var(--violet)' : 'transparent'; }
+  if (mode === 'analysis') {
+    window._hspPopulateFilters();
+    window.renderHspAnalysis();
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ANALYSIS VIEW
+// ─────────────────────────────────────────────────────────────────────────────
+
+function _hspCalcTier(h, prods) {
+  var hProdIds = h.products || [];
+  var hasGroup = function(gid) {
+    return prods.some(function(p) { return p.group === gid && hProdIds.includes(p.id); });
+  };
+  var hasFront = hasGroup('his_front');
+  var hasBack  = hasGroup('his_back');
+  var hasIC    = hasGroup('interconnect');
+  var hasApp   = hasGroup('application');
+  var hasSmart = hasGroup('smart');
+  if (!hProdIds.length)                                   return { tier: 4, label: 'Tier 4', color: '#6b7280', desc: 'ยังไม่มี Product' };
+  if (hasFront && hasBack && hasIC && hasApp && hasSmart) return { tier: 0, label: 'Full',   color: '#059669', desc: 'ครบทุกกลุ่ม' };
+  if (hasFront && !hasBack)                               return { tier: 1, label: 'Tier 1', color: '#dc2626', desc: 'มี HIS Front ขาด Back Office' };
+  if ((hasFront || hasBack) && !hasIC)                    return { tier: 2, label: 'Tier 2', color: '#d97706', desc: 'มี HIS ขาด Interconnection' };
+  if (hasFront && hasBack && (!hasApp || !hasSmart))      return { tier: 3, label: 'Tier 3', color: '#2563eb', desc: 'พร้อม Upsell Digital' };
+  return { tier: 3, label: 'Tier 3', color: '#2563eb', desc: 'มีโอกาสต่อยอด' };
+}
+
+window.renderHspAnalysis = function() {
+  var body = document.getElementById('hsp-analysis-body');
+  if (!body) return;
+  var prods      = window.HSP_PRODUCTS || [];
+  var hosps      = window.HOSPITALS    || [];
+  var filterProd = (document.getElementById('hsp-product-filter') || {}).value || '';
+  var filterTier = window._hspAnalysisTier || '';
+  var filterProv = (document.getElementById('hsp-prov')  || {}).value || '';
+  var filterDist = (document.getElementById('hsp-dist')  || {}).value || '';
+  var filterQ    = ((document.getElementById('hsp-q')    || {}).value || '').trim().toLowerCase();
+  var filterType = (document.getElementById('hsp-type')  || {}).value || '';
+
+  if (!prods.length) {
+    body.innerHTML = '<div style="text-align:center;color:var(--txt-muted);padding:64px 24px;font-size:14px;">ยังไม่มี Product ในระบบ<br><span style="font-size:12px;">ไปที่ Admin Panel → Product เพื่อเพิ่ม</span></div>';
+    return;
+  }
+
+  var totalHosps   = hosps.length;
+  var withProd     = hosps.filter(function(h) { return (h.products||[]).length > 0; }).length;
+  var tier4Count   = hosps.filter(function(h) { return (h.products||[]).length === 0; }).length;
+  var filled       = hosps.reduce(function(s,h) { return s + (h.products||[]).length; }, 0);
+  var whitespace   = totalHosps * prods.length - filled;
+  var topWS        = prods.reduce(function(mx, p) {
+    var miss = hosps.filter(function(h) { return !(h.products||[]).includes(p.id); }).length;
+    return miss > mx.miss ? { p: p, miss: miss } : mx;
+  }, { p: prods[0], miss: -1 });
+
+  // ── KPI CARDS ──────────────────────────────────────────────────────────────
+  function kpiCard(label, val, unit, color) {
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid ' + color + ';border-radius:12px;padding:14px 16px;">' +
+      '<div style="font-size:11px;color:var(--txt-muted);margin-bottom:6px;">' + label + '</div>' +
+      '<div style="font-size:22px;font-weight:800;color:' + color + ';line-height:1.1;">' + val + '</div>' +
+      (unit ? '<div style="font-size:11px;color:var(--txt-muted);margin-top:3px;">' + unit + '</div>' : '') +
+      '</div>';
+  }
+  var pct = totalHosps ? Math.round(withProd / totalHosps * 100) : 0;
+  var kpiHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px;">' +
+    kpiCard('🏥 โรงพยาบาลทั้งหมด', totalHosps, 'รพ.', 'var(--primary)') +
+    kpiCard('✅ มี Product แล้ว', withProd + ' (' + pct + '%)', 'จาก ' + totalHosps + ' รพ.', 'var(--teal)') +
+    kpiCard('❌ ยังไม่มี Product', tier4Count, 'รพ. (Tier 4)', '#dc2626') +
+    kpiCard('📦 Whitespace Slots', whitespace, 'โอกาสการขายรวม', 'var(--violet)') +
+    kpiCard('🎯 Top Whitespace', topWS.p ? esc(topWS.p.name) : '—', topWS.p ? topWS.miss + ' รพ. ยังไม่ใช้' : '', topWS.p ? topWS.p.color : 'var(--txt-muted)') +
+    '</div>';
+
+  // ── PENETRATION BARS ───────────────────────────────────────────────────────
+  var penetHtml = '<div style="margin-bottom:24px;">' +
+    '<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:12px;">📊 Product Penetration Rate</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;">';
+  HSP_PROD_GROUPS.forEach(function(grp) {
+    var grpProds = prods.filter(function(p) { return p.group === grp.id; });
+    if (!grpProds.length) return;
+    penetHtml += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">' +
+      '<div style="font-size:11px;font-weight:700;color:' + grp.color + ';text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">' + esc(grp.label) + '</div>';
+    grpProds.forEach(function(p) {
+      var haveN = hosps.filter(function(h) { return (h.products||[]).includes(p.id); }).length;
+      var barPct = totalHosps ? Math.round(haveN / totalHosps * 100) : 0;
+      penetHtml += '<div style="margin-bottom:7px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">' +
+        '<span style="font-size:12px;color:var(--txt);">' + esc(p.name) + '</span>' +
+        '<span style="font-size:11px;font-weight:700;color:' + p.color + ';">' + barPct + '% · ' + haveN + ' รพ.</span></div>' +
+        '<div style="background:var(--border);border-radius:4px;height:7px;overflow:hidden;">' +
+        '<div style="width:' + barPct + '%;background:' + p.color + ';height:100%;border-radius:4px;"></div></div></div>';
+    });
+    penetHtml += '</div>';
+  });
+  penetHtml += '</div></div>';
+
+  // ── TIER SUMMARY (clickable filter) ────────────────────────────────────────
+  var tierDefs = [
+    { tier: 1, label: 'Tier 1',    sublabel: 'Quick Win',      color: '#dc2626', desc: 'มี HIS Front ขาด Back Office',   icon: '🔴' },
+    { tier: 2, label: 'Tier 2',    sublabel: 'Strategic',      color: '#d97706', desc: 'มี HIS ขาด Interconnection',      icon: '🟠' },
+    { tier: 3, label: 'Tier 3',    sublabel: 'Upsell',         color: '#2563eb', desc: 'พร้อม Upsell Digital',             icon: '🔵' },
+    { tier: 4, label: 'Tier 4',    sublabel: 'New Land',       color: '#6b7280', desc: 'ยังไม่มี Product',                  icon: '⚫' },
+    { tier: 0, label: 'Full',      sublabel: 'Full Coverage',  color: '#059669', desc: 'ครบทุกกลุ่ม',                      icon: '🟢' },
+  ];
+  var tierCounts = {};
+  hosps.forEach(function(h) { var t = _hspCalcTier(h, prods).tier; tierCounts[t] = (tierCounts[t]||0)+1; });
+
+  var tierHtml = '<div style="margin-bottom:24px;">' +
+    '<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:12px;">🎯 Customer Segmentation by Tier <span style="font-size:11px;font-weight:400;color:var(--txt-muted);">(คลิกเพื่อกรอง)</span></div>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:10px;">' +
+    tierDefs.map(function(td) {
+      var cnt = tierCounts[td.tier] || 0;
+      var isAct = filterTier === String(td.tier);
+      return '<div onclick="window._hspAnalysisTier=window._hspAnalysisTier===\'' + td.tier + '\'?\'\':\'' + td.tier + '\';window.renderHspAnalysis();" ' +
+        'style="background:var(--surface);border:2px solid ' + (isAct ? td.color : 'var(--border)') + ';border-radius:12px;padding:12px 16px;min-width:120px;cursor:pointer;transition:border .15s;' + (isAct ? 'background:' + td.color + '18;' : '') + '">' +
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">' +
+        '<span style="font-size:16px;">' + td.icon + '</span>' +
+        '<span style="font-size:13px;font-weight:800;color:' + td.color + ';">' + td.label + '</span>' +
+        '<span style="font-size:10px;font-weight:600;color:var(--txt-muted);">— ' + td.sublabel + '</span></div>' +
+        '<div style="font-size:24px;font-weight:900;color:' + td.color + ';line-height:1.1;">' + cnt + '</div>' +
+        '<div style="font-size:10px;color:var(--txt-muted);margin-top:3px;">' + esc(td.desc) + '</div></div>';
+    }).join('') + '</div></div>';
+
+  // ── FILTERED TABLE ─────────────────────────────────────────────────────────
+  var showHosps = hosps;
+  if (filterProv) showHosps = showHosps.filter(function(h) { return h.province === filterProv; });
+  if (filterDist) showHosps = showHosps.filter(function(h) { return h.district === filterDist; });
+  if (filterType) showHosps = showHosps.filter(function(h) { return (h.level||h.type||'') === filterType; });
+  if (filterQ)    showHosps = showHosps.filter(function(h) { return (h.name||'').toLowerCase().includes(filterQ) || (h.code||'').toLowerCase().includes(filterQ) || (h.district||'').toLowerCase().includes(filterQ); });
+  if (filterTier) showHosps = showHosps.filter(function(h) { return String(_hspCalcTier(h, prods).tier) === filterTier; });
+  if (filterProd) showHosps = showHosps.filter(function(h) { return !(h.products||[]).includes(filterProd); });
+
+  var selProdName = filterProd ? ((prods.find(function(p){return p.id===filterProd;})||{}).name||'') : '';
+
+  var ctxParts = [];
+  if (filterTier) { var td2 = tierDefs.find(function(x){return String(x.tier)===filterTier;}); if(td2) ctxParts.push(td2.label + ' — ' + td2.sublabel); }
+  if (filterProv) ctxParts.push(filterProv);
+  if (filterDist) ctxParts.push(filterDist);
+  if (filterQ)    ctxParts.push('"' + filterQ + '"');
+  if (selProdName) ctxParts.push('ยังไม่ใช้ ' + selProdName);
+  var ctxStr = ctxParts.length ? ' <span style="font-size:11px;color:var(--txt-muted);font-weight:400;">· ' + ctxParts.join(' · ') + '</span>' : '';
+  var tableTitle = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">' +
+    '<div style="font-size:13px;font-weight:700;color:var(--txt);">📋 รายชื่อ รพ. ตามเงื่อนไข <span style="font-weight:400;color:var(--txt-muted);">(' + showHosps.length + ' รายการ)</span>' + ctxStr + '</div>' +
+    '<button class="btn btn-ghost btn-sm" onclick="window._hspExportAnalysis()" style="margin-left:auto;" title="Export CSV">⬇️ Export CSV</button>' +
+    '</div>';
+
+  if (!showHosps.length) {
+    body.innerHTML = kpiHtml + penetHtml + tierHtml + tableTitle +
+      '<div style="text-align:center;color:var(--teal);padding:32px 24px;font-size:14px;font-weight:700;border:1px solid var(--teal)44;border-radius:12px;background:var(--teal)11;">✅ ไม่มี รพ. ที่ตรงเงื่อนไขนี้</div>';
+    return;
+  }
+
+  var GRP_ABBR = { his_front:'F', his_back:'B', interconnect:'I', application:'A', smart:'S' };
+  var thS  = 'padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);font-size:11px;color:var(--txt-muted);white-space:nowrap;background:var(--bg);';
+  var thCS = 'padding:8px 10px;text-align:center;border-bottom:2px solid var(--border);font-size:11px;font-weight:700;white-space:nowrap;background:var(--bg);';
+
+  var selProd = filterProd ? prods.find(function(p){ return p.id === filterProd; }) : null;
+
+  var thead = '<tr>' +
+    '<th style="' + thS + '">Tier</th>' +
+    '<th style="' + thS + '">รหัส</th>' +
+    '<th style="' + thS + '">ชื่อ รพ.</th>' +
+    '<th style="' + thS + '">จังหวัด</th>' +
+    (selProd
+      ? '<th style="' + thCS + 'color:' + selProd.color + ';">' + esc(selProd.name) + '</th>'
+      : '<th style="' + thS + '">ความครอบคลุม</th><th style="' + thS + '">กลุ่มที่ขาด</th>'
+    ) + '</tr>';
+
+  var tbody = showHosps.map(function(h) {
+    var ti      = _hspCalcTier(h, prods);
+    var hProds  = h.products || [];
+    var tierBadge = '<span style="background:' + ti.color + '22;color:' + ti.color + ';padding:2px 8px;border-radius:8px;font-size:10px;font-weight:800;">' + ti.label + '</span>';
+
+    var cells;
+    if (selProd) {
+      var has = hProds.includes(selProd.id);
+      cells = '<td style="padding:7px 10px;text-align:center;">' +
+        (has ? '<span style="color:' + selProd.color + ';font-size:15px;">✅</span>' : '<span style="color:var(--border);">—</span>') + '</td>';
+    } else {
+      // 5 group dots
+      var dots = HSP_PROD_GROUPS.map(function(grp) {
+        var hasGrp = prods.some(function(p){ return p.group === grp.id && hProds.includes(p.id); });
+        var abbr = GRP_ABBR[grp.id] || grp.id[0].toUpperCase();
+        return '<span title="' + grp.label + '" style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;font-size:10px;font-weight:900;margin-right:2px;' +
+          (hasGrp ? 'background:' + grp.color + ';color:#fff;' : 'background:var(--bg);border:1.5px solid var(--border);color:var(--txt-muted);') +
+          '">' + abbr + '</span>';
+      }).join('');
+      // missing group chips
+      var missing = HSP_PROD_GROUPS.filter(function(grp){
+        return !prods.some(function(p){ return p.group === grp.id && hProds.includes(p.id); });
+      });
+      var chips = missing.length === 0
+        ? '<span style="color:var(--teal);font-size:11px;font-weight:700;">ครบทุกกลุ่ม ✅</span>'
+        : missing.map(function(grp){
+            return '<span style="background:' + grp.color + '18;color:' + grp.color + ';border:1px solid ' + grp.color + '44;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;white-space:nowrap;display:inline-block;margin:1px;">' + esc(grp.label) + '</span>';
+          }).join('');
+      cells = '<td style="padding:7px 10px;white-space:nowrap;">' + dots + '</td>' +
+              '<td style="padding:7px 10px;max-width:260px;">' + chips + '</td>';
+    }
+
+    return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="window.openHospitalDetail(\'' + esc(h.id) + '\')" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">' +
+      '<td style="padding:7px 10px;white-space:nowrap;">' + tierBadge + '</td>' +
+      '<td style="padding:7px 10px;font-family:monospace;color:var(--primary);font-size:11px;white-space:nowrap;">' + esc(h.code||'—') + '</td>' +
+      '<td style="padding:7px 10px;font-weight:500;color:var(--txt);">' + esc(h.name) + '</td>' +
+      '<td style="padding:7px 10px;color:var(--txt-muted);white-space:nowrap;">' + esc(h.province||'—') + '</td>' +
+      cells + '</tr>';
+  }).join('');
+
+  var tableHtml = tableTitle + '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">' +
+    '<thead>' + thead + '</thead><tbody>' + tbody + '</tbody></table></div>';
+
+  body.innerHTML = kpiHtml + penetHtml + tierHtml + tableHtml;
+};
+
+// Export analysis table to CSV
+window._hspExportAnalysis = function() {
+  var prods      = window.HSP_PRODUCTS || [];
+  var hosps      = window.HOSPITALS    || [];
+  var filterProd = (document.getElementById('hsp-product-filter') || {}).value || '';
+  var filterTier = window._hspAnalysisTier || '';
+  var filterProv = (document.getElementById('hsp-prov')  || {}).value || '';
+  var filterDist = (document.getElementById('hsp-dist')  || {}).value || '';
+  var filterQ    = ((document.getElementById('hsp-q')    || {}).value || '').trim().toLowerCase();
+  var filterType = (document.getElementById('hsp-type')  || {}).value || '';
+
+  var rows = hosps;
+  if (filterProv) rows = rows.filter(function(h){ return h.province === filterProv; });
+  if (filterDist) rows = rows.filter(function(h){ return h.district === filterDist; });
+  if (filterType) rows = rows.filter(function(h){ return (h.level||h.type||'') === filterType; });
+  if (filterQ)    rows = rows.filter(function(h){ return (h.name||'').toLowerCase().includes(filterQ)||(h.code||'').toLowerCase().includes(filterQ); });
+  if (filterTier) rows = rows.filter(function(h){ return String(_hspCalcTier(h, prods).tier) === filterTier; });
+  if (filterProd) rows = rows.filter(function(h){ return !(h.products||[]).includes(filterProd); });
+
+  var showProds = filterProd ? prods.filter(function(p){ return p.id === filterProd; }) : prods;
+  var headers   = ['Tier', 'รหัส', 'ชื่อ รพ.', 'จังหวัด', 'อำเภอ', 'Product Count'].concat(showProds.map(function(p){ return p.name; }));
+  var csvRows   = [headers.join(',')];
+  rows.forEach(function(h) {
+    var ti  = _hspCalcTier(h, prods);
+    var row = [
+      ti.label,
+      '"' + (h.code||'').replace(/"/g,'""') + '"',
+      '"' + (h.name||'').replace(/"/g,'""') + '"',
+      '"' + (h.province||'').replace(/"/g,'""') + '"',
+      '"' + (h.district||'').replace(/"/g,'""') + '"',
+      (h.products||[]).length,
+    ].concat(showProds.map(function(p){ return (h.products||[]).includes(p.id) ? '1' : '0'; }));
+    csvRows.push(row.join(','));
+  });
+  var blob = new Blob(['\uFEFF' + csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href = url; a.download = 'hospital_analysis.csv'; a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
 };
