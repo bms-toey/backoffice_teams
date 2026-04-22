@@ -632,6 +632,15 @@ select.f-input{appearance:none;cursor:pointer;}
   #stat-row,[style*="grid-template-columns:repeat(4"]{
     grid-template-columns:repeat(2,1fr)!important;
   }
+
+  /* Overview grid: 3-col → 2-col on tablet */
+  .ov-grid{grid-template-columns:1fr 1fr!important;}
+
+  /* Workload: allow horizontal scroll on tablet */
+  .wl-container{overflow-x:auto;}
+
+  /* Hospital toolbar compact */
+  #hsp-body{padding:0 16px 16px!important;}
 }
 
 /* ══════════════════════════════════════════════
@@ -789,6 +798,64 @@ select.f-input{appearance:none;cursor:pointer;}
 
   /* ── Cost cards ── */
   div[style*="padding:0 24px 28px"]{padding:0 12px 20px!important;}
+
+  /* ── Overview grid: 3-col → 1-col ── */
+  .ov-grid{grid-template-columns:1fr!important;padding:0 12px 16px!important;}
+
+  /* ── Workload: horizontal scroll cols → vertical stack ── */
+  .wl-container{flex-direction:column!important;padding:12px!important;gap:16px!important;}
+  .wl-col{min-width:0!important;width:100%!important;}
+  #view-workload .toolbar{padding:10px 12px!important;}
+  #view-workload .toolbar > div:first-child{font-size:13px!important;}
+
+  /* ── Timeline (Calendar / Workload): narrow left column ── */
+  .tl-left{width:120px!important;min-width:120px!important;padding:10px 8px!important;}
+  .tl-th,.tl-bg-cell{min-width:38px!important;width:38px!important;}
+
+  /* ── Hospital view ── */
+  #hsp-body{padding:0 12px 16px!important;}
+  #hsp-pager{padding:8px 12px 20px!important;}
+  #hsp-analysis-area{padding:10px 12px!important;}
+  #hsp-count{display:none!important;}
+  #view-hospital .t-search{width:100%;}
+  #view-hospital .t-search input{width:100%!important;}
+  #hsp-vtab-list,#hsp-vtab-analysis{padding:8px 12px!important;font-size:12px!important;}
+
+  /* ── Availability: date inputs compact ── */
+  #avl-start,#avl-end{width:100px!important;font-size:12px!important;}
+
+  /* ── Holidays ── */
+  #hol-summary{padding:10px 12px!important;gap:8px!important;}
+  #hol-list{padding:0 12px 20px!important;}
+  div[style*="padding:20px 24px 0;"]{padding:12px 12px 0!important;}
+
+  /* ── Leave filters ── */
+  div[style*="padding:14px 24px 0"]{padding:10px 12px 0!important;}
+  div[style*="padding:14px 24px;"]{padding:10px 12px!important;}
+
+  /* ── Targets ── */
+  #targets-body{padding:16px 12px!important;}
+
+  /* ── Workload title: truncate long text ── */
+  #view-workload .toolbar > div:first-child{
+    font-size:13px!important;overflow:hidden;white-space:nowrap;
+    text-overflow:ellipsis;max-width:calc(100vw - 120px);
+  }
+
+  /* ── Timesheet: tighten staff column ── */
+  .ts-row-staff{width:120px!important;}
+  .ts-row-item{gap:6px!important;}
+
+  /* ── Workload stats chips: compact ── */
+  #wl-stats > div{gap:6px!important;padding:8px 10px!important;}
+
+  /* ── Hospital: view-toggle tabs compact ── */
+  div[style*="border-bottom:2px solid var(--border);padding:0 24px"]{
+    padding:0 12px!important;
+  }
+
+  /* ── Leave: balance summary cards compact ── */
+  #leave-balance-wrap,#leave-quota-row{flex-wrap:wrap!important;gap:6px!important;}
 }
 
 /* ══════════════════════════════════════════════
@@ -800,4 +867,18 @@ select.f-input{appearance:none;cursor:pointer;}
   }
   .ts-row-staff{width:120px;}
   .stat-v{font-size:18px;}
+
+  /* Timeline even narrower */
+  .tl-left{width:96px!important;min-width:96px!important;}
+  .tl-th,.tl-bg-cell{min-width:32px!important;width:32px!important;}
+
+  /* Kanban tighter */
+  .kb-col{min-width:160px!important;width:160px!important;}
+
+  /* Availability date inputs tiny */
+  #avl-start,#avl-end{width:88px!important;font-size:11px!important;}
+
+  /* Hospital tabs icon-only feel */
+  #hsp-vtab-list{font-size:11px!important;}
+  #hsp-vtab-analysis{font-size:11px!important;}
 }
