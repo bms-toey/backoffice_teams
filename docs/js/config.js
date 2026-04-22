@@ -27,6 +27,7 @@ window.STAFF = [];
 window.USERS = [];
 window.PROJECTS = [];
 window.ADVANCES = [];
+window.CONTRACTS = [];
 window.DEPARTMENTS = ['IT','Finance','PM','HR','Marketing','Operations','Procurement','Other'];
 window.DEPT_LIST = [];
 window.POSITIONS = [];
@@ -263,6 +264,7 @@ window.PERM_MODULES = [
   { id:'admin',         label:'Admin Panel',    icon:'⚙️' },
   { id:'targets',       label:'เป้าหมายทีม',    icon:'🎯' },
   { id:'hospital',      label:'รายชื่อ รพ.',     icon:'🏥' },
+  { id:'contract',      label:'ข้อมูลสัญญา',     icon:'📄' },
 ];
 
 // Default permissions when not configured (backward-compat)
@@ -288,6 +290,7 @@ function _roleDefaultPerms(role) {
       admin:        none,  // ไม่มีสิทธิ์
       targets:      none,  // ไม่มีสิทธิ์
       hospital:     ro,    // ดูอย่างเดียว
+      contract:     full,  // เต็ม
     };
   }
   if (role === 'viewer') {
@@ -307,10 +310,11 @@ function _roleDefaultPerms(role) {
       admin:        none,  // ไม่มีสิทธิ์
       targets:      none,  // ไม่มีสิทธิ์
       hospital:     ro,    // ดูอย่างเดียว
+      contract:     ro,    // ดูอย่างเดียว
     };
   }
   // fallback: view-only all
-  return {overview:ro,kanban:ro,projects:ro,advance:ro,lodging:ro,workload:ro,calendar:ro,leave:ro,timesheet:ro,cost:ro,availability:ro,holiday:none,admin:none,targets:none,hospital:ro};
+  return {overview:ro,kanban:ro,projects:ro,advance:ro,lodging:ro,workload:ro,calendar:ro,leave:ro,timesheet:ro,cost:ro,availability:ro,holiday:none,admin:none,targets:none,hospital:ro,contract:ro};
 }
 
 // Main permission check

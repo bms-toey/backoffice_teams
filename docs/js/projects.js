@@ -289,7 +289,16 @@ window.openProjModal=function(id){
     +'<div class="f-group" id="pf-revisit1-grp"><label class="f-label">Revisit 1</label><input type="date" class="f-input" id="pf-revisit1" value="'+(p?p.revisit1:'')+'" '+ceA+'></div>'
     +'<div class="f-group" id="pf-revisit2-grp"><label class="f-label">Revisit 2</label><input type="date" class="f-input" id="pf-revisit2" value="'+(p?p.revisit2:'')+'" '+ceA+'></div>'
     +'</div>'
-    +'<div class="f-grid" style="align-items:start;margin-top:4px;">'
+    +'<div id="pf-contract-wrap" style="display:none;margin-top:4px;">'
+    +'<div class="f-group"><label class="f-label">🔗 ผูกสัญญา</label>'
+    +'<div style="position:relative;">'
+    +'<input type="hidden" id="pf-contract-id" value="'+(p&&p.contractId?p.contractId:'')+'">'
+    +'<input type="text" class="f-input" id="pf-contract-search" autocomplete="off" placeholder="🔍 พิมพ์รหัสสัญญา หรือชื่อโครงการ..." '+(ce?'':'disabled ')+' style="padding-right:28px;" oninput="window.pfContractFilter()" onfocus="window.pfContractFilter()">'
+    +'<span id="pf-contract-clear" onclick="window.pfContractClear()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--txt3);font-size:14px;display:none;">✕</span>'
+    +'<div id="pf-contract-drop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);max-height:220px;overflow-y:auto;margin-top:3px;"></div>'
+    +'</div></div>'
+    +'</div>'
+    +'<div id="pf-budget-area" class="f-grid" style="align-items:start;margin-top:4px;">'
     +'<div class="f-group" style="margin:0;">'
     +'<label class="f-label" style="margin-bottom:6px;display:block;">พื้นที่</label>'
     +'<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;height:40px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);box-sizing:border-box;">'
@@ -388,6 +397,9 @@ window.pkuFilter=function(q){
     hdr.style.display=hasVis?'':'none';
   });
 };
+var _PF_CONTRACT_GRPS = ['GRP17733355541901','GRP17733355541902','GRP17733355541903'];
+var _PF_NO_BUDGET_GRPS = ['GRP17733355541905','GRP17733355541906'];
+
 window.updateProjFormByGroup=function(initialParentId){
   var grpId=(document.getElementById('pf-grp')||{}).value||'';
   var gType=window.projGroupType(grpId);
@@ -398,7 +410,6 @@ window.updateProjFormByGroup=function(initialParentId){
   var pWrap=document.getElementById('pf-revisit-parent-wrap');
   if(pWrap)pWrap.style.display=(gType==='revisit')?'':'none';
   if(gType==='revisit'){
-    // ตั้งค่า smart search — แสดงชื่อโครงการหลักที่เลือกอยู่ (ถ้ามี)
     var hidEl=document.getElementById('pf-parent-proj');
     var txtEl=document.getElementById('pf-parent-search');
     if(hidEl&&txtEl&&initialParentId){
@@ -411,6 +422,23 @@ window.updateProjFormByGroup=function(initialParentId){
       }
     }
   }
+  // ── Contract wrap ──
+  var showContract = _PF_CONTRACT_GRPS.includes(grpId);
+  var cWrap = document.getElementById('pf-contract-wrap');
+  if(cWrap) cWrap.style.display = showContract ? '' : 'none';
+  if(showContract){
+    var cHid = document.getElementById('pf-contract-id');
+    var cTxt = document.getElementById('pf-contract-search');
+    var cClr = document.getElementById('pf-contract-clear');
+    if(cHid&&cTxt&&cHid.value){
+      var selCt = window.CONTRACTS.find(function(x){return x.id===cHid.value;});
+      if(selCt){ cTxt.value=selCt.id+' — '+selCt.name; if(cClr)cClr.style.display=''; }
+    }
+  }
+  // ── Budget / border area ──
+  var showBudget = !_PF_NO_BUDGET_GRPS.includes(grpId);
+  var bArea = document.getElementById('pf-budget-area');
+  if(bArea) bArea.style.display = showBudget ? '' : 'none';
 };
 
 // ── PARENT PROJECT SMART SEARCH ──────────────────────────────────────────────
@@ -464,6 +492,66 @@ window.ppSearchSelect=function(id,name){
   if(drop)drop.style.display='none';
   if(clr)clr.style.display='';
 };
+// ── CONTRACT SMART SEARCH (in project modal) ─────────────────────────────────
+window._pfContractOutsideClose=function(e){
+  var wrap=document.getElementById('pf-contract-wrap');
+  if(wrap&&wrap.contains(e.target))return;
+  var drop=document.getElementById('pf-contract-drop');
+  if(drop)drop.style.display='none';
+};
+window.pfContractFilter=function(){
+  var txt=document.getElementById('pf-contract-search');
+  var drop=document.getElementById('pf-contract-drop');
+  var clr=document.getElementById('pf-contract-clear');
+  if(!txt||!drop)return;
+  document.removeEventListener('click',window._pfContractOutsideClose);
+  document.addEventListener('click',window._pfContractOutsideClose,{once:true});
+  var q=(txt.value||'').trim().toLowerCase();
+  if(clr)clr.style.display=txt.value?'':'none';
+  var list=(window.CONTRACTS||[]).filter(function(c){
+    return !q||c.id.toLowerCase().includes(q)||c.name.toLowerCase().includes(q)||c.customer.toLowerCase().includes(q);
+  }).slice(0,10);
+  if(!list.length){
+    drop.innerHTML='<div style="padding:10px 14px;font-size:12px;color:var(--txt3);">ไม่พบสัญญา</div>';
+  } else {
+    drop.innerHTML=list.map(function(c){
+      var ctSt=c.status==='active'?'มีผลบังคับ':c.status==='completed'?'สิ้นสุดแล้ว':'ยกเลิก';
+      var ctColor=c.status==='active'?'var(--teal)':c.status==='completed'?'var(--indigo)':'var(--coral)';
+      return '<div onclick="window.pfContractSelect(this.dataset.cid,this.dataset.cname)" data-cid="'+esc(c.id)+'" data-cname="'+esc(c.name)+'" '
+        +'style="padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:12px;" '
+        +'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+        +'<div style="display:flex;align-items:center;gap:6px;">'
+        +'<span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:var(--txt3);">'+esc(c.id)+'</span>'
+        +'<span style="font-size:10px;background:'+ctColor+'18;color:'+ctColor+';padding:1px 7px;border-radius:20px;font-weight:600;">'+ctSt+'</span>'
+        +'</div>'
+        +'<div style="font-weight:700;color:var(--txt);margin-top:2px;">'+esc(c.name)+'</div>'
+        +'<div style="font-size:10px;color:var(--txt3);margin-top:1px;">'+esc(c.customer)+(c.value?' · '+fca(c.value):'')+'</div>'
+        +'</div>';
+    }).join('');
+  }
+  drop.style.display='';
+};
+window.pfContractSelect=function(id,name){
+  var hid=document.getElementById('pf-contract-id');
+  var txt=document.getElementById('pf-contract-search');
+  var drop=document.getElementById('pf-contract-drop');
+  var clr=document.getElementById('pf-contract-clear');
+  if(hid)hid.value=id;
+  if(txt)txt.value=id+' — '+name;
+  if(drop)drop.style.display='none';
+  if(clr)clr.style.display='';
+};
+window.pfContractClear=function(){
+  var hid=document.getElementById('pf-contract-id');
+  var txt=document.getElementById('pf-contract-search');
+  var clr=document.getElementById('pf-contract-clear');
+  if(hid)hid.value='';
+  if(txt){txt.value='';txt.focus();}
+  if(clr)clr.style.display='none';
+  var drop=document.getElementById('pf-contract-drop');
+  if(drop)drop.style.display='none';
+};
+
 window.ppSearchClear=function(){
   var hid=document.getElementById('pf-parent-proj');
   var txt=document.getElementById('pf-parent-search');
@@ -614,13 +702,15 @@ window.saveProject=async function(){
   if(!window.canEdit('projects'))return;if(!window.auth.currentUser)return;
   var name=(document.getElementById('pf-name')||{}).value||'';if(!name.trim())return;
   var _vErr=[];
-  if(!(document.getElementById('pf-grp')||{}).value)_vErr.push('กลุ่มโครงการ');
+  var _saveGrpId=(document.getElementById('pf-grp')||{}).value||'';
+  if(!_saveGrpId)_vErr.push('กลุ่มโครงการ');
   if(!(document.getElementById('pf-type-modal')||document.getElementById('pf-type')||{}).value)_vErr.push('ประเภท');
   if(!(document.getElementById('pf-owner')||{}).value)_vErr.push('เจ้าของไซต์');
   if(!(document.getElementById('pf-installer')||{}).value)_vErr.push('ชื่อผู้ติดตั้ง');
   if(!(document.getElementById('pf-start')||{}).value)_vErr.push('วันเริ่ม');
   if(!(document.getElementById('pf-end')||{}).value)_vErr.push('วันสิ้นสุด');
-  var _cv=(document.getElementById('pf-cost')||{}).value;if(_cv===''||_cv==null||isNaN(parseFloat(_cv))||parseFloat(_cv)<0)_vErr.push('งบประมาณ (฿)');
+  var _noBudget=_PF_NO_BUDGET_GRPS.includes(_saveGrpId);
+  if(!_noBudget){var _cv=(document.getElementById('pf-cost')||{}).value;if(_cv===''||_cv==null||isNaN(parseFloat(_cv))||parseFloat(_cv)<0)_vErr.push('งบประมาณ (฿)');}
   if(_vErr.length){window.showAlert('กรุณาระบุ: '+_vErr.join(', '),'error');return;}
   var pid=window.editPid||'P'+Date.now();
   var memDs=document.querySelectorAll('#mem-list > .m-row[id^="mr-"]');
@@ -629,7 +719,7 @@ window.saveProject=async function(){
   var selStage=(document.getElementById('pf-stg')||{}).value||(window.STAGES.length?window.STAGES[0].id:'');
   var rawProg=parseInt((document.getElementById('pf-prog')||{}).value)||0;
   var finalProg=window.stageForces100(selStage)?100:rawProg;
-  var dbProj={project_id:pid,project_name:name.trim(),group_id:document.getElementById('pf-grp').value,site_owner:(document.getElementById('pf-owner')||{}).value||'',installer_name:(document.getElementById('pf-installer')||{}).value||'',type_id:(document.getElementById('pf-type-modal')||document.getElementById('pf-type')||{}).value||'',stage_id:selStage,budget:parseFloat(document.getElementById('pf-cost').value)||0,start_date:document.getElementById('pf-start').value,end_date:document.getElementById('pf-end').value,revisit_1:(document.getElementById('pf-revisit1')||{}).value||'',revisit_2:(document.getElementById('pf-revisit2')||{}).value||'',parentProjectId:(document.getElementById('pf-parent-proj')||{}).value||'',revisitRound:Number((document.getElementById('pf-revisit-round')||{}).value)||0,progress_pct:finalProg,note:document.getElementById('pf-note').value,pm_staff_id:members.length>0?members[0].sid:'',status:'active',team:members.map(m=>m.sid),members:members,visits:savedVisits,is_border:!!(document.getElementById('pf-border')||{}).checked};
+  var dbProj={project_id:pid,project_name:name.trim(),group_id:_saveGrpId,site_owner:(document.getElementById('pf-owner')||{}).value||'',installer_name:(document.getElementById('pf-installer')||{}).value||'',type_id:(document.getElementById('pf-type-modal')||document.getElementById('pf-type')||{}).value||'',stage_id:selStage,budget:_noBudget?0:(parseFloat((document.getElementById('pf-cost')||{}).value)||0),start_date:document.getElementById('pf-start').value,end_date:document.getElementById('pf-end').value,revisit_1:(document.getElementById('pf-revisit1')||{}).value||'',revisit_2:(document.getElementById('pf-revisit2')||{}).value||'',parentProjectId:(document.getElementById('pf-parent-proj')||{}).value||'',revisitRound:Number((document.getElementById('pf-revisit-round')||{}).value)||0,progress_pct:finalProg,note:document.getElementById('pf-note').value,pm_staff_id:members.length>0?members[0].sid:'',status:'active',team:members.map(m=>m.sid),members:members,visits:savedVisits,is_border:!!(document.getElementById('pf-border')||{}).checked,contract_id:(document.getElementById('pf-contract-id')||{}).value||''};
   window.closeM('m-proj');
   try {
     await setDoc(getDocRef('PROJECTS',pid),dbProj);

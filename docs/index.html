@@ -111,6 +111,9 @@
       <div class="nav-btn" onclick="window.goView('hospital',this)">
         <span class="ni">🏥</span><span class="nl">รายชื่อ รพ.</span>
       </div>
+      <div class="nav-btn" onclick="window.goView('contract',this)">
+        <span class="ni">📄</span><span class="nl">ข้อมูลสัญญา</span>
+      </div>
 
       <div class="sb-sec admin-only" style="display:none">ระบบ</div>
       <div class="nav-btn admin-only" style="display:none" onclick="window.openAdminModal()">
@@ -569,6 +572,11 @@
           <select class="t-sel" id="hsp-product-filter" onchange="window._hspPage=1;window.renderHospital();if(window._hspViewMode==='analysis')window.renderHspAnalysis&&window.renderHspAnalysis();" style="display:none;">
             <option value="">ทุก Product</option>
           </select>
+          <select class="t-sel" id="hsp-prod-usage-filter" onchange="window._hspAnalysisPage=1;window._hspAnalysisLastFilter='';window._hspPage=1;if(window._hspViewMode==='analysis'){window.renderHspAnalysis&&window.renderHspAnalysis();}else{window.renderHospital&&window.renderHospital();}" style="display:none;">
+            <option value="">🏥 ทั้งหมด</option>
+            <option value="has">✅ ใช้งาน Products</option>
+            <option value="none">⬜ ยังไม่ได้ใช้ Products</option>
+          </select>
           <button class="btn btn-ghost btn-sm admin-only" style="display:none" onclick="window.openHspApiSettings()" title="ตั้งค่าการเชื่อมต่อ MOPH API">⚙️ MOPH API</button>
           <button class="btn btn-ghost btn-sm admin-only" style="display:none" onclick="window.openHspAutoEnrich()" title="เติมข้อมูลที่ไม่ครบถ้วนจาก MOPH API อัตโนมัติ">🔄 เติมข้อมูล API</button>
 
@@ -594,6 +602,43 @@
         <!-- Analysis view -->
         <div id="hsp-analysis-area" style="display:none;padding:20px 24px;">
           <div id="hsp-analysis-body"></div>
+        </div>
+      </div>
+
+      <!-- CONTRACT -->
+      <div class="view" id="view-contract" style="overflow-y:auto;">
+        <div class="toolbar" style="position:sticky;top:0;z-index:10;background:var(--surface);">
+          <div class="t-search"><input id="ct-q" placeholder="ค้นหาชื่อโครงการ / ลูกค้า / รหัสสัญญา..." oninput="window.renderContract()"></div>
+          <select class="t-sel" id="ct-yr" onchange="window.renderContract()"><option value="">ทุกปี พ.ศ.</option></select>
+          <select class="t-sel" id="ct-status" onchange="window.renderContract()">
+            <option value="">ทุกสถานะ</option>
+            <option value="active">มีผลบังคับ</option>
+            <option value="completed">สิ้นสุดแล้ว</option>
+            <option value="cancelled">ยกเลิก</option>
+          </select>
+          <div style="flex:1"></div>
+          <button class="btn btn-pri btn-sm ce-only" onclick="window.openContractModal(null)">+ เพิ่มสัญญา</button>
+        </div>
+        <div id="ct-summary-bar" style="display:flex;gap:12px;padding:12px 24px;background:var(--bg);flex-wrap:wrap;"></div>
+        <div style="padding:0 24px 28px;">
+          <div class="ov-card" style="padding:0;overflow:hidden;">
+            <div style="overflow-x:auto;">
+              <table class="t-table" style="min-width:900px;">
+                <thead><tr>
+                  <th style="width:120px">รหัสสัญญา</th>
+                  <th>ชื่อโครงการ</th>
+                  <th>ลูกค้า / คู่สัญญา</th>
+                  <th style="text-align:right">มูลค่าสัญญา (฿)</th>
+                  <th>วันลงนาม</th>
+                  <th>วันเริ่ม</th>
+                  <th>วันสิ้นสุด</th>
+                  <th>สถานะ</th>
+                  <th style="width:80px"></th>
+                </tr></thead>
+                <tbody id="ct-rows"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1058,6 +1103,77 @@
   </div>
 </div>
 
+<!-- CONTRACT MODAL -->
+<div class="overlay" id="m-contract">
+  <div class="modal lg" style="max-width:680px">
+    <div class="m-head">
+      <div class="m-icon" style="background:rgba(67,97,238,.12)">📄</div>
+      <div class="m-title" id="m-contract-title">เพิ่มสัญญา</div>
+      <span id="m-contract-id-badge" style="display:none;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--txt3);background:var(--surface2);border:1px solid var(--border);padding:3px 8px;border-radius:6px;margin-left:auto;margin-right:8px;white-space:nowrap;"></span>
+      <button class="m-x" onclick="window.closeM('m-contract')">✕</button>
+    </div>
+    <div class="m-body">
+      <input type="hidden" id="ctf-id">
+      <div class="f-grid" style="grid-template-columns:repeat(3,1fr)">
+        <!-- แถว 1: รหัสสัญญา | สถานะ | วันที่ลงนาม -->
+        <div class="f-group">
+          <label class="f-label">รหัสสัญญา *</label>
+          <input class="f-input" id="ctf-code" placeholder="เช่น CT-2026-001">
+        </div>
+        <div class="f-group">
+          <label class="f-label">สถานะ</label>
+          <select class="f-input" id="ctf-status">
+            <option value="active">มีผลบังคับ</option>
+            <option value="completed">สิ้นสุดแล้ว</option>
+            <option value="cancelled">ยกเลิก</option>
+          </select>
+        </div>
+        <div class="f-group">
+          <label class="f-label">วันที่ลงนามสัญญา</label>
+          <input type="date" class="f-input" id="ctf-sign">
+        </div>
+        <!-- แถว 2: ชื่อโครงการ -->
+        <div class="f-group" style="grid-column:span 3">
+          <label class="f-label">ชื่อโครงการ *</label>
+          <input class="f-input" id="ctf-name" placeholder="ชื่อโครงการตามสัญญา...">
+        </div>
+        <!-- แถว 3: ชื่อลูกค้า smart search -->
+        <div class="f-group" style="grid-column:span 3">
+          <label class="f-label">ชื่อลูกค้า / คู่สัญญา *</label>
+          <div style="position:relative;">
+            <input class="f-input" id="ctf-customer" autocomplete="off" placeholder="พิมพ์เพื่อค้นหาโรงพยาบาล หรือพิมพ์ชื่อเอง..."
+              oninput="window._ctCustomerSearch(this.value)"
+              onblur="setTimeout(function(){var d=document.getElementById('ctf-customer-dd');if(d)d.style.display='none';},200)">
+            <div id="ctf-customer-dd" style="display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--sh-sm);max-height:220px;overflow-y:auto;"></div>
+          </div>
+        </div>
+        <!-- แถว 4: มูลค่า | วันเริ่ม | วันสิ้นสุด -->
+        <div class="f-group">
+          <label class="f-label">มูลค่าสัญญารวม (฿) *</label>
+          <input type="number" class="f-input" id="ctf-value" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div class="f-group">
+          <label class="f-label">วันที่เริ่มต้นสัญญา</label>
+          <input type="date" class="f-input" id="ctf-start">
+        </div>
+        <div class="f-group">
+          <label class="f-label">วันที่สิ้นสุดสัญญา</label>
+          <input type="date" class="f-input" id="ctf-end">
+        </div>
+        <!-- แถว 5: หมายเหตุ -->
+        <div class="f-group" style="grid-column:span 3">
+          <label class="f-label">หมายเหตุ</label>
+          <textarea class="f-input" id="ctf-note" rows="3" placeholder="รายละเอียดเพิ่มเติม..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="m-foot" id="m-contract-foot">
+      <button class="btn btn-ghost" onclick="window.closeM('m-contract')">ยกเลิก</button>
+      <button class="btn btn-pri" onclick="window.saveContract()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
 <!-- STAGE MODAL -->
 <div class="overlay" id="m-stage">
   <div class="modal md" style="max-width:420px">
@@ -1199,6 +1315,7 @@
           <option value="DEPARTMENTS">🏢 แผนก (Departments)</option>
           <option value="HOSPITALS">🏥 รายชื่อโรงพยาบาล (Excel)</option>
           <option value="HOSPITAL_CONTACTS">📋 ผู้ติดต่อโรงพยาบาล (Excel)</option>
+          <option value="HOSPITAL_PRODUCTS">📦 Products ที่ รพ. ใช้งาน (Excel)</option>
         </select>
       </div>
       <div style="margin-bottom:20px; padding:16px; background:var(--surface2); border-radius:12px; border:1px dashed var(--border);">
@@ -1612,4 +1729,5 @@
 <script type="module" src="js/modals.js"></script>
 <script type="module" src="js/gcal.js"></script>
 <script type="module" src="js/hospital.js"></script>
+<script type="module" src="js/contract.js"></script>
 </body>

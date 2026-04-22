@@ -116,7 +116,7 @@ function setupRealtimeListeners(){
       var rawR2=d.revisit_2||d.revisit2||d.revisitTwo||'';
       // แปลง Firestore Timestamp เป็น string
       function tsToStr(v){if(!v)return'';if(typeof v==='string')return v;if(v&&v.toDate){var dt=v.toDate();return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');}return String(v);}
-      return{id:d.project_id||d.id,name:d.project_name||d.name||'',groupId:d.group_id||d.groupId||'',siteOwner:d.site_owner||d.siteOwner||'',installer:d.installer_name||d.installer||'',typeId:d.type_id||d.typeId||'',stage:d.stage_id||d.stage||'init',cost:Number(d.budget||d.cost)||0,start:tsToStr(rawStart),end:tsToStr(rawEnd),revisit1:tsToStr(rawR1),revisit2:tsToStr(rawR2),parentProjectId:d.parentProjectId||d.parent_project_id||'',revisitRound:Number(d.revisitRound||d.revisit_round)||0,progress:Number(d.progress_pct||d.progress)||0,note:d.note||'',status:d.status||'active',pm:d.pm_staff_id||d.pm||'',team:d.team||[],members:d.members||[],isBorder:d.is_border===true||d.is_border==='TRUE',visits:(d.visits||[]).map(function(v){return{id:v.id||('V'+Math.random().toString(36).slice(2,7)),no:v.no||1,start:tsToStr(v.start||v.start_date||''),end:tsToStr(v.end||v.end_date||''),purpose:v.purpose||'',team:v.team||[],status:v.status||'planned',note:v.note||''};})};
+      return{id:d.project_id||d.id,name:d.project_name||d.name||'',groupId:d.group_id||d.groupId||'',siteOwner:d.site_owner||d.siteOwner||'',installer:d.installer_name||d.installer||'',typeId:d.type_id||d.typeId||'',stage:d.stage_id||d.stage||'init',cost:Number(d.budget||d.cost)||0,start:tsToStr(rawStart),end:tsToStr(rawEnd),revisit1:tsToStr(rawR1),revisit2:tsToStr(rawR2),parentProjectId:d.parentProjectId||d.parent_project_id||'',revisitRound:Number(d.revisitRound||d.revisit_round)||0,progress:Number(d.progress_pct||d.progress)||0,note:d.note||'',status:d.status||'active',pm:d.pm_staff_id||d.pm||'',team:d.team||[],members:d.members||[],isBorder:d.is_border===true||d.is_border==='TRUE',contractId:d.contract_id||'',visits:(d.visits||[]).map(function(v){return{id:v.id||('V'+Math.random().toString(36).slice(2,7)),no:v.no||1,start:tsToStr(v.start||v.start_date||''),end:tsToStr(v.end||v.end_date||''),purpose:v.purpose||'',team:v.team||[],status:v.status||'planned',note:v.note||''};})};
     });
     checkLoaded();
     if(window.cu){
@@ -198,6 +198,11 @@ function setupRealtimeListeners(){
     window.DEPT_LIST = s.docs.map(doc=>{let d=doc.data();return{id:d.dept_id||d.id,label:d.label_th||d.label||''};}).sort((a,b)=>a.label.localeCompare(b.label,'th'));
     if(window.DEPT_LIST.length>0) window.DEPARTMENTS=window.DEPT_LIST.map(d=>d.label);
     checkLoaded();
+  }, e=>window.showDbError(e));
+
+  onSnapshot(getColRef('CONTRACTS'), s => {
+    window.CONTRACTS = s.docs.map(doc=>{let d=doc.data();return{id:d.contract_id||doc.id,name:d.project_name||'',customer:d.customer_name||'',value:Number(d.total_contract_value||d.value)||0,signDate:d.contract_sign_date||'',startDate:d.contract_start_date||'',endDate:d.end_date||'',note:d.note||'',status:d.status||'active'};});
+    if(window.cu&&document.getElementById('view-contract')&&document.getElementById('view-contract').classList.contains('on'))window.renderContract&&window.renderContract();
   }, e=>window.showDbError(e));
 
   onSnapshot(getColRef('HSP_PRODUCTS'), s => {
@@ -352,7 +357,7 @@ window.setupUser = function(){
   var uTab=document.getElementById('at-users');
   if(uTab) uTab.style.display=(window.cu.role==='admin')?'':'none';
   // ── apply nav visibility per role permissions ──
-  var navModules=['overview','kanban','projects','advance','lodging','workload','calendar','leave','timesheet','cost','targets','hospital'];
+  var navModules=['overview','kanban','projects','advance','lodging','workload','calendar','leave','timesheet','cost','targets','hospital','contract'];
   navModules.forEach(function(m){
     var btn=document.querySelector('.nav-btn[onclick*="\''+m+'\'"]');
     if(!btn) return;
@@ -367,7 +372,7 @@ window.setupUser = function(){
     if(navModules.indexOf(vid)>=0 && !window.canView(vid)){
       var firstOk=navModules.find(function(m){return window.canView(m);});
       if(firstOk){
-        var vLabels={overview:'Overview',kanban:'Delivery Board',projects:'โครงการทั้งหมด',advance:'Advance',lodging:'ระบบจัดหาที่พัก',workload:'สรุปภาระงาน',calendar:'ปฏิทินทีม',leave:'การลางาน',timesheet:'Timesheet',cost:'Cost Tracking'};
+        var vLabels={overview:'Overview',kanban:'Delivery Board',projects:'โครงการทั้งหมด',advance:'Advance',lodging:'ระบบจัดหาที่พัก',workload:'สรุปภาระงาน',calendar:'ปฏิทินทีม',leave:'การลางาน',timesheet:'Timesheet',cost:'Cost Tracking',contract:'ข้อมูลสัญญา'};
         // navigate โดยตรง (bypass goView alert check)
         document.querySelectorAll('.nav-btn').forEach(function(n){n.classList.remove('on');});
         document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on');});
@@ -386,7 +391,7 @@ window.setupUser = function(){
 
 window.goView = function(id,el){
   // ตรวจสิทธิ์ view ก่อนนำทาง
-  var _navMods=['overview','kanban','projects','advance','lodging','workload','calendar','leave','timesheet','cost','targets','hospital'];
+  var _navMods=['overview','kanban','projects','advance','lodging','workload','calendar','leave','timesheet','cost','targets','hospital','contract'];
   if(_navMods.indexOf(id)>=0 && !window.canView(id)){
     window.showAlert('คุณไม่มีสิทธิ์เข้าถึง Module นี้','warn'); return;
   }
@@ -395,7 +400,7 @@ window.goView = function(id,el){
   document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on');});
   var v=document.getElementById('view-'+id);
   if(v){v.style.display='';v.classList.add('on');}
-  var labels={overview:'Overview',kanban:'Delivery Board',projects:'โครงการทั้งหมด',advance:'Advance',lodging:'ระบบจัดหาที่พัก',workload:'สรุปภาระงาน',availability:'ทีมว่าง',calendar:'ปฏิทินทีม',holidays:'วันหยุด',leave:'การลางาน',timesheet:'Timesheet',cost:'Cost Tracking',targets:'เป้าหมายทีม',hospital:'รายชื่อ รพ.'};
+  var labels={overview:'Overview',kanban:'Delivery Board',projects:'โครงการทั้งหมด',advance:'Advance',lodging:'ระบบจัดหาที่พัก',workload:'สรุปภาระงาน',availability:'ทีมว่าง',calendar:'ปฏิทินทีม',holidays:'วันหยุด',leave:'การลางาน',timesheet:'Timesheet',cost:'Cost Tracking',targets:'เป้าหมายทีม',hospital:'รายชื่อ รพ.',contract:'ข้อมูลสัญญา'};
   document.getElementById('tp-title').textContent=labels[id]||id;
   var actions={};
   document.getElementById('tp-actions').innerHTML=actions[id]||'';
@@ -420,6 +425,7 @@ window.goView = function(id,el){
   if(id==='timesheet') window.renderTimesheet();
   if(id==='cost') window.renderCost();
   if(id==='hospital'){window._hspPopulateFilters&&window._hspPopulateFilters();window.renderHospital&&window.renderHospital();}
+  if(id==='contract') window.renderContract&&window.renderContract();
 }
 
 window.toggleSB = function(){
@@ -464,6 +470,7 @@ window.renderAll = function(){
   window.renderCalendar();
   window.renderTimesheet();
   window.renderCost();
+  window.renderContract&&window.renderContract();
   window.updateBadge();
 }
 

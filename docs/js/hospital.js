@@ -582,12 +582,15 @@ function _hspFiltered() {
   var dist = document.getElementById('hsp-dist')?.value || '';
   var typ  = document.getElementById('hsp-type')?.value || '';
   var prod = document.getElementById('hsp-product-filter')?.value || '';
+  var prodUsage = document.getElementById('hsp-prod-usage-filter')?.value || '';
 
   return (window.HOSPITALS || []).filter(h => {
     if (prov && h.province !== prov) return false;
     if (dist && h.district !== dist) return false;
     if (typ  && h.type    !== typ)   return false;
     if (prod && !(h.products||[]).includes(prod)) return false;
+    if (prodUsage === 'has'  && !(h.products||[]).length) return false;
+    if (prodUsage === 'none' &&  (h.products||[]).length) return false;
     if (q) {
       var hay = (h.code + ' ' + h.name + ' ' + (h.district||'') + ' ' + (h.tambon||'') + ' ' + (h.affiliation||'')).toLowerCase();
       if (!hay.includes(q)) return false;
@@ -2105,6 +2108,8 @@ window._hspPopulateFilters = function() {
     prodSel.innerHTML = '<option value="">ทุก Product</option>' + prods.map(p => `<option value="${esc(p.id)}"${p.id===curProd?' selected':''}>${esc(p.name)}</option>`).join('');
     prodSel.style.display = prods.length ? '' : 'none';
   }
+  var usageSel = document.getElementById('hsp-prod-usage-filter');
+  if (usageSel) usageSel.style.display = prods.length ? '' : 'none';
 };
 
 // อัปเดต dropdown อำเภอใน toolbar ตามจังหวัดที่เลือก
@@ -2684,6 +2689,9 @@ window._hspProdCbChange = function(cb, color) {
 // ─────────────────────────────────────────────────────────────────────────────
 window._hspViewMode = 'list';
 window._hspAnalysisTier = '';
+window._hspAnalysisPage = 1;
+window._hspAnalysisLastFilter = '';
+var HSP_ANALYSIS_PAGE_SIZE = 100;
 
 window.goHspView = function(mode) {
   window._hspViewMode = mode;
@@ -2818,6 +2826,7 @@ window.renderHspAnalysis = function() {
     }).join('') + '</div></div>';
 
   // ── FILTERED TABLE ─────────────────────────────────────────────────────────
+  var prodUsage = (document.getElementById('hsp-prod-usage-filter') || {}).value || '';
   var showHosps = hosps;
   if (filterProv) showHosps = showHosps.filter(function(h) { return h.province === filterProv; });
   if (filterDist) showHosps = showHosps.filter(function(h) { return h.district === filterDist; });
@@ -2825,6 +2834,20 @@ window.renderHspAnalysis = function() {
   if (filterQ)    showHosps = showHosps.filter(function(h) { return (h.name||'').toLowerCase().includes(filterQ) || (h.code||'').toLowerCase().includes(filterQ) || (h.district||'').toLowerCase().includes(filterQ); });
   if (filterTier) showHosps = showHosps.filter(function(h) { return String(_hspCalcTier(h, prods).tier) === filterTier; });
   if (filterProd) showHosps = showHosps.filter(function(h) { return !(h.products||[]).includes(filterProd); });
+  if (prodUsage === 'has')  showHosps = showHosps.filter(function(h) { return (h.products||[]).length > 0; });
+  if (prodUsage === 'none') showHosps = showHosps.filter(function(h) { return !(h.products||[]).length; });
+
+  // ── PAGINATION: reset to page 1 เมื่อ filter เปลี่ยน ─────────────────────
+  var filterKey = [filterProd, filterTier, filterProv, filterDist, filterQ, filterType, prodUsage].join('|');
+  if (filterKey !== window._hspAnalysisLastFilter) {
+    window._hspAnalysisPage = 1;
+    window._hspAnalysisLastFilter = filterKey;
+  }
+  var totalItems = showHosps.length;
+  var totalPages = Math.max(1, Math.ceil(totalItems / HSP_ANALYSIS_PAGE_SIZE));
+  var curPage    = Math.min(Math.max(1, window._hspAnalysisPage), totalPages);
+  window._hspAnalysisPage = curPage;
+  var pageHosps  = showHosps.slice((curPage - 1) * HSP_ANALYSIS_PAGE_SIZE, curPage * HSP_ANALYSIS_PAGE_SIZE);
 
   var selProdName = filterProd ? ((prods.find(function(p){return p.id===filterProd;})||{}).name||'') : '';
 
@@ -2835,8 +2858,14 @@ window.renderHspAnalysis = function() {
   if (filterQ)    ctxParts.push('"' + filterQ + '"');
   if (selProdName) ctxParts.push('ยังไม่ใช้ ' + selProdName);
   var ctxStr = ctxParts.length ? ' <span style="font-size:11px;color:var(--txt-muted);font-weight:400;">· ' + ctxParts.join(' · ') + '</span>' : '';
-  var tableTitle = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">' +
-    '<div style="font-size:13px;font-weight:700;color:var(--txt);">📋 รายชื่อ รพ. ตามเงื่อนไข <span style="font-weight:400;color:var(--txt-muted);">(' + showHosps.length + ' รายการ)</span>' + ctxStr + '</div>' +
+
+  var rangeStart = totalItems ? (curPage - 1) * HSP_ANALYSIS_PAGE_SIZE + 1 : 0;
+  var rangeEnd   = Math.min(curPage * HSP_ANALYSIS_PAGE_SIZE, totalItems);
+  var rangeText  = totalItems ? (rangeStart + '–' + rangeEnd + ' จาก ' + totalItems) : '0';
+
+  var tableTitle = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">' +
+    '<div style="font-size:13px;font-weight:700;color:var(--txt);">📋 รายชื่อ รพ. ตามเงื่อนไข' + ctxStr + '</div>' +
+    '<span style="font-size:12px;color:var(--txt-muted);margin-left:4px;">(' + rangeText + ' รายการ)</span>' +
     '<button class="btn btn-ghost btn-sm" onclick="window._hspExportAnalysis()" style="margin-left:auto;" title="Export CSV">⬇️ Export CSV</button>' +
     '</div>';
 
@@ -2853,6 +2882,7 @@ window.renderHspAnalysis = function() {
   var selProd = filterProd ? prods.find(function(p){ return p.id === filterProd; }) : null;
 
   var thead = '<tr>' +
+    '<th style="' + thS + '">#</th>' +
     '<th style="' + thS + '">Tier</th>' +
     '<th style="' + thS + '">รหัส</th>' +
     '<th style="' + thS + '">ชื่อ รพ.</th>' +
@@ -2862,9 +2892,10 @@ window.renderHspAnalysis = function() {
       : '<th style="' + thS + '">ความครอบคลุม</th><th style="' + thS + '">กลุ่มที่ขาด</th>'
     ) + '</tr>';
 
-  var tbody = showHosps.map(function(h) {
+  var tbody = pageHosps.map(function(h, idx) {
     var ti      = _hspCalcTier(h, prods);
     var hProds  = h.products || [];
+    var rowNum  = rangeStart + idx;
     var tierBadge = '<span style="background:' + ti.color + '22;color:' + ti.color + ';padding:2px 8px;border-radius:8px;font-size:10px;font-weight:800;">' + ti.label + '</span>';
 
     var cells;
@@ -2873,7 +2904,6 @@ window.renderHspAnalysis = function() {
       cells = '<td style="padding:7px 10px;text-align:center;">' +
         (has ? '<span style="color:' + selProd.color + ';font-size:15px;">✅</span>' : '<span style="color:var(--border);">—</span>') + '</td>';
     } else {
-      // 5 group dots
       var dots = HSP_PROD_GROUPS.map(function(grp) {
         var hasGrp = prods.some(function(p){ return p.group === grp.id && hProds.includes(p.id); });
         var abbr = GRP_ABBR[grp.id] || grp.id[0].toUpperCase();
@@ -2881,7 +2911,6 @@ window.renderHspAnalysis = function() {
           (hasGrp ? 'background:' + grp.color + ';color:#fff;' : 'background:var(--bg);border:1.5px solid var(--border);color:var(--txt-muted);') +
           '">' + abbr + '</span>';
       }).join('');
-      // missing group chips
       var missing = HSP_PROD_GROUPS.filter(function(grp){
         return !prods.some(function(p){ return p.group === grp.id && hProds.includes(p.id); });
       });
@@ -2895,6 +2924,7 @@ window.renderHspAnalysis = function() {
     }
 
     return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="window.openHospitalDetail(\'' + esc(h.id) + '\')" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">' +
+      '<td style="padding:7px 10px;font-size:11px;color:var(--txt-muted);text-align:right;white-space:nowrap;">' + rowNum + '</td>' +
       '<td style="padding:7px 10px;white-space:nowrap;">' + tierBadge + '</td>' +
       '<td style="padding:7px 10px;font-family:monospace;color:var(--primary);font-size:11px;white-space:nowrap;">' + esc(h.code||'—') + '</td>' +
       '<td style="padding:7px 10px;font-weight:500;color:var(--txt);">' + esc(h.name) + '</td>' +
@@ -2902,10 +2932,59 @@ window.renderHspAnalysis = function() {
       cells + '</tr>';
   }).join('');
 
-  var tableHtml = tableTitle + '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">' +
-    '<thead>' + thead + '</thead><tbody>' + tbody + '</tbody></table></div>';
+  // ── PAGINATION CONTROLS ────────────────────────────────────────────────────
+  function _pagBtn(n, label, active, disabled) {
+    var base = 'display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid;transition:all .12s;font-family:inherit;';
+    if (disabled) return '<button disabled style="' + base + 'border-color:var(--border);background:var(--bg);color:var(--txt-muted);cursor:not-allowed;opacity:.4;">' + label + '</button>';
+    if (active)   return '<button style="' + base + 'border-color:var(--violet);background:var(--violet);color:#fff;" onclick="window._hspAnalysisGoPage(' + n + ')">' + label + '</button>';
+    return '<button style="' + base + 'border-color:var(--border);background:var(--bg);color:var(--txt2);" onclick="window._hspAnalysisGoPage(' + n + ')" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'var(--bg)\'">' + label + '</button>';
+  }
+
+  var pagParts = [];
+  pagParts.push(_pagBtn(curPage - 1, '← ก่อนหน้า', false, curPage <= 1));
+
+  var pageNums = [];
+  if (totalPages <= 7) {
+    for (var pi = 1; pi <= totalPages; pi++) pageNums.push(pi);
+  } else {
+    pageNums.push(1);
+    if (curPage > 3) pageNums.push('…');
+    for (var pi = Math.max(2, curPage - 1); pi <= Math.min(totalPages - 1, curPage + 1); pi++) pageNums.push(pi);
+    if (curPage < totalPages - 2) pageNums.push('…');
+    pageNums.push(totalPages);
+  }
+  pageNums.forEach(function(pn) {
+    if (pn === '…') {
+      pagParts.push('<span style="display:inline-flex;align-items:center;padding:0 4px;color:var(--txt-muted);font-size:13px;">…</span>');
+    } else {
+      pagParts.push(_pagBtn(pn, pn, pn === curPage, false));
+    }
+  });
+
+  pagParts.push(_pagBtn(curPage + 1, 'ถัดไป →', false, curPage >= totalPages));
+
+  var paginationHtml = totalPages > 1
+    ? '<div style="display:flex;align-items:center;justify-content:center;gap:4px;padding:16px 0 4px;flex-wrap:wrap;">'
+      + pagParts.join('') + '</div>'
+    : '';
+
+  var tableHtml = tableTitle
+    + '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">'
+    + '<thead>' + thead + '</thead><tbody>' + tbody + '</tbody></table></div>'
+    + paginationHtml;
 
   body.innerHTML = kpiHtml + penetHtml + tierHtml + tableHtml;
+};
+
+window._hspAnalysisGoPage = function(n) {
+  window._hspAnalysisPage = n;
+  window.renderHspAnalysis();
+  // เลื่อน scroll ไปที่ตาราง
+  var body = document.getElementById('hsp-analysis-body');
+  if (body) {
+    var tableEl = body.querySelector('table');
+    if (tableEl) tableEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 };
 
 // Export analysis table to CSV
@@ -2947,4 +3026,230 @@ window._hspExportAnalysis = function() {
   var a    = document.createElement('a');
   a.href = url; a.download = 'hospital_analysis.csv'; a.click();
   setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HOSPITAL PRODUCTS IMPORT
+// ─────────────────────────────────────────────────────────────────────────────
+
+window.downloadHospitalProductsTemplate = function() {
+  var prods = window.HSP_PRODUCTS || [];
+  if (!prods.length) { window.showAlert('ยังไม่มี Product ในระบบ กรุณาเพิ่ม Product ก่อน', 'warn'); return; }
+
+  var wb = XLSX.utils.book_new();
+  var headers = ['hospital_code', 'hospital_name'].concat(prods.map(function(p){ return p.name; }));
+
+  var hosps = (window.HOSPITALS || []).slice(0, 10);
+  var dataRows = hosps.map(function(h) {
+    return [h.code, h.name].concat(prods.map(function(p){
+      return (h.products || []).includes(p.id) ? 'Y' : 'N';
+    }));
+  });
+  if (!dataRows.length) {
+    dataRows.push(['10669', ''].concat(prods.map(function(){ return 'N'; })));
+    dataRows.push(['10710', ''].concat(prods.map(function(){ return 'N'; })));
+  }
+
+  var ws = XLSX.utils.aoa_to_sheet([headers].concat(dataRows));
+  ws['!cols'] = [{wch:14},{wch:36}].concat(prods.map(function(){ return {wch:12}; }));
+  XLSX.utils.book_append_sheet(wb, ws, 'Products รพ.');
+
+  var guide = [
+    ['=== คู่มือนำเข้า Products โรงพยาบาล ==='],
+    [''],
+    ['คอลัมน์', 'คำอธิบาย', 'ค่าที่รองรับ', 'จำเป็น'],
+    ['hospital_code', 'รหัสสถานพยาบาล', '10669, 10710 ...', '✅'],
+    ['hospital_name', 'ชื่อ รพ. (ใช้อ้างอิงเท่านั้น ไม่ถูกนำเข้า)', '—', '—'],
+    ['[ชื่อ Product]', 'แต่ละ Product = 1 คอลัมน์', 'Y / N', '—'],
+    [''],
+    ['ค่าที่ถือว่า "ใช้งาน":', 'Y, YES, TRUE, 1, ✓, มี, ใช้'],
+    ['ค่าอื่นๆ ถือว่า "ไม่ใช้งาน"'],
+    [''],
+    ['หมายเหตุ:'],
+    ['• ระบบอัปเดตเฉพาะ รพ. ที่อยู่ในไฟล์ (รพ. ที่ไม่ได้ระบุจะไม่ถูกแก้ไข)'],
+    ['• ชื่อ Product ต้องตรงกับชื่อในระบบ (Template นี้ generate ให้อัตโนมัติแล้ว)'],
+    ['• ค่า Y/N แต่ละแถวจะ "แทนที่" products ของ รพ. นั้นทั้งหมด'],
+  ];
+  var ws2 = XLSX.utils.aoa_to_sheet(guide);
+  ws2['!cols'] = [{wch:20},{wch:50},{wch:26},{wch:8}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'คำแนะนำ');
+
+  XLSX.writeFile(wb, 'Template_HOSPITAL_PRODUCTS.xlsx');
+};
+
+window._hspProdImportPending = null;
+
+window.importHospitalProductsFromFile = async function(file) {
+  try {
+    var ab = await file.arrayBuffer();
+    var wb = XLSX.read(ab);
+    var ws = wb.Sheets[wb.SheetNames[0]];
+    var rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    if (!rows.length) { window.showAlert('ไม่พบข้อมูลในไฟล์', 'warn'); return; }
+
+    var allProds  = window.HSP_PRODUCTS || [];
+    var hospitals = window.HOSPITALS || [];
+    var headers   = Object.keys(rows[0]);
+
+    var skipCols = ['hospital_code','รหัสสถานพยาบาล','รหัส','code','hcode',
+                    'hospital_name','ชื่อโรงพยาบาล','ชื่อ','name'];
+
+    var colCode = headers.find(function(h) {
+      return ['hospital_code','รหัสสถานพยาบาล','รหัส','code','hcode'].indexOf(h.trim().toLowerCase()) >= 0;
+    }) || headers[0];
+
+    // map คอลัมน์ → product id
+    var prodCols = {};
+    headers.forEach(function(h) {
+      if (skipCols.indexOf(h.trim().toLowerCase()) >= 0) return;
+      var p = allProds.find(function(p){ return p.name.trim().toLowerCase() === h.trim().toLowerCase(); });
+      if (p) prodCols[h] = p.id;
+    });
+
+    if (!Object.keys(prodCols).length) {
+      window.showAlert(
+        'ไม่พบคอลัมน์ชื่อ Product ที่ตรงกับระบบ\n'
+        + 'ใช้ปุ่ม "โหลดไฟล์ Template" เพื่อรับไฟล์ที่มีชื่อคอลัมน์ถูกต้อง', 'warn');
+      return;
+    }
+
+    var TRUTHY = ['y','yes','true','1','✓','มี','ใช้'];
+    var items = [];
+    rows.forEach(function(row, i) {
+      var code = String(row[colCode] || '').trim();
+      if (!code) return;
+      var h = hospitals.find(function(x){ return x.code === code; });
+      var newProdIds = Object.keys(prodCols).filter(function(col){
+        return TRUTHY.indexOf(String(row[col] || '').trim().toLowerCase()) >= 0;
+      }).map(function(col){ return prodCols[col]; });
+
+      items.push({
+        rowNum:   i + 2,
+        code,
+        hospName: h ? h.name : null,
+        hospId:   h ? h.id   : null,
+        oldProds: h ? (h.products || []) : [],
+        newProds: newProdIds,
+        status:   !h ? 'not_found' : 'update',
+      });
+    });
+
+    if (!items.length) { window.showAlert('ไม่พบแถวข้อมูล', 'warn'); return; }
+
+    window._hspProdImportPending = { items, prodCols, fileName: file.name };
+    _hspShowProdImportPreview();
+
+  } catch(err) {
+    window.showAlert('อ่านไฟล์ไม่สำเร็จ: ' + err.message, 'warn');
+  }
+};
+
+function _hspShowProdImportPreview() {
+  var pending = window._hspProdImportPending;
+  if (!pending) return;
+  var items    = pending.items;
+  var prodCols = pending.prodCols;
+  var fileName = pending.fileName;
+
+  var found    = items.filter(function(e){ return e.status !== 'not_found'; });
+  var notFound = items.filter(function(e){ return e.status === 'not_found'; });
+  var prodCount = Object.keys(prodCols).length;
+
+  var ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;';
+
+  var tableRows = found.map(function(e){
+    var changed = JSON.stringify(e.oldProds.slice().sort()) !== JSON.stringify(e.newProds.slice().sort());
+    return '<tr style="border-top:1px solid var(--border);' + (changed ? '' : 'opacity:.55;') + '">'
+      + '<td style="padding:5px 10px;font-family:monospace;font-size:11px;color:var(--txt3);">' + esc(e.code) + '</td>'
+      + '<td style="padding:5px 10px;font-weight:600;font-size:12px;">' + esc(e.hospName || '') + '</td>'
+      + '<td style="padding:5px 10px;text-align:center;color:var(--txt3);font-size:12px;">' + e.oldProds.length + '</td>'
+      + '<td style="padding:5px 10px;text-align:center;font-weight:700;font-size:12px;color:' + (changed ? 'var(--teal)' : 'var(--txt3)') + ';">' + e.newProds.length + '</td>'
+      + '</tr>';
+  }).join('');
+
+  var notFoundHtml = notFound.length
+    ? '<div style="margin-top:10px;padding:9px 13px;background:rgba(255,107,107,.08);border:1px solid #ff6b6b44;border-radius:8px;font-size:11px;">'
+      + '<span style="color:var(--coral);font-weight:700;">ไม่พบในระบบ (จะข้าม): </span>'
+      + notFound.map(function(e){ return esc(e.code); }).join(', ')
+      + '</div>'
+    : '';
+
+  ov.innerHTML = '<div style="background:var(--surface);border-radius:16px;padding:0;max-width:560px;width:100%;box-shadow:0 12px 48px rgba(0,0,0,.3);border:1px solid var(--border);overflow:hidden;">'
+    + '<div style="padding:20px 24px 14px;border-bottom:1px solid var(--border);">'
+      + '<div style="font-size:22px;margin-bottom:6px;">📦</div>'
+      + '<div style="font-size:15px;font-weight:700;color:var(--txt);">ยืนยันนำเข้า Products</div>'
+      + '<div style="font-size:11px;color:var(--txt3);margin-top:2px;">' + esc(fileName) + '</div>'
+    + '</div>'
+    + '<div style="padding:16px 24px;">'
+      + '<div style="display:flex;gap:14px;margin-bottom:14px;flex-wrap:wrap;">'
+        + '<div style="background:var(--surface2);border-radius:10px;padding:10px 16px;flex:1;min-width:100px;text-align:center;">'
+          + '<div style="font-size:10px;color:var(--txt3);text-transform:uppercase;font-weight:700;">Product</div>'
+          + '<div style="font-size:18px;font-weight:800;color:var(--violet);">' + prodCount + '</div>'
+        + '</div>'
+        + '<div style="background:var(--surface2);border-radius:10px;padding:10px 16px;flex:1;min-width:100px;text-align:center;">'
+          + '<div style="font-size:10px;color:var(--txt3);text-transform:uppercase;font-weight:700;">จะอัปเดต</div>'
+          + '<div style="font-size:18px;font-weight:800;color:var(--teal);">' + found.length + ' รพ.</div>'
+        + '</div>'
+        + (notFound.length ? '<div style="background:rgba(255,107,107,.1);border-radius:10px;padding:10px 16px;flex:1;min-width:100px;text-align:center;">'
+          + '<div style="font-size:10px;color:var(--coral);text-transform:uppercase;font-weight:700;">ไม่พบ</div>'
+          + '<div style="font-size:18px;font-weight:800;color:var(--coral);">' + notFound.length + ' รพ.</div>'
+        + '</div>' : '')
+      + '</div>'
+      + (found.length ? '<div style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:10px;">'
+        + '<table style="width:100%;border-collapse:collapse;">'
+        + '<thead><tr style="background:var(--surface2);position:sticky;top:0;">'
+          + '<th style="padding:6px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--txt3);">รหัส</th>'
+          + '<th style="padding:6px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--txt3);">ชื่อ รพ.</th>'
+          + '<th style="padding:6px 10px;text-align:center;font-size:11px;font-weight:700;color:var(--txt3);">เดิม</th>'
+          + '<th style="padding:6px 10px;text-align:center;font-size:11px;font-weight:700;color:var(--txt3);">ใหม่</th>'
+        + '</tr></thead><tbody>' + tableRows + '</tbody></table>'
+        + '</div>' : '')
+      + notFoundHtml
+    + '</div>'
+    + '<div style="padding:14px 24px 20px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border);">'
+      + '<button id="_hprod-cancel" style="padding:9px 20px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">ยกเลิก</button>'
+      + (found.length ? '<button id="_hprod-ok" style="padding:9px 20px;background:var(--teal);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">✅ นำเข้า ' + found.length + ' รพ.</button>' : '')
+    + '</div>'
+  + '</div>';
+
+  ov.querySelector('#_hprod-cancel').onclick = function(){ ov.remove(); };
+  var okBtn = ov.querySelector('#_hprod-ok');
+  if (okBtn) {
+    okBtn.onclick = function() {
+      ov.remove();
+      window._execHspProdImport();
+    };
+  }
+  ov.addEventListener('click', function(e){ if (e.target === ov) ov.remove(); });
+  document.body.appendChild(ov);
+}
+
+window._execHspProdImport = async function() {
+  var pending = window._hspProdImportPending;
+  if (!pending) return;
+  var toUpdate = pending.items.filter(function(e){ return e.status !== 'not_found' && e.hospId; });
+  if (!toUpdate.length) { window.showAlert('ไม่มีรายการที่จะอัปเดต', 'warn'); return; }
+
+  try {
+    var db    = window.getDb();
+    var batch = window.writeBatch(db);
+    var count = 0;
+
+    for (var i = 0; i < toUpdate.length; i++) {
+      var e = toUpdate[i];
+      batch.update(getDocRef('HOSPITALS', e.hospId), { products: e.newProds });
+      count++;
+      if (count % 400 === 0) {
+        await batch.commit();
+        batch = window.writeBatch(db);
+      }
+    }
+    if (count % 400 !== 0) await batch.commit();
+
+    window._hspProdImportPending = null;
+    window.showAlert('อัปเดต Products สำเร็จ ' + toUpdate.length + ' โรงพยาบาล', 'success');
+  } catch(err) {
+    window.showAlert('เกิดข้อผิดพลาด: ' + err.message, 'warn');
+  }
 };

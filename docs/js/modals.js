@@ -6,11 +6,11 @@ window.askDel=function(type,id,label){window.delTarget={type:type,id:id};documen
 window.execDelete=async function(){
   if(!window.delTarget)return;if(!window.auth.currentUser)return;
   var t=window.delTarget.type,id=window.delTarget.id;
-  var _delModMap={project:'projects',advance:'advance',lodging:'lodging',timesheet:'timesheet',cost:'cost',leave:'leave'};
+  var _delModMap={project:'projects',advance:'advance',lodging:'lodging',timesheet:'timesheet',cost:'cost',leave:'leave',contract:'contract'};
   if(['staff','type','position','group','user','stage','department'].includes(t)){if(!window.isAdmin())return;}
   else if(_delModMap[t]){if(!window.canDel(_delModMap[t]))return;}
   else{if(!window.isAdmin())return;}
-  var sheetMap={project:'PROJECTS',advance:'ADVANCES',staff:'STAFF',type:'PTYPES',user:'USERS',position:'POSITIONS',group:'PGROUPS',lodging:'LODGINGS',stage:'STAGES',timesheet:'TIMESHEETS',cost:'COSTS',department:'DEPARTMENTS'};
+  var sheetMap={project:'PROJECTS',advance:'ADVANCES',staff:'STAFF',type:'PTYPES',user:'USERS',position:'POSITIONS',group:'PGROUPS',lodging:'LODGINGS',stage:'STAGES',timesheet:'TIMESHEETS',cost:'COSTS',department:'DEPARTMENTS',contract:'CONTRACTS'};
   if(t==='project'){window.PROJECTS=window.PROJECTS.filter(x=>x.id!==id);window.ADVANCES.filter(x=>x.pid===id).forEach(a=>deleteDoc(getDocRef('ADVANCES',a.id)));window.LODGINGS.filter(x=>x.pid===id).forEach(l=>deleteDoc(getDocRef('LODGINGS',l.id)));}
   else if(t==='advance')window.ADVANCES=window.ADVANCES.filter(x=>x.id!==id);
   else if(t==='lodging')window.LODGINGS=window.LODGINGS.filter(x=>x.id!==id);
@@ -23,6 +23,7 @@ window.execDelete=async function(){
   else if(t==='department'){window.DEPT_LIST=window.DEPT_LIST.filter(x=>x.id!==id);window.DEPARTMENTS=window.DEPT_LIST.map(d=>d.label);}
   else if(t==='timesheet')window.TIMESHEETS=window.TIMESHEETS.filter(x=>x.id!==id);
   else if(t==='cost')window.COSTS=window.COSTS.filter(x=>x.id!==id);
+  else if(t==='contract')window.CONTRACTS=window.CONTRACTS.filter(x=>x.id!==id);
   window.closeM('m-del');window.delTarget=null;window.renderAll();
   if(t==='staff')window.admTab('staff');else if(['type','user','position','group','stage'].includes(t))window.admTab(t+'s');
   if(t==='department')window.admTab('dept');
@@ -78,6 +79,7 @@ window.downloadTemplate=function(){
   const type=document.getElementById('import-type').value;
   if(type==='HOSPITALS'){window.downloadHospitalTemplate();return;}
   if(type==='HOSPITAL_CONTACTS'){window.downloadHospitalContactsTemplate();return;}
+  if(type==='HOSPITAL_PRODUCTS'){window.downloadHospitalProductsTemplate();return;}
   const schema=window.IMPORT_SCHEMAS[type];if(!schema)return;const csvContent="data:text/csv;charset=utf-8,\uFEFF"+schema.headers.join(",")+"\n"+schema.example.join(",");const link=document.createElement("a");link.setAttribute("href",encodeURI(csvContent));link.setAttribute("download",`Template_${type}.csv`);document.body.appendChild(link);link.click();document.body.removeChild(link);
 }
 window.execImport=async function(){
@@ -85,6 +87,7 @@ window.execImport=async function(){
   if(!fileInput.files.length){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">⚠ กรุณาเลือกไฟล์ก่อน</span>';return;}
   if(selType==='HOSPITALS'){window.closeM('m-import');await window.importHospitalsFromFile(fileInput.files[0]);return;}
   if(selType==='HOSPITAL_CONTACTS'){window.closeM('m-import');await window.importHospitalContactsFromFile(fileInput.files[0]);return;}
+  if(selType==='HOSPITAL_PRODUCTS'){window.closeM('m-import');await window.importHospitalProductsFromFile(fileInput.files[0]);return;}
   if(!window.auth.currentUser){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">⚠ กรุณาเชื่อมต่อก่อน</span>';return;}
   const file=fileInput.files[0];const reader=new FileReader();
   reader.onload=async function(e){
