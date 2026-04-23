@@ -175,6 +175,37 @@
     doExport(['รหัสสัญญา','ชื่อโครงการ','ลูกค้า','มูลค่าสัญญา (฿)','วันที่ทำสัญญา','วันเริ่ม','วันสิ้นสุด','สถานะ','หมายเหตุ'],rows,'สัญญา');
   };
 
+  // ── สรุปงบประมาณ ──────────────────────────────────────────────────────────
+  window.exportBudget=function(){
+    var yr=_v('bud-yr'),grp=_v('bud-grp'),q=_v('bud-q').toLowerCase(),statusFilter=_v('bud-status');
+    var rows=(window.PROJECTS||[]).filter(function(p){
+      if(yr&&window.getYearBE(p.start)!=yr)return false;
+      if(grp&&p.groupId!==grp)return false;
+      if(q&&!p.name.toLowerCase().includes(q))return false;
+      return true;
+    }).map(function(p){
+      var advAmt=(window.ADVANCES||[]).filter(function(a){return a.pid===p.id;}).reduce(function(s,a){return s+(a.amount||0);},0);
+      var costAmt=(window.COSTS||[]).filter(function(c){return c.pid===p.id;}).reduce(function(s,c){return s+(c.amount||0);},0);
+      var used=advAmt+costAmt;
+      var budget=p.cost||0;
+      var remain=budget-used;
+      var pct=budget>0?Math.round(used/budget*100):0;
+      return{p:p,budget:budget,advAmt:advAmt,costAmt:costAmt,used:used,remain:remain,pct:pct};
+    }).filter(function(r){
+      if(statusFilter==='over')return r.remain<0;
+      if(statusFilter==='warn')return r.pct>=80&&r.remain>=0;
+      if(statusFilter==='ok')return r.pct<80;
+      return true;
+    });
+    var stMap={active:'กำลังดำเนินการ',completed:'เสร็จสิ้น',cancelled:'ยกเลิก',on_hold:'พักชั่วคราว'};
+    var data=rows.map(function(r){
+      var pg=window.gG(r.p.groupId);var sg=window.gS(r.p.stage);
+      var overStatus=r.remain<0?'เกินงบ':r.pct>=80?'ใกล้เกิน':'ปกติ';
+      return[r.p.id,r.p.name,pg?pg.label:'',sg?sg.label:'',r.budget,r.advAmt,r.costAmt,r.used,r.remain,r.pct+'%',overStatus,stMap[r.p.status]||r.p.status,r.p.start,r.p.end];
+    });
+    doExport(['รหัส','ชื่อโครงการ','กลุ่ม','Stage','งบประมาณ (฿)','เบิกล่วงหน้า (฿)','ค่าใช้จ่าย (฿)','ใช้แล้วรวม (฿)','คงเหลือ (฿)','% ใช้','สถานะงบ','สถานะโครงการ','วันเริ่ม','วันสิ้นสุด'],data,'สรุปงบประมาณ');
+  };
+
   // ── โรงพยาบาล ──────────────────────────────────────────────────────────────
   window.exportHospitals=function(){
     var q=(_v('hsp-q')||'').toLowerCase(),prov=_v('hsp-prov'),dist=_v('hsp-dist'),typ=_v('hsp-type');

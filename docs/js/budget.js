@@ -1,0 +1,141 @@
+// ── BUDGET SUMMARY ──
+(function(){
+var _chart=null;
+
+window.renderBudget=function(){
+  var yf=document.getElementById('bud-yr');
+  if(yf&&yf.options.length<=1){
+    var yrs=[...new Set((window.PROJECTS||[]).map(function(p){return window.getYearBE(p.start);}).filter(Boolean))].sort(function(a,b){return b-a;});
+    yrs.forEach(function(y){var o=document.createElement('option');o.value=y;o.textContent='ปี พ.ศ. '+y;yf.appendChild(o);});
+    var _cbe=(new Date().getFullYear()+543).toString();
+    if(!yf.value||yf.value==='')yf.value=_cbe;
+  }
+  var gf=document.getElementById('bud-grp');
+  if(gf&&gf.options.length<=1){
+    (window.PGROUPS||[]).forEach(function(g){var o=document.createElement('option');o.value=g.id;o.textContent=g.label;gf.appendChild(o);});
+  }
+
+  var yr=(document.getElementById('bud-yr')||{}).value||'';
+  var grp=(document.getElementById('bud-grp')||{}).value||'';
+  var q=((document.getElementById('bud-q')||{}).value||'').toLowerCase();
+  var sort=(document.getElementById('bud-sort')||{}).value||'pct_desc';
+  var statusFilter=(document.getElementById('bud-status')||{}).value||'';
+
+  var rows=(window.PROJECTS||[]).filter(function(p){
+    if(yr&&window.getYearBE(p.start)!=yr)return false;
+    if(grp&&p.groupId!==grp)return false;
+    if(q&&!p.name.toLowerCase().includes(q))return false;
+    if(statusFilter==='over'&&true){/* filter below */}
+    return true;
+  }).map(function(p){
+    var advAmt=(window.ADVANCES||[]).filter(function(a){return a.pid===p.id;}).reduce(function(s,a){return s+(a.amount||0);},0);
+    var costAmt=(window.COSTS||[]).filter(function(c){return c.pid===p.id;}).reduce(function(s,c){return s+(c.amount||0);},0);
+    var used=advAmt+costAmt;
+    var budget=p.cost||0;
+    var remain=budget-used;
+    var pct=budget>0?Math.round(used/budget*100):0;
+    return{p:p,budget:budget,advAmt:advAmt,costAmt:costAmt,used:used,remain:remain,pct:pct};
+  }).filter(function(r){
+    if(statusFilter==='over')return r.remain<0;
+    if(statusFilter==='warn')return r.pct>=80&&r.remain>=0;
+    if(statusFilter==='ok')return r.pct<80;
+    return true;
+  });
+
+  rows.sort(function(a,b){
+    if(sort==='pct_desc')return b.pct-a.pct;
+    if(sort==='pct_asc')return a.pct-b.pct;
+    if(sort==='budget_desc')return b.budget-a.budget;
+    if(sort==='remain_asc')return a.remain-b.remain;
+    if(sort==='name_asc')return a.p.name.localeCompare(b.p.name,'th');
+    return 0;
+  });
+
+  var totalBudget=rows.reduce(function(s,r){return s+r.budget;},0);
+  var totalAdv=rows.reduce(function(s,r){return s+r.advAmt;},0);
+  var totalCost=rows.reduce(function(s,r){return s+r.costAmt;},0);
+  var totalUsed=rows.reduce(function(s,r){return s+r.used;},0);
+  var totalRemain=rows.reduce(function(s,r){return s+r.remain;},0);
+  var overCount=rows.filter(function(r){return r.remain<0;}).length;
+  var pctUsed=totalBudget>0?Math.round(totalUsed/totalBudget*100):0;
+
+  var cards=document.getElementById('bud-kpi');
+  if(cards){
+    cards.innerHTML=[
+      {k:'งบประมาณรวม',v:window.fc(totalBudget),s:rows.length+' โครงการ',icon:'💵',g1:'#4361ee',g2:'#4cc9f0'},
+      {k:'เบิกล่วงหน้ารวม',v:window.fc(totalAdv),s:'Advance รวมทุกโครงการ',icon:'💳',g1:'#7209b7',g2:'#f72585'},
+      {k:'ค่าใช้จ่ายสุทธิ',v:window.fc(totalCost),s:'Cost Tracking รวม',icon:'💰',g1:'#f4a261',g2:'#e76f51'},
+      {k:'คงเหลือ',v:window.fc(totalRemain),s:pctUsed+'% ใช้แล้ว'+(overCount>0?' · ⚠ '+overCount+' เกินงบ':''),icon:'📊',g1:totalRemain>=0?'#06d6a0':'#ff6b6b',g2:totalRemain>=0?'#4cc9f0':'#ffa62b'},
+    ].map(function(s){
+      return'<div class="stat-c" style="display:flex;flex-direction:column;gap:2px;">'
+        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;">'
+        +'<div class="stat-k">'+s.k+'</div>'
+        +'<div class="stat-icon" style="background:linear-gradient(135deg,'+s.g1+'18,'+s.g2+'18);width:36px;height:36px;flex-shrink:0;">'+s.icon+'</div>'
+        +'</div>'
+        +'<div class="stat-v" style="background:linear-gradient(135deg,'+s.g1+','+s.g2+');-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-size:22px;">'+s.v+'</div>'
+        +'<div class="stat-s">'+s.s+'</div>'
+        +'</div>';
+    }).join('');
+  }
+
+  var ctx=document.getElementById('bud-chart');
+  if(ctx){
+    if(_chart){_chart.destroy();_chart=null;}
+    var cr=rows.slice(0,15);
+    Chart.defaults.font.family='Plus Jakarta Sans';Chart.defaults.color='#9ba3b8';
+    _chart=new Chart(ctx,{
+      type:'bar',
+      data:{
+        labels:cr.map(function(r){var n=r.p.name;return n.length>22?n.substring(0,22)+'…':n;}),
+        datasets:[
+          {label:'เบิกล่วงหน้า (฿)',data:cr.map(function(r){return r.advAmt;}),backgroundColor:'#7209b760',borderColor:'#7209b7',borderWidth:1.5,borderRadius:3},
+          {label:'ค่าใช้จ่าย (฿)',data:cr.map(function(r){return r.costAmt;}),backgroundColor:'#f4a26160',borderColor:'#f4a261',borderWidth:1.5,borderRadius:3},
+          {label:'คงเหลือ (฿)',data:cr.map(function(r){return Math.max(r.remain,0);}),backgroundColor:'#06d6a040',borderColor:'#06d6a0',borderWidth:1.5,borderRadius:3},
+        ]
+      },
+      options:{
+        indexAxis:'y',responsive:true,maintainAspectRatio:false,
+        plugins:{
+          legend:{position:'top',labels:{boxWidth:12,font:{size:11}}},
+          tooltip:{callbacks:{label:function(c){return c.dataset.label+': ฿'+Number(c.raw).toLocaleString('th-TH');}}}
+        },
+        scales:{
+          x:{stacked:false,ticks:{callback:function(v){return v>=1000000?'฿'+(v/1000000).toFixed(1)+'M':v>=1000?'฿'+(v/1000).toFixed(0)+'K':'฿'+v;}}},
+          y:{stacked:false,ticks:{font:{size:11}}}
+        }
+      }
+    });
+  }
+
+  var tb=document.getElementById('bud-rows');
+  if(!tb)return;
+  if(!rows.length){tb.innerHTML='<tr><td colspan="8" style="text-align:center;padding:48px;color:var(--txt3);">ไม่พบข้อมูล</td></tr>';return;}
+  tb.innerHTML=rows.map(function(r){
+    var bar=r.budget>0?Math.min(r.pct,100):0;
+    var barColor=r.pct>=100?'#ff6b6b':r.pct>=80?'#ffa62b':r.pct>=50?'#4361ee':'#06d6a0';
+    var remainStyle=r.remain<0?'color:var(--coral);font-weight:700':'';
+    var sg=window.gS(r.p.stage);
+    var pg=window.gG(r.p.groupId);
+    return'<tr onclick="window.openProjModal(\''+r.p.id+'\')" style="cursor:pointer;">'
+      +'<td><div style="font-weight:600;font-size:13px;">'+window.esc(r.p.name)+'</div>'
+      +(pg?'<span class="tag" style="background:'+pg.color+'18;color:'+pg.color+';font-size:9px;padding:1px 5px;margin-top:2px;display:inline-block;">'+window.esc(pg.label)+'</span>':'')
+      +(sg?'<span class="tag" style="background:'+sg.color+'18;color:'+sg.color+';font-size:9px;padding:1px 5px;margin-top:2px;display:inline-block;margin-left:2px;">'+sg.label+'</span>':'')
+      +'</td>'
+      +'<td style="text-align:right;font-weight:700;">'+window.fc(r.budget)+'</td>'
+      +'<td style="text-align:right;color:#7209b7;">'+window.fc(r.advAmt)+'</td>'
+      +'<td style="text-align:right;color:#e76f51;">'+window.fc(r.costAmt)+'</td>'
+      +'<td style="text-align:right;font-weight:600;">'+window.fc(r.used)+'</td>'
+      +'<td style="text-align:right;'+remainStyle+'">'+window.fc(r.remain)+'</td>'
+      +'<td style="min-width:130px;">'
+        +'<div style="display:flex;align-items:center;gap:6px;">'
+          +'<div style="flex:1;height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;">'
+            +'<div style="width:'+bar+'%;height:100%;background:'+barColor+';border-radius:4px;"></div>'
+          +'</div>'
+          +'<span style="font-size:11px;font-weight:700;color:'+barColor+';min-width:30px;text-align:right;">'+r.pct+'%</span>'
+        +'</div>'
+      +'</td>'
+      +'<td style="font-size:11px;color:var(--txt2);">'+(r.p.start?window.fd(r.p.start):'')+'</td>'
+      +'</tr>';
+  }).join('');
+};
+})();

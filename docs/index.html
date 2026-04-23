@@ -87,6 +87,9 @@
       <div class="nav-btn" onclick="window.goView('cost',this)">
         <span class="ni">💰</span><span class="nl">Cost Tracking</span>
       </div>
+      <div class="nav-btn" onclick="window.goView('budget',this)">
+        <span class="ni">📊</span><span class="nl">สรุปงบประมาณ</span>
+      </div>
       <div class="sb-sec">ทีม</div>
       <div class="nav-btn" onclick="window.goView('workload',this)">
         <span class="ni">🏢</span><span class="nl">สรุปภาระงาน</span>
@@ -614,6 +617,56 @@
         <!-- Analysis view -->
         <div id="hsp-analysis-area" style="display:none;padding:20px 24px;">
           <div id="hsp-analysis-body"></div>
+        </div>
+      </div>
+
+      <!-- BUDGET SUMMARY -->
+      <div class="view" id="view-budget" style="overflow-y:auto;">
+        <div class="toolbar" style="position:sticky;top:0;z-index:10;background:var(--surface);">
+          <div class="t-search"><input id="bud-q" placeholder="ค้นหาโครงการ..." oninput="window.renderBudget()"></div>
+          <select class="t-sel" id="bud-yr" onchange="window.renderBudget()"><option value="">ทุกปี พ.ศ.</option></select>
+          <select class="t-sel" id="bud-grp" onchange="window.renderBudget()"><option value="">ทุกกลุ่ม</option></select>
+          <select class="t-sel" id="bud-status" onchange="window.renderBudget()">
+            <option value="">ทุกสถานะงบ</option>
+            <option value="over">🔴 เกินงบ</option>
+            <option value="warn">🟡 ใกล้เกิน (≥80%)</option>
+            <option value="ok">🟢 ปกติ (&lt;80%)</option>
+          </select>
+          <select class="t-sel" id="bud-sort" onchange="window.renderBudget()">
+            <option value="pct_desc">% ใช้ (มาก→น้อย)</option>
+            <option value="pct_asc">% ใช้ (น้อย→มาก)</option>
+            <option value="budget_desc">งบประมาณ (มาก→น้อย)</option>
+            <option value="remain_asc">คงเหลือ (น้อย→มาก)</option>
+            <option value="name_asc">ชื่อโครงการ A-Z</option>
+          </select>
+          <div style="flex:1"></div>
+          <button class="btn btn-xls btn-sm" onclick="window.exportBudget()" title="Export Excel">📥 Excel</button>
+        </div>
+        <div id="bud-kpi" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:16px 24px;"></div>
+        <div style="padding:0 24px 16px;">
+          <div class="ov-card">
+            <div class="ov-card-title">📊 งบประมาณ vs การใช้จ่าย (Top 15)</div>
+            <div style="height:360px;position:relative"><canvas id="bud-chart"></canvas></div>
+          </div>
+        </div>
+        <div style="padding:0 24px 28px;">
+          <div class="ov-card" style="padding:0;overflow:hidden;">
+            <div style="overflow-x:auto;">
+              <table class="t-table" style="min-width:860px;">
+                <thead><tr>
+                  <th>ชื่อโครงการ</th>
+                  <th style="text-align:right">งบประมาณ (฿)</th>
+                  <th style="text-align:right">เบิกล่วงหน้า (฿)</th>
+                  <th style="text-align:right">ค่าใช้จ่าย (฿)</th>
+                  <th style="text-align:right">ใช้แล้วรวม (฿)</th>
+                  <th style="text-align:right">คงเหลือ (฿)</th>
+                  <th>% ใช้งบ</th>
+                  <th>วันเริ่มต้น</th>
+                </tr></thead>
+                <tbody id="bud-rows"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1743,5 +1796,6 @@
 <script type="module" src="js/gcal.js"></script>
 <script type="module" src="js/hospital.js"></script>
 <script type="module" src="js/contract.js"></script>
+<script src="js/budget.js"></script>
 <script src="js/export.js"></script>
 </body>

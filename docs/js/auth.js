@@ -401,7 +401,7 @@ window.goView = function(id,el){
   document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on');});
   var v=document.getElementById('view-'+id);
   if(v){v.style.display='';v.classList.add('on');}
-  var labels={overview:'Overview',kanban:'Delivery Board',projects:'โครงการทั้งหมด',advance:'Advance',lodging:'ระบบจัดหาที่พัก',workload:'สรุปภาระงาน',availability:'ทีมว่าง',calendar:'ปฏิทินทีม',holidays:'วันหยุด',leave:'การลางาน',timesheet:'Timesheet',cost:'Cost Tracking',targets:'เป้าหมายทีม',hospital:'รายชื่อ รพ.',contract:'ข้อมูลสัญญา'};
+  var labels={overview:'Overview',kanban:'Delivery Board',projects:'โครงการทั้งหมด',advance:'Advance',lodging:'ระบบจัดหาที่พัก',workload:'สรุปภาระงาน',availability:'ทีมว่าง',calendar:'ปฏิทินทีม',holidays:'วันหยุด',leave:'การลางาน',timesheet:'Timesheet',cost:'Cost Tracking',budget:'สรุปงบประมาณ',targets:'เป้าหมายทีม',hospital:'รายชื่อ รพ.',contract:'ข้อมูลสัญญา'};
   document.getElementById('tp-title').textContent=labels[id]||id;
   var actions={};
   document.getElementById('tp-actions').innerHTML=actions[id]||'';
@@ -425,6 +425,7 @@ window.goView = function(id,el){
   if(id==='leave') window.renderLeave();
   if(id==='timesheet') window.renderTimesheet();
   if(id==='cost') window.renderCost();
+  if(id==='budget') window.renderBudget&&window.renderBudget();
   if(id==='hospital'){window._hspPopulateFilters&&window._hspPopulateFilters();window.renderHospital&&window.renderHospital();}
   if(id==='contract') window.renderContract&&window.renderContract();
 }
@@ -471,6 +472,7 @@ window.renderAll = function(){
   window.renderCalendar();
   window.renderTimesheet();
   window.renderCost();
+  window.renderBudget&&window.renderBudget();
   window.renderContract&&window.renderContract();
   window.updateBadge();
 }
