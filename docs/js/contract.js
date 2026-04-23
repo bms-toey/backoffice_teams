@@ -1,6 +1,6 @@
-import { getFirestore, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-const db = getFirestore();
 const { esc, fd, fca, pd, uid, getYearBE, getColRef, getDocRef } = window;
+const setDoc    = (...a) => window.setDoc(...a);
+const deleteDoc = (...a) => window.deleteDoc(...a);
 
 var CT_STATUS = [
   {id:'active',    label:'มีผลบังคับ', color:'#06d6a0'},

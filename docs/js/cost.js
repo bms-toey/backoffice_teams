@@ -1,5 +1,5 @@
-import { setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 const { esc, fd, fc, fca, pd, gSt, uid, getColRef, getDocRef, getYearBE } = window;
+const setDoc = (...a) => window.setDoc(...a);
 
 const COST_CAT = {
   phone:      { label: 'ค่าโทรศัพท์',          icon: '📱', color: '#4cc9f0' },

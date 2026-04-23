@@ -4,7 +4,8 @@ const db = getFirestore();
 const auth = window.auth;
 window.setDoc = setDoc;
 window.deleteDoc = deleteDoc;
-window.writeBatch = writeBatch;
+window.getDocs = getDocs;
+window.writeBatch = () => writeBatch(db);
 window.getDb = () => db;
 const { esc, fd, fc, fca, pd, gS, gT, gG, gSt, gC, avC, uid, getFY, getYearBE, getStaffOverlaps, overlapWarnText, getStaffLeaveConflicts, getColRef, getDocRef } = window;
 // ── FIREBASE AUTH ──

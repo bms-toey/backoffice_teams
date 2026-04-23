@@ -1,6 +1,6 @@
-import { getFirestore, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-const db = getFirestore();
 const { esc, fd, fc, fca, pd, gS, gT, gG, gSt, gC, avC, uid, getFY, getYearBE, getStaffOverlaps, overlapWarnText, getStaffLeaveConflicts, getColRef, getDocRef } = window;
+const setDoc = (...a) => window.setDoc(...a);
+const writeBatch = () => window.writeBatch();
 // ── ADMIN ──
 window.openAdminModal=function(){if(window.isAdmin()||window.canView('admin')){window.admTab('staff');window.openM('m-admin');}}
 window.admTab=function(t){window.admCur=t;document.querySelectorAll('.adm-nav-item').forEach(function(el){el.classList.remove('on');});var el=document.getElementById('at-'+t);if(el)el.classList.add('on');renderAdm();}
@@ -295,7 +295,7 @@ window.saveAdmStage=async function(){
   setDoc(getDocRef('STAGES',sid),{stage_id:sid,label_th:l.trim(),color_hex:document.getElementById('asgf-col').value,order:order,auto_rule:rule,auto_offset:offset,set_progress:prog},{merge:true}).catch(e=>window.showDbError(e));
 }
 window.stgDragId=null;window.stgDrag=function(e,id){window.stgDragId=id;}
-window.stgDrop=async function(e,targetId){e.preventDefault();if(!window.stgDragId||window.stgDragId===targetId||!window.canEdit('admin'))return;let arr=[...window.STAGES];let fromIdx=arr.findIndex(x=>x.id===window.stgDragId);let toIdx=arr.findIndex(x=>x.id===targetId);if(fromIdx<0||toIdx<0)return;let[moved]=arr.splice(fromIdx,1);arr.splice(toIdx,0,moved);arr.forEach((s,i)=>s.order=i+1);window.STAGES=arr;window.admTab('stages');try{const batch=writeBatch(db);arr.forEach(s=>{batch.update(getDocRef('STAGES',s.id),{order:s.order});});await batch.commit();}catch(err){window.showDbError(err);}window.stgDragId=null;}
+window.stgDrop=async function(e,targetId){e.preventDefault();if(!window.stgDragId||window.stgDragId===targetId||!window.canEdit('admin'))return;let arr=[...window.STAGES];let fromIdx=arr.findIndex(x=>x.id===window.stgDragId);let toIdx=arr.findIndex(x=>x.id===targetId);if(fromIdx<0||toIdx<0)return;let[moved]=arr.splice(fromIdx,1);arr.splice(toIdx,0,moved);arr.forEach((s,i)=>s.order=i+1);window.STAGES=arr;window.admTab('stages');try{const batch=writeBatch();arr.forEach(s=>{batch.update(getDocRef('STAGES',s.id),{order:s.order});});await batch.commit();}catch(err){window.showDbError(err);}window.stgDragId=null;}
 window.openStaffImport=function(){
   document.getElementById('import-file').value='';
   document.getElementById('import-msg').innerHTML='รองรับเฉพาะไฟล์ .csv เท่านั้น';

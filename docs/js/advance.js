@@ -1,6 +1,8 @@
-import { getFirestore, setDoc, deleteDoc, getDocs, writeBatch, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-const db = getFirestore();
 const { esc, fd, fc, fca, pd, gS, gT, gG, gSt, gC, avC, uid, getFY, getYearBE, getStaffOverlaps, overlapWarnText, getStaffLeaveConflicts, getColRef, getDocRef } = window;
+const setDoc    = (...a) => window.setDoc(...a);
+const deleteDoc = (...a) => window.deleteDoc(...a);
+const getDocs   = (...a) => window.getDocs(...a);
+const writeBatch = ()   => window.writeBatch();
 // ── ADVANCE ──
 window.renderAdvance=function(){
   var gf=document.getElementById('adv-grp');if(gf&&gf.options.length<=1){window.PGROUPS.forEach(function(g){var o=document.createElement('option');o.value=g.id;o.textContent=g.label;gf.appendChild(o);});}
@@ -182,7 +184,7 @@ window.saveAdvance=async function(){
 }
 
 window.advSyncCosts = async function(aid, pid, purpose, dbAdv) {
-  var batch    = writeBatch(db);
+  var batch    = writeBatch();
   var costDate = dbAdv.due_date || dbAdv.request_date || new Date().toISOString().slice(0,10);
   var advno    = dbAdv.advance_no || aid;
 

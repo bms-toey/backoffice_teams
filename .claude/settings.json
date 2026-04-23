@@ -15,6 +15,9 @@
       "Bash(sed -i 's/if\\(!window\\\\.ce\\(\\)\\)return;/if\\(!window.canEdit\\('\\\\''projects'\\\\''\\)\\)return;/g' docs/js/projects.js)",
       "WebFetch(domain:hcode.moph.go.th)",
       "Bash(node --input-type=module)"
+    ],
+    "additionalDirectories": [
+      "d:\\ส่วนตัว\\พัฒนาโปรแกรม\\backoffice_teams"
     ]
   }
 }

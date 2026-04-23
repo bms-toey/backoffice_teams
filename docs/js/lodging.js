@@ -1,6 +1,5 @@
-import { getFirestore, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-const db = getFirestore();
 const { esc, fd, fc, fca, pd, gS, gT, gG, gSt, gC, avC, uid, getFY, getYearBE, getStaffOverlaps, overlapWarnText, getStaffLeaveConflicts, getColRef, getDocRef } = window;
+const setDoc = (...a) => window.setDoc(...a);
 // ── LODGING ──
 window.renderLodging=function(){
   var qf=document.getElementById('ld-q'),gf=document.getElementById('ld-grp'),tf=document.getElementById('ld-type'),yf=document.getElementById('ld-yr'),sf=document.getElementById('ld-status');
@@ -70,8 +69,8 @@ window.renderLodging=function(){
       if(appM&&appM.mTotal>0)parts.push(`<span style="color:var(--coral);font-weight:700;">📆 ${fc(appM.mTotal)}</span>`);
       if(parts.length)budgetRow=`<div style="display:flex;gap:12px;font-size:11px;">${parts.join('')}</div>`;
     }
-    // options
-    var optionList=lds.map((l,i)=>{
+    // options — approved first, others collapsible
+    var _renderOpt=function(l,i){
       var isAppD=l.approvedDaily==='yes';var isAppM=l.approvedMonthly==='yes';var isAnyApp=isAppD||isAppM;
       var hasDRate=l.dsQty>0||l.ddQty>0||l.dTotal>0;
       var hasMRate=l.msQty>0||l.mdQty>0||l.mTotal>0;
@@ -134,7 +133,20 @@ window.renderLodging=function(){
         ${rateBoxes?`<div style="display:flex;gap:8px;">${rateBoxes}</div>`:''}
         ${l.note?`<div style="font-size:10px;color:var(--txt3);margin-top:6px;">📝 ${esc(l.note)}</div>`:''}
       </div>`;
-    }).join('');
+    };
+    var _appLds=lds.filter(l=>l.approvedDaily==='yes'||l.approvedMonthly==='yes');
+    var _othLds=lds.filter(l=>l.approvedDaily!=='yes'&&l.approvedMonthly!=='yes');
+    var optionList;
+    if(hasAny&&_othLds.length>0){
+      var _appHtml=_appLds.map((l,i)=>_renderOpt(l,i)).join('');
+      var _othHtml=_othLds.map((l,i)=>_renderOpt(l,_appLds.length+i)).join('');
+      var _tid='ldx'+p.id;
+      optionList=_appHtml+`<div style="margin-top:6px;"><button onclick="var d=document.getElementById('${_tid}');var e=d.style.display!=='none';d.style.display=e?'none':'block';this.textContent=e?'▼ ดูตัวเลือกอื่น (${_othLds.length}) · ยังไม่อนุมัติ':'▲ ซ่อนตัวเลือกอื่น';" style="width:100%;padding:5px 10px;border:1px dashed var(--border);border-radius:8px;background:var(--surface2);cursor:pointer;color:var(--txt3);font-size:10px;font-weight:600;margin-bottom:6px;">▼ ดูตัวเลือกอื่น (${_othLds.length}) · ยังไม่อนุมัติ</button><div id="${_tid}" style="display:none;">${_othHtml}</div></div>`;
+    } else if(hasAny){
+      optionList=_appLds.map((l,i)=>_renderOpt(l,i)).join('');
+    } else {
+      optionList=lds.map((l,i)=>_renderOpt(l,i)).join('');
+    }
     return`<div class="fade" style="background:var(--surface);border:1px solid ${hasAny?'var(--teal)':'var(--border)'};border-radius:16px;overflow:hidden;box-shadow:var(--sh-sm);display:flex;flex-direction:column;${hasAny?'border-width:2px':''}">
       <div style="padding:14px 16px;border-bottom:1px solid var(--border);background:linear-gradient(135deg,${pt.color}08,transparent);">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px;">

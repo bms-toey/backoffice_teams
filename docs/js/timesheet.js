@@ -1,6 +1,5 @@
-import { getFirestore, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-const db = getFirestore();
 const { esc, fd, fc, pd, gSt, getColRef, getDocRef, getYearBE } = window;
+const writeBatch = () => window.writeBatch();
 
 const TS_CAT = {
   planning:  { label: 'วางแผน',        icon: '📋' },
@@ -333,7 +332,7 @@ function _populateTsFilters() {
 
 // ── AUTO-SYNC FROM PROJECT MEMBERS / VISITS ──────────────────────────────────
 window.tsSyncProject = async function(pid, members) {
-  var batch = writeBatch(db);
+  var batch = writeBatch();
 
   // ลบรายการ auto-generate เก่าของโครงการนี้
   (window.TIMESHEETS || [])

@@ -1,6 +1,5 @@
-import { getFirestore, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-const db = getFirestore();
 const { esc, fd, fc, fca, pd, gS, gT, gG, gSt, gC, avC, uid, getFY, getYearBE, getStaffOverlaps, overlapWarnText, getStaffLeaveConflicts, getColRef, getDocRef } = window;
+const setDoc = (...a) => window.setDoc(...a);
 // ── KANBAN ──
 window.renderKanban = function(){
   var yf=document.getElementById('kb-yr');

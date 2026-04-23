@@ -1,6 +1,7 @@
-import { getFirestore, deleteDoc, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-const db = getFirestore();
 const { esc, fd, fc, fca, pd, gS, gT, gG, gSt, gC, avC, uid, getFY, getYearBE, getStaffOverlaps, overlapWarnText, getStaffLeaveConflicts, getColRef, getDocRef } = window;
+const deleteDoc  = (...a) => window.deleteDoc(...a);
+const writeBatch = ()    => window.writeBatch();
+const getDocs    = (...a) => window.getDocs(...a);
 // ── DELETE ──
 window.askDel=function(type,id,label){window.delTarget={type:type,id:id};document.getElementById('del-label').textContent=label;window.openM('m-del');}
 window.execDelete=async function(){
@@ -96,8 +97,8 @@ window.execImport=async function(){
     const lines=parseCSV(text);if(lines.length<=1){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">⚠ ไม่พบข้อมูลในไฟล์</span>';return;}
     const headers=lines[0].map(h=>h.trim());document.getElementById('import-msg').innerHTML='<span style="color:var(--teal)">⏳ กำลังประมวลผล...</span>';
     try{
-      let batch=writeBatch(db);let opCount=0;
-      const commitBatchIfNeeded=async()=>{if(opCount>=400){await batch.commit();batch=writeBatch(db);opCount=0;}};
+      let batch=writeBatch();let opCount=0;
+      const commitBatchIfNeeded=async()=>{if(opCount>=400){await batch.commit();batch=writeBatch();opCount=0;}};
       if(isClearFirst){const existingDocs=await getDocs(getColRef(selType));for(let docSnap of existingDocs.docs){batch.delete(docSnap.ref);opCount++;await commitBatchIfNeeded();}}
       for(let i=1;i<lines.length;i++){const values=lines[i].map(v=>v.trim());let rowObj={};const newId=schema.prefix+Date.now()+i;rowObj[schema.idField]=newId;if(selType==='PROJECTS'){rowObj.status='active';rowObj.team=[];rowObj.members=[];}headers.forEach((h,index)=>{if(values[index]!==undefined&&schema.headers.includes(h)){let val=values[index];if(['budget','progress_pct','amount_requested','amount_cleared'].includes(h))val=Number(val)||0;if(['is_active'].includes(h))val=(val.toUpperCase()==='TRUE');rowObj[h]=val;}});batch.set(getDocRef(selType,newId),rowObj);opCount++;await commitBatchIfNeeded();}
       if(opCount>0)await batch.commit();
