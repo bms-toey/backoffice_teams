@@ -275,6 +275,7 @@
             <option value="progress_asc">📊 ความคืบหน้า (น้อย→มาก)</option>
           </select>
           <div style="flex:1"></div>
+          <button class="btn btn-xls btn-sm" onclick="window.exportProjects()" title="Export Excel">📥 Excel</button>
           <button class="btn btn-pri btn-sm ce-only" id="btn-add-proj" onclick="window.openProjModal(null)">+ เพิ่มโครงการ</button>
         </div>
         <div class="dtable-wrap">
@@ -293,6 +294,7 @@
           <select class="t-sel" id="adv-type" onchange="window.renderAdvance()"><option value="">ทุกประเภท</option></select>
           <select class="t-sel" id="adv-yr" onchange="window.renderAdvance()"><option value="">ทุกปี พ.ศ.</option></select>
           <div style="flex:1"></div>
+          <button class="btn btn-xls btn-sm" onclick="window.exportAdvances()" title="Export Excel">📥 Excel</button>
           <button class="btn btn-teal btn-sm" id="btn-add-adv" onclick="window.openAdvModal(null)">+ New Advance</button>
         </div>
         <!-- Summary bar -->
@@ -315,6 +317,7 @@
             <option value="pending">⏳ รออนุมัติ</option>
           </select>
           <div style="flex:1"></div>
+          <button class="btn btn-xls btn-sm" onclick="window.exportLodging()" title="Export Excel">📥 Excel</button>
           <button class="btn btn-pri btn-sm cl-only" id="btn-add-ld" onclick="window.openLodgingGroupModal(null)">+ เพิ่มที่พัก</button>
         </div>
         <!-- Summary bar -->
@@ -480,6 +483,9 @@
                   <option value="rejected">❌ ไม่อนุมัติ</option>
                 </select>
               </div>
+              <div style="margin-left:auto;align-self:flex-end;">
+                <button class="btn btn-xls btn-sm" onclick="window.exportLeaves()" title="Export Excel">📥 Excel</button>
+              </div>
             </div>
           </div>
           <div id="leave-list" style="padding:14px 24px 28px;"></div>
@@ -509,6 +515,8 @@
           <select class="t-sel" id="ts-type" onchange="window.renderTimesheet()"><option value="">ทุกประเภท</option></select>
           <select class="t-sel" id="ts-proj" onchange="window.renderTimesheet()"><option value="">ทุกโครงการ</option></select>
           <select class="t-sel" id="ts-staff" onchange="window.renderTimesheet()"><option value="">ทุกคน</option></select>
+          <div style="flex:1"></div>
+          <button class="btn btn-xls btn-sm" onclick="window.exportTimesheet()" title="Export Excel">📥 Excel</button>
         </div>
         <div id="ts-summary-bar" style="display:flex;gap:12px;padding:12px 24px;background:var(--bg);flex-wrap:wrap;"></div>
         <div style="padding:0 24px 28px;">
@@ -545,6 +553,8 @@
             <option value="allowance">💵 ค่าเบี้ยเลี้ยง</option>
             <option value="other">📝 อื่นๆ</option>
           </select>
+          <div style="flex:1"></div>
+          <button class="btn btn-xls btn-sm" onclick="window.exportCosts()" title="Export Excel">📥 Excel</button>
         </div>
         <div id="cost-summary-bar" style="display:flex;gap:12px;padding:12px 24px;background:var(--bg);flex-wrap:wrap;"></div>
         <div id="cost-project-list" style="padding:0 24px 28px;"></div>
@@ -581,6 +591,7 @@
           <button class="btn btn-ghost btn-sm admin-only" style="display:none" onclick="window.openHspApiSettings()" title="ตั้งค่าการเชื่อมต่อ MOPH API">⚙️ MOPH API</button>
           <button class="btn btn-ghost btn-sm admin-only" style="display:none" onclick="window.openHspAutoEnrich()" title="เติมข้อมูลที่ไม่ครบถ้วนจาก MOPH API อัตโนมัติ">🔄 เติมข้อมูล API</button>
 
+          <button class="btn btn-xls btn-sm" onclick="window.exportHospitals()" title="Export Excel">📥 Excel</button>
           <button class="btn btn-pri btn-sm admin-only" style="display:none" onclick="window.openHospitalModal(null)">➕ เพิ่ม รพ.</button>
         </div>
         <!-- View toggle tabs -->
@@ -618,6 +629,7 @@
             <option value="cancelled">ยกเลิก</option>
           </select>
           <div style="flex:1"></div>
+          <button class="btn btn-xls btn-sm" onclick="window.exportContracts()" title="Export Excel">📥 Excel</button>
           <button class="btn btn-pri btn-sm ce-only" onclick="window.openContractModal(null)">+ เพิ่มสัญญา</button>
         </div>
         <div id="ct-summary-bar" style="display:flex;gap:12px;padding:12px 24px;background:var(--bg);flex-wrap:wrap;"></div>
@@ -1731,4 +1743,5 @@
 <script type="module" src="js/gcal.js"></script>
 <script type="module" src="js/hospital.js"></script>
 <script type="module" src="js/contract.js"></script>
+<script src="js/export.js"></script>
 </body>

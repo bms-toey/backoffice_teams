@@ -442,6 +442,8 @@ select.f-input{appearance:none;cursor:pointer;}
 .btn-sec:hover{background:var(--surface3);color:var(--txt);}
 .btn-ghost{background:transparent;color:var(--txt2);border:1.5px solid var(--border);}
 .btn-ghost:hover{background:var(--surface2);color:var(--txt);}
+.btn-xls{background:#16a34a18;color:#16a34a;border:1px solid #16a34a40;font-weight:700;}
+.btn-xls:hover{background:#16a34a28;border-color:#16a34a70;transform:translateY(-1px);}
 .btn-red{background:rgba(255,107,107,.1);color:var(--coral);border:1.5px solid rgba(255,107,107,.25);}
 .btn-red:hover{background:rgba(255,107,107,.18);}
 .btn-sm{padding:5px 12px;font-size:11px;border-radius:8px;}
