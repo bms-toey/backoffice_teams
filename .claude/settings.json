@@ -16,7 +16,10 @@
       "WebFetch(domain:hcode.moph.go.th)",
       "Bash(node --input-type=module)",
       "Bash(git fetch *)",
-      "Bash(git ls-tree *)"
+      "Bash(git ls-tree *)",
+      "Bash(rm .github/workflows/pages.yml)",
+      "Bash(rmdir .github/workflows)",
+      "Bash(rmdir .github)"
     ],
     "additionalDirectories": [
       "d:\\ส่วนตัว\\พัฒนาโปรแกรม\\backoffice_teams"
