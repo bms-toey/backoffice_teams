@@ -101,15 +101,64 @@ window.saveNotifyProjectToken=async function(){
   }catch(e){window.showDbError(e);}
 };
 
+// ── CORE FETCH (ตรวจ HTTP status + คืน error message) ────────────────────────
+async function _doNotifyFetch(token, content) {
+  var res = await fetch('https://api.notify.bmscloud.in.th/api/v1/push-notify', {
+    method: 'POST',
+    headers: { 'Token': token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content: content, receiver: null })
+  });
+  var body = '';
+  try { body = await res.text(); } catch(e) {}
+  return { ok: res.ok, status: res.status, body: body };
+}
+
+// ── TEST WITH UI FEEDBACK ─────────────────────────────────────────────────────
+async function _testWithFeedback(token, content, msgId) {
+  var msgEl = document.getElementById(msgId);
+  function _msg(color, text, autoClear) {
+    if (!msgEl) return;
+    msgEl.style.color = color;
+    msgEl.textContent = text;
+    if (autoClear) setTimeout(function(){ msgEl.textContent = ''; }, 3000);
+  }
+  if (!token) { _msg('var(--coral)', '❌ ยังไม่ได้บันทึก Token'); return; }
+  _msg('var(--txt3)', '⏳ กำลังส่ง...', false);
+  try {
+    var r = await _doNotifyFetch(token, content);
+    if (r.ok) {
+      _msg('var(--teal)', '✅ ส่งสำเร็จ! (HTTP ' + r.status + ')', true);
+    } else {
+      _msg('var(--coral)', '❌ HTTP ' + r.status + ' — ' + (r.body || 'server ไม่ตอบกลับ'));
+    }
+  } catch(e) {
+    _msg('var(--coral)', '❌ Network error: ' + (e.message || String(e)));
+  }
+}
+
 // ── TEST BUTTONS ─────────────────────────────────────────────────────────────
-window.testNotify=function(){window.sendLeaveNotify('test',null);};
-window.testNotifyAdvance=function(){
-  var fake={name:'[ทดสอบ] โครงการตัวอย่าง',siteOwner:'ทดสอบไซต์',installer:'ทดสอบผู้ติดตั้ง',start:new Date().toISOString().slice(0,10),end:''};
-  window.sendAdvanceNotify(fake,false);
+window.testNotify = async function() {
+  await _testWithFeedback(
+    window.NOTIFY_TOKEN || '',
+    '🔔 **ทดสอบระบบแจ้งเตือน**\nการแจ้งเตือนทำงานปกติ ✅',
+    'notify-token-msg'
+  );
 };
-window.testNotifyProject=function(){
-  var fake={name:'[ทดสอบ] โครงการตัวอย่าง',siteOwner:'ทดสอบไซต์',installer:'ทดสอบผู้ติดตั้ง',start:new Date().toISOString().slice(0,10),end:new Date().toISOString().slice(0,10)};
-  window.sendProjectNotify(fake,'start');
+window.testNotifyAdvance = async function() {
+  var fake = { name:'[ทดสอบ] โครงการตัวอย่าง', siteOwner:'ทดสอบไซต์', installer:'ทดสอบผู้ติดตั้ง', start:new Date().toISOString().slice(0,10), end:'' };
+  await _testWithFeedback(
+    window.NOTIFY_ADVANCE_TOKEN || '',
+    '📋 **ทดสอบ: ถึงกำหนดจัดทำ Advance**\n' + _projNotifyBlock(fake),
+    'notify-advance-token-msg'
+  );
+};
+window.testNotifyProject = async function() {
+  var fake = { name:'[ทดสอบ] โครงการตัวอย่าง', siteOwner:'ทดสอบไซต์', installer:'ทดสอบผู้ติดตั้ง', start:new Date().toISOString().slice(0,10), end:new Date().toISOString().slice(0,10) };
+  await _testWithFeedback(
+    window.NOTIFY_PROJECT_TOKEN || '',
+    '🚀 **ทดสอบ: เริ่มดำเนินการโครงการแล้ว**\n' + _projNotifyBlock(fake),
+    'notify-project-token-msg'
+  );
 };
 
 // ── PROJECT INFO BLOCK ────────────────────────────────────────────────────────
@@ -138,10 +187,8 @@ window.sendAdvanceSavedNotify=async function(adv,isNew){
     +(adv.amount?'\n💰 จำนวน: '+fc(adv.amount)+' บาท':'')
     +clearedBlock;
   try{
-    await fetch('https://api.notify.bmscloud.in.th/api/v1/push-notify',{
-      method:'POST',headers:{'Token':token,'Content-Type':'application/json'},
-      body:JSON.stringify({content:content,receiver:null})
-    });
+    var r=await _doNotifyFetch(token,content);
+    if(!r.ok)console.warn('Advance saved notify HTTP '+r.status+':',r.body);
   }catch(e){console.warn('Advance saved notify error:',e);}
 };
 
@@ -153,10 +200,8 @@ window.sendAdvanceNotify=async function(p,isReminder){
     :'📋 **ถึงกำหนดที่ต้องจัดทำ Advance แล้ว**';
   var content=header+'\n'+_projNotifyBlock(p);
   try{
-    await fetch('https://api.notify.bmscloud.in.th/api/v1/push-notify',{
-      method:'POST',headers:{'Token':token,'Content-Type':'application/json'},
-      body:JSON.stringify({content:content,receiver:null})
-    });
+    var r=await _doNotifyFetch(token,content);
+    if(!r.ok)console.warn('Advance notify HTTP '+r.status+':',r.body);
   }catch(e){console.warn('Advance notify error:',e);}
 };
 
@@ -169,10 +214,8 @@ window.sendProjectNotify=async function(p,eventType){
   var costLine=(eventType==='close'&&p.cost)?'\n💵 มูลค่าโครงการ: '+fc(p.cost)+' บาท':'';
   var content=header+'\n'+_projNotifyBlock(p)+costLine;
   try{
-    await fetch('https://api.notify.bmscloud.in.th/api/v1/push-notify',{
-      method:'POST',headers:{'Token':token,'Content-Type':'application/json'},
-      body:JSON.stringify({content:content,receiver:null})
-    });
+    var r=await _doNotifyFetch(token,content);
+    if(!r.ok)console.warn('Project notify HTTP '+r.status+':',r.body);
   }catch(e){console.warn('Project notify error:',e);}
 };
 
@@ -289,10 +332,7 @@ window.sendLeaveNotify=async function(eventType,lv){
   }
   if(!content)return;
   try{
-    await fetch('https://api.notify.bmscloud.in.th/api/v1/push-notify',{
-      method:'POST',
-      headers:{'Token':token,'Content-Type':'application/json'},
-      body:JSON.stringify({content:content,receiver:null})
-    });
-  }catch(e){console.warn('Notify API error:',e);}
+    var r=await _doNotifyFetch(token,content);
+    if(!r.ok)console.warn('Leave notify HTTP '+r.status+':',r.body);
+  }catch(e){console.warn('Leave notify error:',e);}
 };
