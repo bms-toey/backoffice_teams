@@ -70,7 +70,11 @@ function setupRealtimeListeners(){
     if(loadCount === colls.length){
       window.isDbLoaded = true;
       window.hideLoader();
-      if(window.cu){ window.setupUser(); window.renderAll(); window.startAutoStageLoop(); if(window.checkDailyNotifications)window.checkDailyNotifications(); }
+      if(window.cu){ window.setupUser(); window.renderAll(); window.startAutoStageLoop();
+        // เรียก daily check เฉพาะเมื่อ SETTINGS โหลดแล้ว (มี token) มิฉะนั้นรอ SETTINGS trigger
+        if(window.checkDailyNotifications && window._settingsLoaded) window.checkDailyNotifications();
+        else window._pendingDailyCheck = true;
+      }
     } else if(loadCount > colls.length){
       if(window.cu && window.kbPid===null) window.renderAll();
       if(window.cu) window.runAutoStage(true);
@@ -236,6 +240,12 @@ onAuthStateChanged(auth, async (user) => {
         window.NOTIFY_TOKEN=d.notify_token||'';
         window.NOTIFY_ADVANCE_TOKEN=d.notify_advance_token||'';
         window.NOTIFY_PROJECT_TOKEN=d.notify_project_token||'';
+        window._settingsLoaded = true;
+        // ถ้า DB โหลดเสร็จแล้วแต่ยังรอ token อยู่ → เรียกตอนนี้
+        if(window.isDbLoaded && window._pendingDailyCheck && window.checkDailyNotifications){
+          window._pendingDailyCheck = false;
+          window.checkDailyNotifications();
+        }
         window.YEAR_TARGETS=d.year_targets||[];
         window.SETTINGS = {
           allowance_weekday_normal:  Number(d.allowance_weekday_normal)  || 350,
