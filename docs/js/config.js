@@ -38,6 +38,7 @@ window.LEAVES = [];
 window.TIMESHEETS = [];
 window.COSTS = [];
 window.NOTIFY_TOKEN = '';
+window.NOTIFY_PROXY_URL = ''; // ถ้าเจอ CORS: ใส่ URL Cloudflare Worker ที่นี่
 
 window.AFLW=[
   {id:'draft',label:'Draft',color:'#9ba3b8'},

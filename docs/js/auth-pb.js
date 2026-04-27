@@ -212,6 +212,7 @@ function setupRealtimeListeners() {
     window.NOTIFY_TOKEN=d.notify_token||'';
     window.NOTIFY_ADVANCE_TOKEN=d.notify_advance_token||'';
     window.NOTIFY_PROJECT_TOKEN=d.notify_project_token||'';
+    window.NOTIFY_PROXY_URL=d.notify_proxy_url||'';
     window._settingsLoaded = true;
     if(window.isDbLoaded && window._pendingDailyCheck && window.checkDailyNotifications){
       window._pendingDailyCheck = false;
