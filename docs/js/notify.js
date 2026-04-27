@@ -29,15 +29,6 @@ window.renderNotifySettings=function(){
   var titleEl=document.getElementById('adm-head-title');
   if(titleEl)titleEl.innerHTML='🔔 ตั้งค่าการแจ้งเตือน';
   c.innerHTML='<div style="max-width:580px;padding:8px 4px;">'
-    +'<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:12px;padding:14px 18px;margin-bottom:16px;font-size:12px;line-height:1.7;">'
-    +'<b>🌐 CORS Proxy URL</b> <span style="color:#888;font-weight:400;">(ถ้าปุ่มทดสอบขึ้น CORS Error)</span><br>'
-    +'<div style="display:flex;gap:8px;margin-top:8px;">'
-    +'<input class="f-input" id="notify-proxy-input" placeholder="https://your-worker.workers.dev (เว้นว่างถ้าไม่ใช้)" value="'+esc(window.NOTIFY_PROXY_URL||'')+'" style="flex:1;font-family:monospace;font-size:11px;">'
-    +'<button onclick="window.saveNotifyProxyUrl()" style="padding:8px 14px;background:var(--violet);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">💾 บันทึก</button>'
-    +'</div>'
-    +'<span id="notify-proxy-msg" style="font-size:11px;color:var(--teal);"></span>'
-    +'<div style="margin-top:6px;color:#666;">วิธีตั้ง Proxy: deploy <b>cloudflare/notify-proxy-worker.js</b> บน <a href="https://workers.cloudflare.com" target="_blank" style="color:var(--violet)">Cloudflare Workers</a> (ฟรี) แล้วนำ URL มาใส่</div>'
-    +'</div>'
     +_tokenCard({
       id:'notify-token',
       title:'🔔 แจ้งเตือนการลางาน',
@@ -79,17 +70,6 @@ window.renderNotifySettings=function(){
     +'</div>';
 };
 
-// ── SAVE PROXY URL ───────────────────────────────────────────────────────────
-window.saveNotifyProxyUrl=async function(){
-  var val=(document.getElementById('notify-proxy-input')||{}).value||'';
-  var msg=document.getElementById('notify-proxy-msg');
-  try{
-    await setDoc(getDocRef('SETTINGS','app'),{notify_proxy_url:val},{merge:true});
-    window.NOTIFY_PROXY_URL=val;
-    if(msg){msg.textContent='✅ บันทึกแล้ว';setTimeout(function(){msg.textContent='';},2500);}
-  }catch(e){window.showDbError(e);}
-};
-
 // ── SAVE TOKENS ──────────────────────────────────────────────────────────────
 window.saveNotifyToken=async function(){
   var val=(document.getElementById('notify-token-input')||{}).value||'';
@@ -122,10 +102,8 @@ window.saveNotifyProjectToken=async function(){
 };
 
 // ── CORE FETCH (ตรวจ HTTP status + คืน error message) ────────────────────────
-var _NOTIFY_DIRECT = 'https://api.notify.bmscloud.in.th/api/v1/push-notify';
 async function _doNotifyFetch(token, content) {
-  var url = (window.NOTIFY_PROXY_URL || '').trim() || _NOTIFY_DIRECT;
-  var res = await fetch(url, {
+  var res = await fetch('https://api.notify.bmscloud.in.th/api/v1/push-notify', {
     method: 'POST',
     headers: { 'Token': token, 'Content-Type': 'application/json' },
     body: JSON.stringify({ content: content, receiver: null })
@@ -154,11 +132,7 @@ async function _testWithFeedback(token, content, msgId) {
       _msg('var(--coral)', '❌ HTTP ' + r.status + ' — ' + (r.body || 'server ไม่ตอบกลับ'));
     }
   } catch(e) {
-    var isCorsProblem = (e.message||'').includes('fetch') || (e.message||'').includes('network') || (e.message||'') === 'Failed to fetch';
-    var errText = isCorsProblem
-      ? '❌ CORS Error — Server ไม่อนุญาต browser เรียกตรง\n👉 ตั้งค่า Proxy URL ในหน้านี้ หรือเพิ่ม CORS header ที่ server'
-      : '❌ Network error: ' + (e.message || String(e));
-    _msg('var(--coral)', errText);
+    _msg('var(--coral)', '❌ ส่งไม่ได้: ' + (e.message || String(e)));
   }
 }
 

@@ -240,7 +240,6 @@ onAuthStateChanged(auth, async (user) => {
         window.NOTIFY_TOKEN=d.notify_token||'';
         window.NOTIFY_ADVANCE_TOKEN=d.notify_advance_token||'';
         window.NOTIFY_PROJECT_TOKEN=d.notify_project_token||'';
-        window.NOTIFY_PROXY_URL=d.notify_proxy_url||'';
         window._settingsLoaded = true;
         // ถ้า DB โหลดเสร็จแล้วแต่ยังรอ token อยู่ → เรียกตอนนี้
         if(window.isDbLoaded && window._pendingDailyCheck && window.checkDailyNotifications){
