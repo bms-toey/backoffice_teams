@@ -107,6 +107,9 @@
         <span class="ni">🏖</span><span class="nl">การลางาน</span>
         <span class="nb" id="leave-nb" style="display:none">0</span>
       </div>
+      <div class="nav-btn" onclick="window.goView('worklog',this)">
+        <span class="ni">📝</span><span class="nl">บันทึกงาน</span>
+      </div>
       <div class="nav-btn targets-only" style="display:none" onclick="window.goView('targets',this)">
         <span class="ni">🎯</span><span class="nl">เป้าหมายทีม</span>
       </div>
@@ -495,6 +498,22 @@
         </div>
       </div>
 
+      <!-- WORK LOG -->
+      <div class="view" id="view-worklog" style="overflow-y:auto;">
+        <div style="padding:16px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;">
+          <div style="font-size:16px;font-weight:800;color:var(--txt);">📝 บันทึกงาน</div>
+          <div style="flex:1;"></div>
+          <button class="btn btn-pri btn-sm" onclick="window.openWorkLogModal()">+ เพิ่มบันทึก</button>
+        </div>
+        <div style="padding:10px 24px;display:flex;align-items:center;gap:4px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;">
+          <button class="wl-ftab" onclick="window._wlSetFilter('mine',this)" style="background:transparent;border:none;border-bottom:2px solid var(--violet);padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--violet);">ของฉัน</button>
+          <button class="wl-ftab" onclick="window._wlSetFilter('all',this)" style="background:transparent;border:none;border-bottom:2px solid transparent;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--txt-muted);">ทั้งทีม</button>
+          <div style="flex:1;"></div>
+          <input type="text" id="wl-q" class="t-sel" placeholder="🔍 ค้นหา..." style="width:160px;" oninput="window.renderWorkLog&&window.renderWorkLog()">
+        </div>
+        <div id="wl-list" style="padding:12px 24px 28px;"></div>
+      </div>
+
       <!-- TARGETS -->
       <div class="view" id="view-targets" style="overflow-y:auto;">
         <div style="padding:14px 24px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;">
@@ -599,8 +618,12 @@
         </div>
         <!-- View toggle tabs -->
         <div style="display:flex;gap:0;border-bottom:2px solid var(--border);padding:0 24px;background:var(--surface);">
-          <button id="hsp-vtab-list" onclick="window.goHspView('list')"
+          <button id="hsp-vtab-dashboard" onclick="window.goHspView('dashboard')"
             style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;color:var(--violet);border-bottom:2px solid var(--violet);margin-bottom:-2px;transition:all .15s;">
+            🗺️ Dashboard
+          </button>
+          <button id="hsp-vtab-list" onclick="window.goHspView('list')"
+            style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;color:var(--txt-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;">
             📋 รายชื่อ รพ.
           </button>
           <button id="hsp-vtab-analysis" onclick="window.goHspView('analysis')"
@@ -609,8 +632,12 @@
           </button>
         </div>
         <div id="hsp-import-progress" style="text-align:center;padding:6px 24px;font-size:12px;color:var(--primary);display:block;min-height:0;"></div>
+        <!-- Dashboard view -->
+        <div id="hsp-dashboard-area" style="padding:20px 24px;">
+          <div id="hsp-dashboard-body"></div>
+        </div>
         <!-- List view -->
-        <div id="hsp-list-area">
+        <div id="hsp-list-area" style="display:none;">
           <div id="hsp-body" style="padding:0 24px 16px;"></div>
           <div id="hsp-pager" style="padding:12px 24px 28px;"></div>
         </div>
@@ -646,7 +673,7 @@
         <div style="padding:0 24px 16px;">
           <div class="ov-card">
             <div class="ov-card-title">📊 งบประมาณ vs การใช้จ่าย (Top 15)</div>
-            <div style="height:360px;position:relative"><canvas id="bud-chart"></canvas></div>
+            <div style="position:relative"><canvas id="bud-chart"></canvas></div>
           </div>
         </div>
         <div style="padding:0 24px 28px;">
@@ -947,6 +974,24 @@
     <div class="m-foot">
       <button class="btn btn-ghost" onclick="window.closeM('m-holiday')">ยกเลิก</button>
       <button class="btn btn-pri" onclick="window.saveHoliday()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- WORK LOG MODAL -->
+<div class="overlay" id="m-worklog">
+  <div class="modal lg">
+    <div class="m-head">
+      <div class="m-icon" style="background:rgba(255,166,43,.12)">📝</div>
+      <div class="m-title" id="m-worklog-title">เพิ่มบันทึกงาน</div>
+      <button class="m-x" onclick="window.closeM('m-worklog')">✕</button>
+    </div>
+    <div class="m-body" id="m-worklog-body" style="max-height:70vh;overflow-y:auto;padding:0;"></div>
+    <div class="m-foot">
+      <button id="m-worklog-del" class="btn btn-ghost" style="display:none;color:var(--coral);" onclick="window.deleteWorkLog()">🗑 ลบ</button>
+      <div style="flex:1;"></div>
+      <button class="btn btn-ghost" onclick="window.closeM('m-worklog')">ยกเลิก</button>
+      <button class="btn btn-pri" onclick="window.saveWorkLog()">💾 บันทึก</button>
     </div>
   </div>
 </div>
@@ -1796,6 +1841,7 @@
 <script type="module" src="js/gcal.js"></script>
 <script type="module" src="js/hospital.js"></script>
 <script type="module" src="js/contract.js"></script>
+<script type="module" src="js/worklog.js"></script>
 <script src="js/budget.js"></script>
 <script src="js/export.js"></script>
 </body>

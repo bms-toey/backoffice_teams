@@ -38,6 +38,9 @@ window.LEAVES = [];
 window.TIMESHEETS = [];
 window.COSTS = [];
 window.NOTIFY_TOKEN = '';
+window.NOTIFY_ADVANCE_TOKEN = '';
+window.NOTIFY_PROJECT_TOKEN = '';
+window.NOTIFY_PROXY_URL = '';
 
 window.AFLW=[
   {id:'draft',label:'Draft',color:'#9ba3b8'},
@@ -397,6 +400,29 @@ window.getStaffLeaveConflicts = function(sid, startStr, endStr) {
     var emoji=LEAVE_EMOJI[lv.leaveType]||'📝';
     var label=LEAVE_LABEL[lv.leaveType]||lv.leaveType;
     return{leave:lv,emoji:emoji,label:label};
+  });
+}
+
+window.getStaffWlConflicts = function(sid, startStr, endStr) {
+  if(!startStr||!endStr||!window.WORK_LOGS) return [];
+  var sDate=pd(startStr);
+  var eDate=pd(endStr);eDate.setHours(23,59,59);
+  return (window.WORK_LOGS||[]).filter(function(wl){
+    var ws,we;
+    var pt=(wl.participants||[]).find(function(p){return p.sid===sid;});
+    if(pt){
+      ws=pt.s||(wl.type==='daily'?wl.date:wl.startDate);
+      we=pt.e||(wl.type==='daily'?wl.date:wl.endDate);
+    } else if(wl.staffId===sid){
+      ws=wl.type==='daily'?wl.date:wl.startDate;
+      we=wl.type==='daily'?wl.date:wl.endDate;
+    }
+    if(!ws||!we) return false;
+    var wsd=pd(ws),wed=pd(we);wed.setHours(23,59,59);
+    return wsd<=eDate&&wed>=sDate;
+  }).map(function(wl){
+    var catEmoji=((window.WL_CATS||[]).find(function(c){return c.id===wl.category;})||{emoji:'📝'}).emoji;
+    return{wl:wl,emoji:catEmoji};
   });
 }
 

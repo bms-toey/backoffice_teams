@@ -104,6 +104,7 @@ window.renderCalendar=function(){
         else{var _ms=p.members&&p.members.length>0?p.members:p.team.map(function(id){return{sid:id,s:p.start,e:p.end};});_ms.forEach(function(m){if(!m.s||!m.e)return;var ms=pd(m.s),me=pd(m.e);me.setHours(23,59,59);if(me>=_rS&&ms<=_rE)_hasEvt.add(m.sid);});}
       });
       (window.LEAVES||[]).forEach(function(lv){if(!lv.startDate||!lv.endDate||lv.status==='rejected')return;var ls=pd(lv.startDate),le=pd(lv.endDate);le.setHours(23,59,59);if(le>=_rS&&ls<=_rE)_hasEvt.add(lv.staffId);});
+      (window.WORK_LOGS||[]).forEach(function(wl){var ws=wl.type==='daily'?wl.date:wl.startDate,we=wl.type==='daily'?wl.date:wl.endDate;if(!ws||!we)return;var wsd=pd(ws),wed=pd(we);wed.setHours(23,59,59);if(wed>=_rS&&wsd<=_rE){if(wl.scope==='personal'&&wl.staffId)_hasEvt.add(wl.staffId);(wl.participants||[]).forEach(function(p){if(p.sid)_hasEvt.add(p.sid);});}});
       baseRows=baseRows.filter(function(r){return _hasEvt.has(r.id);});
     }
   }
@@ -139,6 +140,25 @@ window.renderCalendar=function(){
       let ls=pd(lv.startDate),le=pd(lv.endDate);le.setHours(23,59,59);
       let idxs=getColIndices(ls,le,tCols);
       if(idxs){let emoji=_LEAVE_EMOJI_CAL[lv.leaveType]||'📝';let label=_LEAVE_LABEL_CAL[lv.leaveType]||lv.leaveType;rawEvents.push({sIdx:idxs.sIdx,eIdx:idxs.eIdx,text:emoji+' '+label,color:'rgba(255,107,107,0.75)',isLeave:true,lv:lv,p:null});}
+    });
+    // Work Logs
+    (window.WORK_LOGS||[]).forEach(function(wl){
+      var wlStart,wlEnd;
+      var pt=(wl.participants||[]).find(function(p){return p.sid===r.id;});
+      if(pt){
+        wlStart=pt.s||(wl.type==='daily'?wl.date:wl.startDate);
+        wlEnd=pt.e||(wl.type==='daily'?wl.date:wl.endDate);
+      } else if(wl.staffId===r.id){
+        wlStart=wl.type==='daily'?wl.date:wl.startDate;
+        wlEnd=wl.type==='daily'?wl.date:wl.endDate;
+      }
+      if(!wlStart||!wlEnd) return;
+      var ls=pd(wlStart),le=pd(wlEnd);le.setHours(23,59,59);
+      var idxs=getColIndices(ls,le,tCols);
+      if(idxs){
+        var catEmoji=((window.WL_CATS||[]).find(function(c){return c.id===wl.category;})||{emoji:'📝'}).emoji;
+        rawEvents.push({sIdx:idxs.sIdx,eIdx:idxs.eIdx,text:catEmoji+' '+wl.title,color:'rgba(255,166,43,0.75)',isWorkLog:true,wl:wl,p:null});
+      }
     });}
     else if(window.calView==='project'){let p=r.obj;if(p.status!=='cancelled'&&p.status!=='completed'){
       // ถ้ามี visits → แสดงแต่ละรอบแยกกัน
@@ -204,11 +224,11 @@ window.renderCalendar=function(){
   activeRowsData.forEach(rowData=>{
     let r=rowData.rInfo;let rh=rowData.height;
     let avatar='';if(r.type==='staff')avatar=`<div class="av" style="background:${avC(window.STAFF.findIndex(s=>s.id===r.id))}">${r.name.charAt(0)}</div>`;else if(r.type==='ptype')avatar=`<div class="av" style="background:${r.obj.color}">🏷</div>`;else avatar=`<div class="av" style="background:${gS(r.obj.stage).color}">📁</div>`;
-    let projEvts=rowData.events.filter(ev=>!ev.isLeave).length;let leaveEvts=rowData.events.filter(ev=>ev.isLeave).length;
-    let workloadText=r.type==='staff'?((projEvts>0?projEvts+' โครงการ':'')+(projEvts>0&&leaveEvts>0?' · ':'')+( leaveEvts>0?leaveEvts+' วันลา':'')):(r.type==='project'?rowData.eventCount+' ทีมงาน':rowData.eventCount+' โครงการ');
+    let projEvts=rowData.events.filter(ev=>!ev.isLeave&&!ev.isWorkLog).length;let leaveEvts=rowData.events.filter(ev=>ev.isLeave).length;let wlEvts=rowData.events.filter(ev=>ev.isWorkLog).length;
+    let workloadText=r.type==='staff'?((projEvts>0?projEvts+' โครงการ':'')+(projEvts>0&&(leaveEvts>0||wlEvts>0)?' · ':'')+( leaveEvts>0?leaveEvts+' วันลา':'')+((leaveEvts>0&&wlEvts>0)?' · ':'')+( wlEvts>0?wlEvts+' บันทึกงาน':'')):(r.type==='project'?rowData.eventCount+' ทีมงาน':rowData.eventCount+' โครงการ');
     html+=`<div class="tl-row" style="height:${rh}px"><div class="tl-left" style="width:${LEFT_WIDTH}px;height:${rh}px">${avatar}<div style="min-width:0;flex:1;display:flex;flex-direction:column;justify-content:center;padding-top:2px;"><div style="font-size:12px;font-weight:600;word-break:break-word;line-height:1.4;">${esc(r.name)}</div><div style="font-size:10px;color:var(--txt3);margin-top:4px;"><div>${esc(r.sub)}</div><div style="color:var(--violet);font-weight:700;">${workloadText}</div></div></div></div><div class="tl-right" style="width:${totalGridWidth}px;height:${rh}px">`;
     tCols.forEach(tc=>{html+=`<div class="tl-bg-cell ${tc.isWk?'wk':''} ${tc.isHol?'hol':''}" style="min-width:${DAY_WIDTH}px;width:${DAY_WIDTH}px"></div>`;});
-    rowData.events.forEach(ev=>{let leftPx=ev.sIdx*DAY_WIDTH+2;let widthPx=((ev.eIdx-ev.sIdx)+1)*DAY_WIDTH-4;let topPx=ROW_PAD+(ev.lane*(BAR_HEIGHT+BAR_GAP));if(ev.isLeave){let _lid=ev.lv?ev.lv.id:'';html+=`<div class="tl-bar" onclick="window.openLeaveDetail('${_lid}')" style="left:${leftPx}px;width:${widthPx}px;top:${topPx}px;background:rgba(255,107,107,0.15);height:${BAR_HEIGHT}px;border:2px dashed #ff6b6b;color:#c0392b;cursor:pointer;font-weight:600;" title="${esc(ev.text)}">${esc(ev.text)}</div>`;}else{html+=`<div class="tl-bar" onclick="window.openProjModal('${ev.p.id}')" style="left:${leftPx}px;width:${widthPx}px;top:${topPx}px;background:${ev.color};height:${BAR_HEIGHT}px" title="${esc(ev.text)}">${esc(ev.text)}</div>`;}});
+    rowData.events.forEach(ev=>{let leftPx=ev.sIdx*DAY_WIDTH+2;let widthPx=((ev.eIdx-ev.sIdx)+1)*DAY_WIDTH-4;let topPx=ROW_PAD+(ev.lane*(BAR_HEIGHT+BAR_GAP));if(ev.isLeave){let _lid=ev.lv?ev.lv.id:'';html+=`<div class="tl-bar" onclick="window.openLeaveDetail('${_lid}')" style="left:${leftPx}px;width:${widthPx}px;top:${topPx}px;background:rgba(255,107,107,0.15);height:${BAR_HEIGHT}px;border:2px dashed #ff6b6b;color:#c0392b;cursor:pointer;font-weight:600;" title="${esc(ev.text)}">${esc(ev.text)}</div>`;}else if(ev.isWorkLog){html+=`<div class="tl-bar" onclick="window.openWorkLogModal('${ev.wl.id}')" style="left:${leftPx}px;width:${widthPx}px;top:${topPx}px;background:rgba(255,166,43,0.15);height:${BAR_HEIGHT}px;border:2px dashed #ffa62b;color:#b87800;cursor:pointer;font-weight:600;" title="${esc(ev.text)}">${esc(ev.text)}</div>`;}else{html+=`<div class="tl-bar" onclick="window.openProjModal('${ev.p.id}')" style="left:${leftPx}px;width:${widthPx}px;top:${topPx}px;background:${ev.color};height:${BAR_HEIGHT}px" title="${esc(ev.text)}">${esc(ev.text)}</div>`;}});
     html+=`</div></div>`;
   });
   html+=`</div>`;document.getElementById('cal-grid').innerHTML=html;

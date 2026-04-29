@@ -82,29 +82,46 @@ window.renderBudget=function(){
   if(ctx){
     if(_chart){_chart.destroy();_chart=null;}
     var cr=rows.slice(0,15);
-    Chart.defaults.font.family='Plus Jakarta Sans';Chart.defaults.color='#9ba3b8';
-    _chart=new Chart(ctx,{
-      type:'bar',
-      data:{
-        labels:cr.map(function(r){var n=r.p.name;return n.length>22?n.substring(0,22)+'…':n;}),
-        datasets:[
-          {label:'เบิกล่วงหน้า (฿)',data:cr.map(function(r){return r.advAmt;}),backgroundColor:'#7209b760',borderColor:'#7209b7',borderWidth:1.5,borderRadius:3},
-          {label:'ค่าใช้จ่าย (฿)',data:cr.map(function(r){return r.costAmt;}),backgroundColor:'#f4a26160',borderColor:'#f4a261',borderWidth:1.5,borderRadius:3},
-          {label:'คงเหลือ (฿)',data:cr.map(function(r){return Math.max(r.remain,0);}),backgroundColor:'#06d6a040',borderColor:'#06d6a0',borderWidth:1.5,borderRadius:3},
-        ]
-      },
-      options:{
-        indexAxis:'y',responsive:true,maintainAspectRatio:false,
-        plugins:{
-          legend:{position:'top',labels:{boxWidth:12,font:{size:11}}},
-          tooltip:{callbacks:{label:function(c){return c.dataset.label+': ฿'+Number(c.raw).toLocaleString('th-TH');}}}
-        },
-        scales:{
-          x:{stacked:false,ticks:{callback:function(v){return v>=1000000?'฿'+(v/1000000).toFixed(1)+'M':v>=1000?'฿'+(v/1000).toFixed(0)+'K':'฿'+v;}}},
-          y:{stacked:false,ticks:{font:{size:11}}}
-        }
-      }
-    });
+    var wrap=ctx.parentElement;
+    if(!wrap)return;
+    wrap.style.height='auto';
+    wrap.style.position='static';
+    // Legend
+    var legend='<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px;font-size:11px;color:var(--txt-muted);">'
+      +'<span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#06d6a0;"></span>ใช้งบ &lt;50%</span>'
+      +'<span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#4361ee;"></span>50–79%</span>'
+      +'<span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#ffa62b;"></span>80–99%</span>'
+      +'<span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#ff6b6b;"></span>เกินงบ</span>'
+      +'</div>';
+    var items=cr.map(function(r,i){
+      var pct=r.pct;
+      var barW=Math.min(pct,100);
+      var barColor=pct>=100?'#ff6b6b':pct>=80?'#ffa62b':pct>=50?'#4361ee':'#06d6a0';
+      var remainColor=r.remain<0?'#ff6b6b':'var(--txt-muted)';
+      var pg=window.gG?window.gG(r.p.groupId):null;
+      return '<div onclick="window.openProjModal(\''+r.p.id+'\')" style="padding:10px 14px;cursor:pointer;transition:background .12s;'+(i<cr.length-1?'border-bottom:1px solid var(--border);':'')+'" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
+        // Row 1: name + %
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:5px;">'
+          +'<div>'
+            +'<div style="font-size:12px;font-weight:600;color:var(--txt);line-height:1.45;">'+window.esc(r.p.name)+'</div>'
+            +(pg?'<span style="font-size:9px;background:'+pg.color+'18;color:'+pg.color+';padding:1px 6px;border-radius:4px;margin-top:2px;display:inline-block;">'+window.esc(pg.label)+'</span>':'')
+          +'</div>'
+          +'<span style="font-size:13px;font-weight:800;color:'+barColor+';flex-shrink:0;min-width:40px;text-align:right;">'+pct+'%</span>'
+        +'</div>'
+        // Row 2: progress bar
+        +'<div style="height:8px;background:'+barColor+'1a;border-radius:4px;overflow:hidden;margin-bottom:5px;">'
+          +'<div style="width:'+barW+'%;height:100%;background:'+barColor+';border-radius:4px;"></div>'
+        +'</div>'
+        // Row 3: amounts
+        +'<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--txt-muted);">'
+          +'<span>งบ <b style="color:var(--txt);">'+window.fc(r.budget)+'</b></span>'
+          +'<span>ใช้ <b style="color:'+barColor+';">'+window.fc(r.used)+'</b> · คงเหลือ <b style="color:'+remainColor+';">'+window.fc(r.remain)+'</b></span>'
+        +'</div>'
+      +'</div>';
+    }).join('');
+    wrap.innerHTML=legend
+      +'<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface);">'+items+'</div>'
+      +'<canvas id="bud-chart" style="display:none;"></canvas>';
   }
 
   var tb=document.getElementById('bud-rows');

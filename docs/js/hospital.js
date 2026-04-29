@@ -1,4 +1,4 @@
-// hospital.js — รายชื่อโรงพยาบาล
+﻿// hospital.js — รายชื่อโรงพยาบาล
 const { esc, fc, uid, getColRef, getDocRef } = window;
 
 window.HOSPITALS = window.HOSPITALS || [];
@@ -2133,13 +2133,15 @@ window._hspProvChanged = function() {
   _hspUpdateDistrictFilter();
   window._hspPage = 1;
   window.renderHospital();
-  if (window._hspViewMode === 'analysis') window.renderHspAnalysis && window.renderHspAnalysis();
+  if (window._hspViewMode === 'analysis')  window.renderHspAnalysis  && window.renderHspAnalysis();
+  if (window._hspViewMode === 'dashboard') window.renderHspDashboard && window.renderHspDashboard();
 };
 
 window._hspDistChanged = function() {
   window._hspPage = 1;
   window.renderHospital();
-  if (window._hspViewMode === 'analysis') window.renderHspAnalysis && window.renderHspAnalysis();
+  if (window._hspViewMode === 'analysis')  window.renderHspAnalysis  && window.renderHspAnalysis();
+  if (window._hspViewMode === 'dashboard') window.renderHspDashboard && window.renderHspDashboard();
 };
 
 // ── CASCADE ในฟอร์ม Add/Edit ─────────────────────────────────────────────────
@@ -2687,7 +2689,7 @@ window._hspProdCbChange = function(cb, color) {
 // ─────────────────────────────────────────────────────────────────────────────
 // VIEW TOGGLE: รายชื่อ ↔ วิเคราะห์ Product
 // ─────────────────────────────────────────────────────────────────────────────
-window._hspViewMode = 'list';
+window._hspViewMode = 'dashboard';
 window._hspAnalysisTier = '';
 window._hspAnalysisPage = 1;
 window._hspAnalysisLastFilter = '';
@@ -2696,16 +2698,29 @@ var HSP_ANALYSIS_PAGE_SIZE = 100;
 window.goHspView = function(mode) {
   window._hspViewMode = mode;
   var listArea  = document.getElementById('hsp-list-area');
+  var dashArea  = document.getElementById('hsp-dashboard-area');
   var analyArea = document.getElementById('hsp-analysis-area');
   var tabList   = document.getElementById('hsp-vtab-list');
+  var tabDash   = document.getElementById('hsp-vtab-dashboard');
   var tabAnaly  = document.getElementById('hsp-vtab-analysis');
-  if (listArea)  listArea.style.display  = mode === 'list'     ? '' : 'none';
-  if (analyArea) analyArea.style.display = mode === 'analysis' ? '' : 'none';
-  if (tabList)  { tabList.style.color  = mode === 'list'     ? 'var(--violet)' : 'var(--txt-muted)'; tabList.style.borderBottomColor  = mode === 'list'     ? 'var(--violet)' : 'transparent'; }
-  if (tabAnaly) { tabAnaly.style.color = mode === 'analysis' ? 'var(--violet)' : 'var(--txt-muted)'; tabAnaly.style.borderBottomColor = mode === 'analysis' ? 'var(--violet)' : 'transparent'; }
+  if (listArea)  listArea.style.display  = mode === 'list'      ? '' : 'none';
+  if (dashArea)  dashArea.style.display  = mode === 'dashboard' ? '' : 'none';
+  if (analyArea) analyArea.style.display = mode === 'analysis'  ? '' : 'none';
+  [['list', tabList], ['dashboard', tabDash], ['analysis', tabAnaly]].forEach(function(p) {
+    if (!p[1]) return;
+    var active = mode === p[0];
+    p[1].style.color            = active ? 'var(--violet)' : 'var(--txt-muted)';
+    p[1].style.borderBottomColor = active ? 'var(--violet)' : 'transparent';
+  });
+  if (mode === 'list') {
+    window.renderHospital();
+  }
   if (mode === 'analysis') {
     window._hspPopulateFilters();
     window.renderHspAnalysis();
+  }
+  if (mode === 'dashboard') {
+    window.renderHspDashboard();
   }
 };
 
@@ -3224,6 +3239,428 @@ function _hspShowProdImportPreview() {
   ov.addEventListener('click', function(e){ if (e.target === ov) ov.remove(); });
   document.body.appendChild(ov);
 }
+
+
+// ── DASHBOARD VIEW ──────────────────────────────────────────────────────────
+var _hspDashCharts = {};
+
+var _HSP_REGIONS = {
+  'ภาคเหนือ':               { color:'#4cc9f0', provinces:['เชียงราย','เชียงใหม่','น่าน','พะเยา','แพร่','แม่ฮ่องสอน','ลำปาง','ลำพูน','กำแพงเพชร','ตาก','นครสวรรค์','พิจิตร','พิษณุโลก','เพชรบูรณ์','สุโขทัย','อุตรดิตถ์','อุทัยธานี'] },
+  'ภาคกลาง':                { color:'#7c5cfc', provinces:['กรุงเทพมหานคร','นครนายก','นครปฐม','นนทบุรี','ปทุมธานี','พระนครศรีอยุธยา','สมุทรปราการ','สมุทรสงคราม','สมุทรสาคร','อ่างทอง','ชัยนาท','ลพบุรี','สระบุรี','สิงห์บุรี','สุพรรณบุรี','กาญจนบุรี','ประจวบคีรีขันธ์','เพชรบุรี','ราชบุรี'] },
+  'ภาคตะวันออก':            { color:'#06d6a0', provinces:['จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ตราด','ปราจีนบุรี','ระยอง','สระแก้ว'] },
+  'ภาคตะวันออกเฉียงเหนือ': { color:'#ffa62b', provinces:['กาฬสินธุ์','ขอนแก่น','ชัยภูมิ','นครพนม','นครราชสีมา','บึงกาฬ','บุรีรัมย์','มหาสารคาม','มุกดาหาร','ยโสธร','ร้อยเอ็ด','เลย','ศรีสะเกษ','สกลนคร','สุรินทร์','หนองคาย','หนองบัวลำภู','อำนาจเจริญ','อุดรธานี','อุบลราชธานี'] },
+  'ภาคใต้':                 { color:'#f72585', provinces:['กระบี่','ชุมพร','ตรัง','นครศรีธรรมราช','นราธิวาส','ปัตตานี','พังงา','พัทลุง','ภูเก็ต','ยะลา','ระนอง','สงขลา','สตูล','สุราษฎร์ธานี'] },
+};
+
+// ── DASHBOARD HELPERS ────────────────────────────────────────────────────────
+
+// แสดง popup รายชื่อ รพ. จาก filter
+window._hspDashPopup = function(title, filter) {
+  var all = window.HOSPITALS || [];
+  var list = all.filter(function(h) {
+    if (filter.type      && h.type     !== filter.type)      return false;
+    if (filter.province  && h.province !== filter.province)  return false;
+    if (filter.provinces && filter.provinces.indexOf(h.province) < 0) return false;
+    if (filter.affil) {
+      var a = (h.affiliation || '').trim().toLowerCase();
+      if (a !== filter.affil.toLowerCase()) return false;
+    }
+    return true;
+  }).sort(function(a,b){ return (a.code||'').localeCompare(b.code||'','th'); });
+
+  var rows = list.map(function(h) {
+    var t = HSP_TYPE_MAP[h.type] || HSP_TYPE_MAP['other'];
+    return '<tr onclick="window.openHospitalDetail(\'' + esc(h.id) + '\')" style="cursor:pointer;border-bottom:1px solid var(--border);transition:background .12s;" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
+      + '<td style="padding:8px 12px;font-family:monospace;font-weight:700;color:var(--primary);font-size:12px;white-space:nowrap;">' + esc(h.code) + '</td>'
+      + '<td style="padding:8px 12px;font-weight:500;color:var(--txt);">' + esc(h.name) + '</td>'
+      + '<td style="padding:8px 12px;text-align:center;"><span style="background:' + t.color + '22;color:' + t.color + ';padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;">' + esc(h.type||'?') + '</span></td>'
+      + '<td style="padding:8px 12px;color:var(--txt-muted);font-size:12px;white-space:nowrap;">' + esc(h.province||'—') + '</td>'
+      + '<td style="padding:8px 12px;color:var(--txt-muted);font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(h.affiliation||'—') + '</td>'
+      + '</tr>';
+  }).join('');
+
+  var ov = document.createElement('div');
+  ov.className = 'hsp-dash-popup-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:48px 16px 24px;overflow-y:auto;';
+  ov.innerHTML = ''
+    + '<div style="background:var(--surface);border-radius:16px;width:100%;max-width:820px;box-shadow:0 20px 60px rgba(0,0,0,.3);display:flex;flex-direction:column;max-height:80vh;">'
+      + '<div style="padding:18px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">'
+        + '<div>'
+          + '<div style="font-size:15px;font-weight:700;color:var(--txt);">' + esc(title) + '</div>'
+          + '<div style="font-size:12px;color:var(--txt-muted);margin-top:2px;">' + list.length.toLocaleString() + ' โรงพยาบาล</div>'
+        + '</div>'
+        + '<button class="hsp-dash-popup-close" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;color:var(--txt);font-family:inherit;">✕ ปิด</button>'
+      + '</div>'
+      + '<div style="overflow-y:auto;flex:1;">'
+        + (rows
+          ? '<table style="width:100%;border-collapse:collapse;">'
+              + '<thead style="position:sticky;top:0;background:var(--surface);z-index:1;">'
+                + '<tr style="border-bottom:2px solid var(--border);">'
+                  + '<th style="padding:7px 12px;text-align:left;font-size:10px;color:var(--txt-muted);font-weight:700;text-transform:uppercase;">รหัส</th>'
+                  + '<th style="padding:7px 12px;text-align:left;font-size:10px;color:var(--txt-muted);font-weight:700;text-transform:uppercase;">ชื่อโรงพยาบาล</th>'
+                  + '<th style="padding:7px 12px;text-align:center;font-size:10px;color:var(--txt-muted);font-weight:700;text-transform:uppercase;">ระดับ</th>'
+                  + '<th style="padding:7px 12px;text-align:left;font-size:10px;color:var(--txt-muted);font-weight:700;text-transform:uppercase;">จังหวัด</th>'
+                  + '<th style="padding:7px 12px;text-align:left;font-size:10px;color:var(--txt-muted);font-weight:700;text-transform:uppercase;">สังกัด</th>'
+                + '</tr>'
+              + '</thead>'
+              + '<tbody>' + rows + '</tbody>'
+            + '</table>'
+          : '<div style="text-align:center;color:var(--txt-muted);padding:48px;">ไม่พบข้อมูล</div>')
+      + '</div>'
+    + '</div>';
+
+  ov.querySelector('.hsp-dash-popup-close').onclick = function(){ ov.remove(); };
+  ov.addEventListener('click', function(e){ if (e.target === ov) ov.remove(); });
+  document.body.appendChild(ov);
+};
+
+// popup ภาค → แสดงจังหวัด → คลิกจังหวัด → popup รพ.
+window._hspDashRegionPopup = function(regionName) {
+  var rdef = _HSP_REGIONS[regionName];
+  if (!rdef) return;
+  var all  = window.HOSPITALS || [];
+  var byP  = {};
+  all.forEach(function(h) {
+    var p = (h.province||'').trim();
+    if (rdef.provinces.indexOf(p) >= 0) byP[p] = (byP[p]||0) + 1;
+  });
+  var provList = rdef.provinces.filter(function(p){ return byP[p]; })
+    .map(function(p){ return { name:p, count:byP[p]||0 }; })
+    .sort(function(a,b){ return b.count - a.count; });
+  var maxP = provList.length ? provList[0].count : 1;
+  var total = provList.reduce(function(s,p){ return s+p.count; }, 0);
+
+  var cards = provList.map(function(pv) {
+    var w = Math.round(pv.count/maxP*100);
+    return '<div onclick="window._hspDashPopup(\'' + esc(pv.name) + ' (' + pv.count + ' แห่ง)\',{province:\'' + esc(pv.name) + '\'})"'
+      + ' style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:background .12s;"'
+      + ' onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'var(--surface)\'">'
+      + '<div style="font-size:13px;font-weight:600;color:var(--txt);margin-bottom:6px;">' + esc(pv.name) + '</div>'
+      + '<div style="font-size:20px;font-weight:800;color:' + rdef.color + ';">' + pv.count.toLocaleString() + '</div>'
+      + '<div style="background:' + rdef.color + '25;border-radius:3px;height:5px;margin-top:8px;">'
+        + '<div style="background:' + rdef.color + ';border-radius:3px;height:5px;width:' + w + '%;"></div>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+
+  var ov = document.createElement('div');
+  ov.className = 'hsp-dash-popup-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:48px 16px 24px;overflow-y:auto;';
+  ov.innerHTML = ''
+    + '<div style="background:var(--surface);border-radius:16px;width:100%;max-width:640px;box-shadow:0 20px 60px rgba(0,0,0,.3);">'
+      + '<div style="padding:18px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">'
+        + '<div>'
+          + '<div style="font-size:15px;font-weight:700;color:var(--txt);">🗺️ ' + esc(regionName) + '</div>'
+          + '<div style="font-size:12px;color:var(--txt-muted);margin-top:2px;">' + total.toLocaleString() + ' โรงพยาบาล · ' + provList.length + ' จังหวัด · คลิกจังหวัดเพื่อดูรายชื่อ</div>'
+        + '</div>'
+        + '<button class="hsp-dash-popup-close" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;color:var(--txt);font-family:inherit;">✕ ปิด</button>'
+      + '</div>'
+      + '<div style="padding:20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;">'
+        + cards
+      + '</div>'
+    + '</div>';
+
+  ov.querySelector('.hsp-dash-popup-close').onclick = function(){ ov.remove(); };
+  ov.addEventListener('click', function(e){ if (e.target === ov) ov.remove(); });
+  document.body.appendChild(ov);
+};
+
+window.renderHspDashboard = function() {
+  var body = document.getElementById('hsp-dashboard-body');
+  if (!body) return;
+
+  var hosps = window.HOSPITALS || [];
+  if (!hosps.length) {
+    body.innerHTML = '<div style="text-align:center;color:var(--txt-muted);padding:64px 24px;">ยังไม่มีข้อมูลโรงพยาบาล</div>';
+    return;
+  }
+
+  Object.keys(_hspDashCharts).forEach(function(k){ try { _hspDashCharts[k].destroy(); } catch(_){} });
+  _hspDashCharts = {};
+
+  // ── aggregate ──────────────────────────────────────────────────────────────
+  var withProd = 0, withContact = 0;
+  var byType = {}, byProv = {}, byAffil = {};
+
+  hosps.forEach(function(h) {
+    if ((h.products || []).length) withProd++;
+    if ((h.contacts || []).length) withContact++;
+
+    var t = h.type || 'other';
+    if (!byType[t]) byType[t] = { count:0 };
+    byType[t].count++;
+
+    var p = (h.province   || '').trim() || '(ไม่ระบุ)';
+    if (!byProv[p])  byProv[p]  = { count:0 };
+    byProv[p].count++;
+
+    var a = (h.affiliation || '').trim() || '(ไม่ระบุ)';
+    if (!byAffil[a]) byAffil[a] = { count:0 };
+    byAffil[a].count++;
+  });
+
+  // regional
+  var byRegion = {};
+  Object.keys(_HSP_REGIONS).forEach(function(rn) {
+    byRegion[rn] = { count:0, color:_HSP_REGIONS[rn].color };
+  });
+  hosps.forEach(function(h) {
+    var p = (h.province || '').trim();
+    Object.keys(_HSP_REGIONS).forEach(function(rn) {
+      if (_HSP_REGIONS[rn].provinces.indexOf(p) >= 0) byRegion[rn].count++;
+    });
+  });
+
+  var typeSorted  = HSP_TYPES.filter(function(t){ return byType[t.id]; })
+    .map(function(t){ return Object.assign({}, t, byType[t.id]); });
+  var provSorted  = Object.keys(byProv).map(function(k){ return { name:k, count:byProv[k].count }; })
+    .sort(function(a,b){ return b.count - a.count; });
+  var affilSorted = Object.keys(byAffil).map(function(k){ return { name:k, count:byAffil[k].count }; })
+    .sort(function(a,b){ return b.count - a.count; });
+
+  var provCount = Object.keys(byProv).filter(function(p){ return p !== '(ไม่ระบุ)'; }).length;
+  var penetPct  = hosps.length ? Math.round(withProd / hosps.length * 100) : 0;
+  var maxType   = typeSorted.length  ? typeSorted[0].count  : 1;
+  var maxProv   = provSorted.length  ? provSorted[0].count  : 1;
+  var maxAffil  = affilSorted.length ? affilSorted[0].count : 1;
+  var maxRegion = Math.max.apply(null, Object.keys(byRegion).map(function(rn){ return byRegion[rn].count; }).concat([1]));
+
+  function miniBar(val, max, color) {
+    var w = max ? Math.round(val / max * 100) : 0;
+    return '<div style="background:' + color + '28;border-radius:3px;height:6px;min-width:50px;flex:1;">'
+      + '<div style="background:' + color + ';border-radius:3px;height:6px;width:' + w + '%;"></div></div>';
+  }
+
+  function kpiCard(icon, label, val, sub, color) {
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid ' + color + ';border-radius:12px;padding:14px 18px;min-width:0;">'
+      + '<div style="font-size:10px;color:var(--txt-muted);margin-bottom:4px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;">' + icon + ' ' + label + '</div>'
+      + '<div style="font-size:22px;font-weight:800;color:' + color + ';line-height:1.1;">' + val + '</div>'
+      + (sub ? '<div style="font-size:11px;color:var(--txt-muted);margin-top:3px;">' + sub + '</div>' : '')
+      + '</div>';
+  }
+
+  var html = '';
+
+  // 1. KPI
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px;">'
+    + kpiCard('🏥','โรงพยาบาลรวม',  hosps.length.toLocaleString(),              'แห่ง',   '#7c5cfc')
+    + kpiCard('📍','ครอบคลุมจังหวัด',provCount + ' / 77',                       'จังหวัด','#4cc9f0')
+    + kpiCard('📦','มี Product',      withProd + ' (' + penetPct + '%)',          'แห่ง',   '#ffa62b')
+    + kpiCard('👤','มีผู้ติดต่อ',      withContact.toLocaleString(),              'แห่ง',  '#f72585')
+    + '</div>';
+
+  // 2. Level + Region
+  html += '<div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:16px;">';
+
+  // Level card — full-width bar table (cleaner, no donut)
+  var typeRows = typeSorted.map(function(t) {
+    var pct = hosps.length ? Math.round(t.count / hosps.length * 100) : 0;
+    var barW = maxType ? Math.round(t.count / maxType * 100) : 0;
+    var shortLabel = t.label.replace(/^[A-Za-z0-9]+\s*–\s*/, '').replace(/\s*\(.*?\)\s*$/, '').trim();
+    var popCall = 'window._hspDashPopup(\'' + esc(t.id) + ' – ' + esc(shortLabel) + ' (' + t.count + ' แห่ง)\',{type:\'' + t.id + '\'})';
+    return '<tr onclick="' + popCall + '" style="cursor:pointer;transition:background .15s;border-bottom:1px solid var(--border);" '
+      + 'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
+      + '<td style="padding:9px 8px 9px 0;">'
+        + '<span style="display:inline-block;background:' + t.color + '20;color:' + t.color + ';padding:3px 9px;border-radius:6px;font-size:11px;font-weight:800;letter-spacing:.2px;">' + esc(t.id) + '</span>'
+      + '</td>'
+      + '<td style="padding:9px 10px;font-size:11px;color:var(--txt-muted);white-space:nowrap;">' + esc(shortLabel) + '</td>'
+      + '<td style="padding:9px 6px;">'
+        + '<div style="background:' + t.color + '20;border-radius:4px;height:12px;overflow:hidden;">'
+          + '<div style="background:' + t.color + ';border-radius:4px;height:12px;width:' + barW + '%;"></div>'
+        + '</div>'
+      + '</td>'
+      + '<td style="padding:9px 0 9px 10px;text-align:right;font-size:14px;font-weight:800;color:var(--txt);white-space:nowrap;">' + t.count.toLocaleString() + '</td>'
+      + '<td style="padding:9px 0 9px 6px;text-align:right;font-size:10px;color:var(--txt-muted);white-space:nowrap;">' + pct + '%</td>'
+      + '</tr>';
+  }).join('');
+
+  html += '<div style="flex:1 1 380px;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;overflow:hidden;">';
+  html += '<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:16px;">🏷️ แยกตามระดับ รพ. <span style="font-size:10px;font-weight:400;color:var(--txt-muted);">คลิกเพื่อดูรายชื่อ</span></div>';
+  html += '<table style="width:100%;border-collapse:collapse;table-layout:fixed;">'
+    + '<colgroup><col style="width:50px;"><col style="width:115px;"><col><col style="width:50px;"><col style="width:36px;"></colgroup>'
+    + '<tbody>' + typeRows + '</tbody></table>';
+  html += '</div>';
+
+  // Region card — horizontal bar chart (Chart.js, each bar in region colour)
+  var regionNames = Object.keys(byRegion);
+  var regionChartH = Math.max(190, regionNames.length * 44) + 'px';
+  html += '<div style="flex:1 1 300px;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;">';
+  html += '<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:14px;">🗺️ แยกตามภาค <span style="font-size:10px;font-weight:400;color:var(--txt-muted);">คลิกเพื่อดูรายชื่อ</span></div>';
+  html += '<div style="position:relative;height:' + regionChartH + ';"><canvas id="hsp-dash-region-chart"></canvas></div>';
+  html += '</div>';
+  html += '</div>'; // end row 2
+
+  // 3. Province + Affiliation charts
+  var provTop  = provSorted.slice(0, 15);
+  var affilTop = affilSorted.slice(0, 12);
+  var provH    = Math.max(280, provTop.length * 22) + 'px';
+  var affilH   = Math.max(240, affilTop.length * 24) + 'px';
+
+  function expandRows(items, maxCount, color, filterKey) {
+    return items.map(function(item) {
+      var popCall = filterKey === 'province'
+        ? 'window._hspDashPopup(\'' + esc(item.name) + ' (' + item.count + ' แห่ง)\',{province:\'' + esc(item.name) + '\'})'
+        : 'window._hspDashPopup(\'' + esc(item.name) + ' (' + item.count + ' แห่ง)\',{affil:\'' + esc(item.name) + '\'})';
+      var pct = maxCount ? Math.round(item.count / maxCount * 100) : 0;
+      return '<tr onclick="' + popCall + '" style="cursor:pointer;border-bottom:1px solid var(--border)22;transition:background .1s;" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
+        + '<td style="padding:5px 8px;color:var(--txt);font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(item.name) + '">' + esc(item.name) + '</td>'
+        + '<td style="padding:5px 8px;text-align:right;font-weight:700;font-size:12px;white-space:nowrap;">' + item.count.toLocaleString() + '</td>'
+        + '<td style="padding:5px 8px;width:80px;">' + miniBar(item.count, maxCount, color) + '</td>'
+        + '<td style="padding:5px 8px;font-size:10px;color:var(--txt-muted);white-space:nowrap;">' + pct + '%</td>'
+        + '</tr>';
+    }).join('');
+  }
+
+  html += '<div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:8px;">';
+
+  // Province
+  html += '<div style="flex:1 1 340px;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;">';
+  html += '<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:14px;">📍 แยกตามจังหวัด'
+    + ' <span style="font-size:10px;font-weight:400;color:var(--txt-muted);">Top ' + provTop.length + ' · คลิกเพื่อดูรายชื่อ</span></div>';
+  html += '<div style="position:relative;height:' + provH + ';"><canvas id="hsp-dash-prov-chart"></canvas></div>';
+  if (provSorted.length > provTop.length) {
+    html += '<details style="margin-top:12px;">'
+      + '<summary style="font-size:11px;color:var(--txt-muted);cursor:pointer;padding:4px 0;user-select:none;">&#9658; ดูทั้งหมด ' + provSorted.length + ' จังหวัด</summary>'
+      + '<div style="max-height:240px;overflow-y:auto;margin-top:8px;">'
+      + '<table style="width:100%;border-collapse:collapse;"><tbody>'
+      + expandRows(provSorted, maxProv, '#4cc9f0', 'province')
+      + '</tbody></table></div></details>';
+  }
+  html += '</div>';
+
+  // Affiliation
+  html += '<div style="flex:1 1 300px;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;">';
+  html += '<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:14px;">🏢 แยกตามสังกัด'
+    + ' <span style="font-size:10px;font-weight:400;color:var(--txt-muted);">Top ' + affilTop.length + ' · คลิกเพื่อดูรายชื่อ</span></div>';
+  html += '<div style="position:relative;height:' + affilH + ';"><canvas id="hsp-dash-affil-chart"></canvas></div>';
+  if (affilSorted.length > affilTop.length) {
+    html += '<details style="margin-top:12px;">'
+      + '<summary style="font-size:11px;color:var(--txt-muted);cursor:pointer;padding:4px 0;user-select:none;">&#9658; ดูทั้งหมด ' + affilSorted.length + ' สังกัด</summary>'
+      + '<div style="max-height:240px;overflow-y:auto;margin-top:8px;">'
+      + '<table style="width:100%;border-collapse:collapse;"><tbody>'
+      + expandRows(affilSorted, maxAffil, '#06d6a0', 'affil')
+      + '</tbody></table></div></details>';
+  }
+  html += '</div>';
+  html += '</div>'; // end row 3
+
+  body.innerHTML = html;
+
+  if (!window.Chart) return;
+
+  // Region bar chart (horizontal, each bar in region colour, click → region popup)
+  (function() {
+    var ctx = document.getElementById('hsp-dash-region-chart');
+    if (!ctx) return;
+    var rNames = Object.keys(byRegion);
+    _hspDashCharts.region = new window.Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: rNames,
+        datasets: [{
+          data:            rNames.map(function(rn){ return byRegion[rn].count; }),
+          backgroundColor: rNames.map(function(rn){ return byRegion[rn].color + 'bb'; }),
+          borderColor:     rNames.map(function(rn){ return byRegion[rn].color; }),
+          borderWidth: 1, borderRadius: 6, borderSkipped: false,
+        }],
+      },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function(c){
+            var pct = hosps.length ? Math.round(c.raw / hosps.length * 100) : 0;
+            return ' ' + c.raw.toLocaleString() + ' แห่ง (' + pct + '%)';
+          }}},
+        },
+        scales: {
+          x: { beginAtZero:true, ticks:{ precision:0, font:{size:10} }, grid:{ color:'rgba(0,0,0,.04)' } },
+          y: { ticks:{ font:{ size:11 }, color: function(ctx) {
+            return byRegion[rNames[ctx.index]] ? byRegion[rNames[ctx.index]].color : undefined;
+          }}},
+        },
+        onClick: function(e, items) {
+          if (!items.length) return;
+          var rn = rNames[items[0].index];
+          if (rn) window._hspDashRegionPopup(rn);
+        },
+        onHover: function(e, items) { e.native.target.style.cursor = items.length ? 'pointer' : 'default'; },
+      },
+    });
+  })();
+
+  // Province bar (horizontal, click → popup)
+  (function() {
+    var ctx = document.getElementById('hsp-dash-prov-chart');
+    if (!ctx) return;
+    _hspDashCharts.prov = new window.Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: provTop.map(function(p){ return p.name; }),
+        datasets: [{
+          data:            provTop.map(function(p){ return p.count; }),
+          backgroundColor: '#4cc9f0bb', borderColor: '#4cc9f0', borderWidth:1, borderRadius:4,
+        }],
+      },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function(c){ return ' ' + c.raw.toLocaleString() + ' แห่ง'; }}},
+        },
+        scales: {
+          x: { beginAtZero:true, ticks:{ precision:0, font:{size:10} }, grid:{ color:'rgba(0,0,0,.04)' } },
+          y: { ticks:{ font:{size:11} } },
+        },
+        onClick: function(e, items) {
+          if (!items.length) return;
+          var pv = provTop[items[0].index];
+          if (pv) window._hspDashPopup(pv.name + ' (' + pv.count + ' แห่ง)', { province: pv.name });
+        },
+        onHover: function(e, items) { e.native.target.style.cursor = items.length ? 'pointer' : 'default'; },
+      },
+    });
+  })();
+
+  // Affiliation bar (horizontal, click → popup)
+  (function() {
+    var ctx = document.getElementById('hsp-dash-affil-chart');
+    if (!ctx) return;
+    _hspDashCharts.affil = new window.Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: affilTop.map(function(a){ return a.name; }),
+        datasets: [{
+          data:            affilTop.map(function(a){ return a.count; }),
+          backgroundColor: '#06d6a0bb', borderColor: '#06d6a0', borderWidth:1, borderRadius:4,
+        }],
+      },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function(c){ return ' ' + c.raw.toLocaleString() + ' แห่ง'; }}},
+        },
+        scales: {
+          x: { beginAtZero:true, ticks:{ precision:0, font:{size:10} }, grid:{ color:'rgba(0,0,0,.04)' } },
+          y: { ticks:{ font:{size:11}, callback: function(val){
+            var label = this.getLabelForValue(val);
+            return label && label.length > 20 ? label.slice(0,18) + '…' : label;
+          }}},
+        },
+        onClick: function(e, items) {
+          if (!items.length) return;
+          var a = affilTop[items[0].index];
+          if (a) window._hspDashPopup(a.name + ' (' + a.count + ' แห่ง)', { affil: a.name });
+        },
+        onHover: function(e, items) { e.native.target.style.cursor = items.length ? 'pointer' : 'default'; },
+      },
+    });
+  })();
+};
+
+
+
 
 window._execHspProdImport = async function() {
   var pending = window._hspProdImportPending;

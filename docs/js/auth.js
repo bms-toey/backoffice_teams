@@ -210,6 +210,17 @@ function setupRealtimeListeners(){
     if(window.cu&&document.getElementById('view-contract')&&document.getElementById('view-contract').classList.contains('on'))window.renderContract&&window.renderContract();
   }, e=>window.showDbError(e));
 
+  onSnapshot(getColRef('WORK_LOGS'), s => {
+    window.WORK_LOGS = s.docs.map(doc=>{
+      let d=doc.data();
+      return{id:doc.id,uid:d.uid||'',staffId:d.staffId||d.staff_id||'',type:d.type||'daily',scope:d.scope||'personal',date:d.date||'',startDate:d.start_date||d.startDate||'',endDate:d.end_date||d.endDate||'',totalDays:Number(d.total_days||d.totalDays)||1,category:d.category||'other',locationType:d.location_type||d.locationType||'local',destination:d.destination||'',title:d.title||'',detail:d.detail||'',participants:d.participants||[],createdAt:d.created_at||d.createdAt||''};
+    }).sort(function(a,b){var da=a.type==='daily'?a.date:a.startDate;var db=b.type==='daily'?b.date:b.startDate;return(db||'').localeCompare(da||'');});
+    var _von=function(id){var el=document.getElementById(id);return el&&el.classList.contains('on');};
+    if(window.cu&&_von('view-worklog'))   window.renderWorkLog&&window.renderWorkLog();
+    if(window.cu&&_von('view-calendar'))  window.renderCalendar&&window.renderCalendar();
+    if(window.cu&&_von('view-availability')) window.renderAvailability&&window.renderAvailability();
+  }, e=>window.showDbError(e));
+
   onSnapshot(getColRef('HSP_PRODUCTS'), s => {
     window.HSP_PRODUCTS = s.docs.map(doc=>{let d=doc.data();return{id:d.product_id||doc.id,name:d.name||'',color:d.color||'#7c3aed',note:d.note||'',group:d.group||''};}).sort((a,b)=>a.name.localeCompare(b.name,'th'));
     if(window.cu&&document.getElementById('view-hospital')&&document.getElementById('view-hospital').classList.contains('on')){
@@ -223,7 +234,8 @@ function setupRealtimeListeners(){
     window.HOSPITALS = s.docs.map(doc=>{let d=doc.data();return{id:d.hospital_id||doc.id,code:d.code||'',name:d.name||'',type:d.type||'other',beds:Number(d.beds)||0,province:d.province||'',district:d.district||'',tambon:d.tambon||'',address:d.address||'',tel:d.tel||'',website:d.website||'',affiliation:d.affiliation||'',note:d.note||'',contacts:Array.isArray(d.contacts)?d.contacts:[],products:Array.isArray(d.products)?d.products:[]};});
     if(window.cu&&document.getElementById('view-hospital')&&document.getElementById('view-hospital').classList.contains('on')){
       window._hspPopulateFilters&&window._hspPopulateFilters();
-      if(window._hspViewMode==='analysis')window.renderHspAnalysis&&window.renderHspAnalysis();
+      if(window._hspViewMode==='analysis') window.renderHspAnalysis&&window.renderHspAnalysis();
+      else if(window._hspViewMode==='dashboard') window.renderHspDashboard&&window.renderHspDashboard();
       else window.renderHospital&&window.renderHospital();
     }
   }, e=>window.showDbError(e));
@@ -240,6 +252,7 @@ onAuthStateChanged(auth, async (user) => {
         window.NOTIFY_TOKEN=d.notify_token||'';
         window.NOTIFY_ADVANCE_TOKEN=d.notify_advance_token||'';
         window.NOTIFY_PROJECT_TOKEN=d.notify_project_token||'';
+        window.NOTIFY_PROXY_URL=d.notify_proxy_url||'';
         window._settingsLoaded = true;
         // ถ้า DB โหลดเสร็จแล้วแต่ยังรอ token อยู่ → เรียกตอนนี้
         if(window.isDbLoaded && window._pendingDailyCheck && window.checkDailyNotifications){
@@ -433,10 +446,16 @@ window.goView = function(id,el){
   if(id==='targets') window.renderTargets&&window.renderTargets();
   if(id==='holidays') window.renderHolidays();
   if(id==='leave') window.renderLeave();
+  if(id==='worklog') window.renderWorkLog&&window.renderWorkLog();
   if(id==='timesheet') window.renderTimesheet();
   if(id==='cost') window.renderCost();
   if(id==='budget') window.renderBudget&&window.renderBudget();
-  if(id==='hospital'){window._hspPopulateFilters&&window._hspPopulateFilters();window.renderHospital&&window.renderHospital();}
+  if(id==='hospital'){
+    window._hspPopulateFilters&&window._hspPopulateFilters();
+    if(window._hspViewMode==='dashboard') window.renderHspDashboard&&window.renderHspDashboard();
+    else if(window._hspViewMode==='analysis') window.renderHspAnalysis&&window.renderHspAnalysis();
+    else window.renderHospital&&window.renderHospital();
+  }
   if(id==='contract') window.renderContract&&window.renderContract();
 }
 

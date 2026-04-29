@@ -185,9 +185,11 @@ window.checkMemOverlap=function(mid){
   if(!sidEl||!msEl||!meEl||!warnEl)return;
   var overlaps=getStaffOverlaps(sidEl.value,msEl.value,meEl.value,window.editPid);
   var leaveC=getStaffLeaveConflicts(sidEl.value,msEl.value,meEl.value);
+  var wlC=window.getStaffWlConflicts?getStaffWlConflicts(sidEl.value,msEl.value,meEl.value):[];
   var html='';
   if(overlaps.length>0)html+='<span style="color:var(--coral)">'+overlapWarnText(overlaps)+'</span>';
   if(leaveC.length>0){if(html)html+='<br>';html+='<span style="color:var(--amber)">'+leaveC.map(function(c){return c.emoji+' มีการลา'+c.label+' ('+fd(c.leave.startDate)+' – '+fd(c.leave.endDate)+')';}).join('<br>')+'</span>';}
+  if(wlC.length>0){if(html)html+='<br>';html+='<span style="color:var(--amber)">'+wlC.map(function(c){return c.emoji+' มีบันทึกงาน: '+esc(c.wl.title)+' ('+fd(c.wl.type==='daily'?c.wl.date:c.wl.startDate)+(c.wl.type==='period'?' – '+fd(c.wl.endDate):'')+')';}).join('<br>')+'</span>';}
   if(html){warnEl.innerHTML=html;warnEl.style.display='block';}else warnEl.style.display='none';
 }
 

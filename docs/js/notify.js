@@ -70,6 +70,17 @@ window.renderNotifySettings=function(){
     +'</div>';
 };
 
+// ── SAVE PROXY URL ───────────────────────────────────────────────────────────
+window.saveNotifyProxyUrl=async function(){
+  var val=((document.getElementById('notify-proxy-input')||{}).value||'').trim();
+  var msg=document.getElementById('notify-proxy-msg');
+  try{
+    await setDoc(getDocRef('SETTINGS','app'),{notify_proxy_url:val},{merge:true});
+    window.NOTIFY_PROXY_URL=val;
+    if(msg){msg.textContent='✅ บันทึกแล้ว';setTimeout(function(){msg.textContent='';},2500);}
+  }catch(e){window.showDbError(e);}
+};
+
 // ── SAVE TOKENS ──────────────────────────────────────────────────────────────
 window.saveNotifyToken=async function(){
   var val=(document.getElementById('notify-token-input')||{}).value||'';
@@ -103,7 +114,8 @@ window.saveNotifyProjectToken=async function(){
 
 // ── CORE FETCH (ตรวจ HTTP status + คืน error message) ────────────────────────
 async function _doNotifyFetch(token, content) {
-  var res = await fetch('https://api.notify.bmscloud.in.th/api/v1/push-notify', {
+  var url = (window.NOTIFY_PROXY_URL || '').trim() || 'https://api.notify.bmscloud.in.th/api/v1/push-notify';
+  var res = await fetch(url, {
     method: 'POST',
     headers: { 'Token': token, 'Content-Type': 'application/json' },
     body: JSON.stringify({ content: content, receiver: null })

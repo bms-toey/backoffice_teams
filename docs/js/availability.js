@@ -58,7 +58,7 @@ function _fmtRange(r) {
 
 // คำนวณ workdays + company holidays ในช่วง
 function _calcAvailability(sid, startStr, endStr) {
-  var zero = { totalDays:0, freeDays:0, busyDays:0, leaveDays:0, holDays:0, busyProjects:[], leaveInfo:[] };
+  var zero = { totalDays:0, freeDays:0, busyDays:0, leaveDays:0, wlDays:0, holDays:0, busyProjects:[], leaveInfo:[], wlInfo:[] };
   if (!startStr || !endStr) return zero;
   var s = pd(startStr), e = pd(endStr); e.setHours(23,59,59);
   if (s > e) return zero;
@@ -130,13 +130,37 @@ function _calcAvailability(sid, startStr, endStr) {
       });
   }
 
-  var totalBusy = new Set([...projBusySet, ...leaveBusySet]);
+  // วันติดงานจาก WORK_LOGS
+  var wlBusySet = new Set(), wlInfo = [];
+  (window.WORK_LOGS||[]).forEach(function(wl){
+    var wlStart, wlEnd;
+    if(wl.scope==='personal' && wl.staffId===sid){
+      wlStart = wl.type==='daily' ? wl.date : wl.startDate;
+      wlEnd   = wl.type==='daily' ? wl.date : wl.endDate;
+    } else if(wl.scope==='group'){
+      var pt = (wl.participants||[]).find(function(p){ return p.sid===sid; });
+      if(pt){ wlStart = pt.s||(wl.type==='daily'?wl.date:wl.startDate); wlEnd = pt.e||(wl.type==='daily'?wl.date:wl.endDate); }
+    }
+    if(!wlStart||!wlEnd) return;
+    var ws2 = pd(wlStart), we2 = pd(wlEnd); we2.setHours(23,59,59);
+    var c2  = new Date(Math.max(ws2.getTime(), s.getTime()));
+    var end2= new Date(Math.min(we2.getTime(), e.getTime()));
+    var dayCount = 0;
+    while(c2 <= end2){
+      var dow2 = c2.getDay();
+      if(dow2!==0&&dow2!==6){ var ds2=_ds(c2); if(workSet.has(ds2)&&!projBusySet.has(ds2)&&!leaveBusySet.has(ds2)&&!wlBusySet.has(ds2)){ wlBusySet.add(ds2); dayCount++; } }
+      c2.setDate(c2.getDate()+1);
+    }
+    if(dayCount>0) wlInfo.push({days:dayCount, title:wl.title, start:wlStart, end:wlEnd, category:wl.category});
+  });
+
+  var totalBusy = new Set([...projBusySet, ...leaveBusySet, ...wlBusySet]);
   var freeSet = new Set([...workSet].filter(function(d) { return !totalBusy.has(d); }));
   return {
     totalDays: workSet.size, freeDays: freeSet.size,
-    busyDays: projBusySet.size, leaveDays: leaveBusySet.size, holDays: holSet.size,
+    busyDays: projBusySet.size, leaveDays: leaveBusySet.size, wlDays: wlBusySet.size, holDays: holSet.size,
     freeSet: freeSet,
-    busyProjects: busyProjects, leaveInfo: leaveInfo,
+    busyProjects: busyProjects, leaveInfo: leaveInfo, wlInfo: wlInfo,
   };
 }
 
@@ -209,10 +233,14 @@ window.renderAvailability = function() {
       return '<span onclick="event.stopPropagation();window.openProjModal&&window.openProjModal(\''+bp.proj.id+'\')" style="font-size:10px;background:rgba(67,97,238,.1);color:var(--indigo);border:1px solid rgba(67,97,238,.2);border-radius:6px;padding:2px 8px;white-space:nowrap;cursor:pointer;" title="'+esc(bp.proj.name)+' · '+bp.days+' วัน">📁 '+esc(nm)+' <span style="opacity:.7;">'+bp.days+'วัน</span></span>';
     }).join('');
     var leaveTags = info.leaveInfo.map(function(lv) {
-      return '<span style="font-size:10px;background:rgba(255,166,43,.1);color:var(--amber);border:1px solid rgba(255,166,43,.2);border-radius:6px;padding:2px 8px;white-space:nowrap;">🏖 ลา <b>'+lv.days+'วัน</b>'+(lv.status==='pending'?' <span style="opacity:.7;">(รอยืนยัน)</span>':'')+'</span>';
+      return '<span style="font-size:10px;background:rgba(255,107,107,.1);color:#c0392b;border:1px solid rgba(255,107,107,.2);border-radius:6px;padding:2px 8px;white-space:nowrap;">🏖 ลา <b>'+lv.days+'วัน</b>'+(lv.status==='pending'?' <span style="opacity:.7;">(รอยืนยัน)</span>':'')+'</span>';
+    }).join('');
+    var wlTags = (info.wlInfo||[]).map(function(w) {
+      var nm = w.title.length > 20 ? w.title.substring(0,20)+'…' : w.title;
+      return '<span style="font-size:10px;background:rgba(255,166,43,.1);color:#b87800;border:1px solid rgba(255,166,43,.25);border-radius:6px;padding:2px 8px;white-space:nowrap;">📝 '+esc(nm)+' <span style="opacity:.7;">'+w.days+'วัน</span></span>';
     }).join('');
 
-    var bottomRow = [freeRangeHtml, projTags, leaveTags].filter(Boolean).join('');
+    var bottomRow = [freeRangeHtml, projTags, leaveTags, wlTags].filter(Boolean).join('');
 
     return '<div style="display:flex;align-items:flex-start;gap:14px;padding:14px 18px;transition:background .15s;" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">' +
       '<div style="width:40px;height:40px;border-radius:11px;background:'+avC(r.i)+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;margin-top:2px;">'+initials+'</div>' +
