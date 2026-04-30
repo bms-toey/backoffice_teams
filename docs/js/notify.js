@@ -114,7 +114,7 @@ window.saveNotifyProjectToken=async function(){
 
 // ── CORE FETCH (ตรวจ HTTP status + คืน error message) ────────────────────────
 async function _doNotifyFetch(token, content) {
-  var url = (window.NOTIFY_PROXY_URL || '').trim() || 'https://api.notify.bmscloud.in.th/api/v1/push-notify';
+  var url = (window.NOTIFY_PROXY_URL || '').trim() || 'https://api-notify.bmscloud.in.th/api/v1/push-notify';
   var res = await fetch(url, {
     method: 'POST',
     headers: { 'Token': token, 'Content-Type': 'application/json' },

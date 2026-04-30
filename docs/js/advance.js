@@ -166,15 +166,15 @@ window.saveAdvance=async function(){
   var aid=window.editAid||'A'+Date.now();
   var finalPid=document.getElementById('af-pid').value.trim();
   var status=document.getElementById('af-status').value;
-  var isFullCleared = status==='cleared';
-  var expItems  = isFullCleared ? window.advGetExpItems()  : [];
-  var labItems  = isFullCleared ? window.advGetLaborItems(): [];
+  var hasItemsSection = status==='clearing' || status==='cleared';
+  var expItems  = hasItemsSection ? window.advGetExpItems()  : [];
+  var labItems  = hasItemsSection ? window.advGetLaborItems(): [];
   var cleared   = parseFloat(((document.getElementById('af-cleared')||{}).value||'').replace(/,/g,''))||0;
   let dbAdv={advance_id:aid,project_id:finalPid,purpose:pur.trim(),amount_requested:parseFloat((document.getElementById('af-amount').value||'').replace(/,/g,''))||0,amount_cleared:cleared,request_date:document.getElementById('af-rdate').value,due_date:document.getElementById('af-ddate').value,status:status,note:document.getElementById('af-note').value,advance_no:(document.getElementById('af-advno')||{}).value||'',expense_items:expItems,labor_items:labItems};
   window.closeM('m-adv');
   try {
     await setDoc(getDocRef('ADVANCES',aid),dbAdv);
-    if(isFullCleared) await window.advSyncCosts(aid, finalPid, pur.trim(), dbAdv);
+    if(status==='cleared') await window.advSyncCosts(aid, finalPid, pur.trim(), dbAdv);
     // แจ้งเตือน Advance บันทึก/อัปเดต
     if(window.sendAdvanceSavedNotify){
       var advObj={pid:finalPid,status:status,advno:dbAdv.advance_no,amount:dbAdv.amount_requested,cleared:dbAdv.amount_cleared};
