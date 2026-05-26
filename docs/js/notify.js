@@ -324,6 +324,8 @@ window.sendLeaveNotify=async function(eventType,lv){
     var statusKey=lv.status||'pending';
     var statusLabel=STATUS_LABEL[statusKey]||statusKey;
     var approvedBy=lv.approvedBy||lv.approved_by||'';
+    var lvId=lv.leave_id||lv.id||'';
+    var lvLink=lvId?(window.location.origin+window.location.pathname+'#leave='+lvId):'';
     var baseInfo='👤 ชื่อ: **'+st.name+'**'
       +(st.role?'\n💼 ตำแหน่ง: '+st.role:'')
       +(st.dept?'\n🏢 แผนก: '+st.dept:'')
@@ -331,7 +333,8 @@ window.sendLeaveNotify=async function(eventType,lv){
       +'\n📅 '+dateRange
       +(subName?'\n🔄 ผู้ทำงานแทน: '+subName:'')
       +(noteText?'\n📝 รายละเอียด: '+noteText:'')
-      +'\n📌 สถานะ: '+statusLabel;
+      +'\n📌 สถานะ: '+statusLabel
+      +(lvLink?'\n🔗 '+lvLink:'');
     if(eventType==='new'){
       content='📋 **แจ้งการลางานใหม่**\n'+baseInfo;
     } else if(eventType==='edit'){

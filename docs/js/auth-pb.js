@@ -58,6 +58,7 @@ function setupRealtimeListeners() {
       if (window.cu) { window.setupUser(); window.renderAll(); window.startAutoStageLoop();
         if(window.checkDailyNotifications && window._settingsLoaded) window.checkDailyNotifications();
         else window._pendingDailyCheck = true;
+        window._handleDeepLink && window._handleDeepLink();
       }
     } else if (loadCount > colls.length) {
       if (window.cu && window.kbPid===null) window.renderAll();
@@ -423,4 +424,19 @@ window.renderAll=function(){
   var hv=document.getElementById('view-hospital');
   if(hv&&hv.classList.contains('on')){window._hspPopulateFilters&&window._hspPopulateFilters();window.renderHospital&&window.renderHospital();}
   window.renderContract&&window.renderContract();
+};
+
+window._handleDeepLink=function(){
+  var hash=window.location.hash;
+  if(!hash)return;
+  var m=hash.match(/^#leave=(.+)$/);
+  if(!m)return;
+  var lvId=decodeURIComponent(m[1]);
+  var navBtn=document.querySelector('.nav-btn[onclick*="\'leave\'"]');
+  window.goView('leave',navBtn);
+  setTimeout(function(){
+    var lv=(window.LEAVES||[]).find(function(x){return x.id===lvId;});
+    if(lv)window.openLeaveForm&&window.openLeaveForm(lv.id);
+    history.replaceState(null,'',window.location.pathname+window.location.search);
+  },300);
 };
