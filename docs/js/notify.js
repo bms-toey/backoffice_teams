@@ -325,7 +325,10 @@ window.sendLeaveNotify=async function(eventType,lv){
     var statusLabel=STATUS_LABEL[statusKey]||statusKey;
     var approvedBy=lv.approvedBy||lv.approved_by||'';
     var lvId=lv.leave_id||lv.id||'';
-    var lvLink=lvId?(window.location.origin+window.location.pathname+'#leave='+lvId):'';
+    var _appBase=(window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1')
+      ?(window.location.origin+window.location.pathname)
+      :'https://bms-toey.github.io/backoffice_teams/docs/';
+    var lvLink=lvId?(_appBase+'#leave='+lvId):'';
     var baseInfo='👤 ชื่อ: **'+st.name+'**'
       +(st.role?'\n💼 ตำแหน่ง: '+st.role:'')
       +(st.dept?'\n🏢 แผนก: '+st.dept:'')
