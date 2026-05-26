@@ -276,12 +276,13 @@ function doLoginNow(u, p) {
   if(titleEl) titleEl.textContent='Overview';
   if(window.isDbLoaded){
     window.setupUser();window.renderAll();
+    window._handleDeepLink&&window._handleDeepLink();
   } else {
     window.setupUser();
     var waitRender=setInterval(function(){
-      if(window.isDbLoaded){clearInterval(waitRender);window.renderAll();}
+      if(window.isDbLoaded){clearInterval(waitRender);window.renderAll();window._handleDeepLink&&window._handleDeepLink();}
     },300);
-    setTimeout(function(){clearInterval(waitRender);window.renderAll();},15000);
+    setTimeout(function(){clearInterval(waitRender);window.renderAll();window._handleDeepLink&&window._handleDeepLink();},15000);
   }
 }
 
@@ -427,10 +428,12 @@ window.renderAll=function(){
 };
 
 window._handleDeepLink=function(){
+  if(window._deepLinkHandled)return;
   var hash=window.location.hash;
   if(!hash)return;
   var m=hash.match(/^#leave=(.+)$/);
   if(!m)return;
+  window._deepLinkHandled=true;
   var lvId=decodeURIComponent(m[1]);
   var navBtn=document.querySelector('.nav-btn[onclick*="\'leave\'"]');
   window.goView('leave',navBtn);
@@ -438,5 +441,5 @@ window._handleDeepLink=function(){
     var lv=(window.LEAVES||[]).find(function(x){return x.id===lvId;});
     if(lv)window.openLeaveForm&&window.openLeaveForm(lv.id);
     history.replaceState(null,'',window.location.pathname+window.location.search);
-  },300);
+  },400);
 };
