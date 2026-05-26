@@ -327,7 +327,7 @@ window.sendLeaveNotify=async function(eventType,lv){
     var lvId=lv.leave_id||lv.id||'';
     var _appBase=(window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1')
       ?(window.location.origin+window.location.pathname)
-      :'https://bms-toey.github.io/backoffice_teams/docs/';
+      :'https://bms-toey.github.io/backoffice_teams/';
     var lvLink=lvId?(_appBase+'#leave='+lvId):'';
     var baseInfo='👤 ชื่อ: **'+st.name+'**'
       +(st.role?'\n💼 ตำแหน่ง: '+st.role:'')
