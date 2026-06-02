@@ -269,8 +269,8 @@ window.exportOvExcel = function() {
 
 // ── ANNUAL TARGET TRACKER ──────────────────────────────────────────────────────
 // ── HELPER: build display rows (กลุ่ม + ประเภทเดี่ยว) ─────────────────────────
-function _buildAnnualTargetRows(fProjs, byType) {
-  var groups = window.TARGET_TYPE_GROUPS || [];
+function _buildAnnualTargetRows(fProjs, byType, useGroups) {
+  var groups = (useGroups !== undefined) ? useGroups : (window.TARGET_TYPE_GROUPS || []);
   var groupedIds = new Set();
   groups.forEach(function(g) { (g.typeIds||[]).forEach(function(tid) { groupedIds.add(tid); }); });
   var allTypeIds = new Set(Object.keys(byType));
@@ -318,8 +318,28 @@ window.renderAnnualTarget = function(fProjs, yr) {
   var entry = targets.find(function(t) { return String(t.year) === String(displayYr); });
   var byType = (entry && entry.byType) ? entry.byType : {};
   var canEditTgt = window.isAdmin() || window.canEdit('targets');
+  var hasGroups = (window.TARGET_TYPE_GROUPS||[]).length > 0;
+  var grouped = hasGroups && (localStorage.getItem('tgt_grouped') !== '0');
 
-  var rows = _buildAnnualTargetRows(fProjs, byType);
+  var rows = _buildAnnualTargetRows(fProjs, byType, grouped ? undefined : []);
+
+  // toggle handler
+  window._setTgtGrouped = function(val) {
+    localStorage.setItem('tgt_grouped', val ? '1' : '0');
+    window.renderOverview();
+  };
+
+  var toggleHtml = hasGroups
+    ? '<div style="display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:11px;flex-shrink:0;">' +
+        '<button onclick="window._setTgtGrouped(true)" style="padding:4px 12px;border:none;cursor:pointer;font-family:inherit;font-weight:600;background:'+(grouped?'var(--violet)':'var(--surface2)')+';color:'+(grouped?'#fff':'var(--txt2)')+';">รวมกลุ่ม</button>' +
+        '<button onclick="window._setTgtGrouped(false)" style="padding:4px 12px;border:none;cursor:pointer;font-family:inherit;font-weight:600;background:'+(!grouped?'var(--violet)':'var(--surface2)')+';color:'+(!grouped?'#fff':'var(--txt2)')+';">แยกประเภท</button>' +
+      '</div>'
+    : '';
+
+  var actionBtns = '<div style="display:flex;gap:8px;align-items:center;">' +
+    toggleHtml +
+    (canEditTgt ? '<button onclick="window.openTypeGroupModal()" style="padding:5px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt2);font-size:11px;cursor:pointer;font-family:inherit;">⚙️ จัดกลุ่ม</button>' : '') +
+    '</div>';
 
   if (!rows.length) {
     wrap.innerHTML = '<div class="ov-card" style="padding:16px 20px;">' +
@@ -327,7 +347,7 @@ window.renderAnnualTarget = function(fProjs, yr) {
         '<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">🎯</span>' +
           '<span style="font-size:14px;font-weight:800;color:var(--txt);">เป้าหมายประจำปี พ.ศ. ' + displayYr + '</span>' +
           '<span style="font-size:12px;color:var(--txt3);margin-left:4px;">— ยังไม่ได้ตั้งเป้าหมาย</span></div>' +
-        (canEditTgt ? '<button onclick="window.openTypeGroupModal()" style="padding:5px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt2);font-size:11px;cursor:pointer;">⚙️ จัดกลุ่ม</button>' : '') +
+        actionBtns +
       '</div>' +
     '</div>';
     return;
@@ -391,7 +411,7 @@ window.renderAnnualTarget = function(fProjs, yr) {
           '<span style="font-size:18px;">🎯</span>' +
           '<span style="font-size:14px;font-weight:800;color:var(--txt);">เป้าหมายประจำปี พ.ศ. ' + displayYr + '</span>' +
         '</div>' +
-        (canEditTgt ? '<button onclick="window.openTypeGroupModal()" style="padding:5px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt2);font-size:11px;cursor:pointer;">⚙️ จัดกลุ่ม</button>' : '') +
+        actionBtns +
       '</div>' +
       '<div style="overflow-x:auto;">' +
         '<table style="width:100%;border-collapse:collapse;min-width:600px;">' +
@@ -490,6 +510,7 @@ function _yearTargetsPayload(yearEntries, groups) {
 window.saveTypeGroups = function() {
   var groups = (window._editingGroups||[]).filter(function(g){return g.label&&g.typeIds.length>0;});
   window.TARGET_TYPE_GROUPS = groups;
+  try{localStorage.setItem('_tgt_groups',JSON.stringify(groups));}catch(e){}
   window.setDoc(getDocRef('SETTINGS','app'),{year_targets:_yearTargetsPayload(null,groups)},{merge:true})
     .then(function(){
       var ov=document.getElementById('tg-overlay'); if(ov)ov.remove();

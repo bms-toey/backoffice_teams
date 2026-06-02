@@ -220,7 +220,13 @@ function setupRealtimeListeners() {
     }
     var _rawTargets=d.year_targets||[];
     window.YEAR_TARGETS=_rawTargets.filter(function(t){return t.year&&!t._typeGroups;});
-    window.TARGET_TYPE_GROUPS=(_rawTargets.find(function(t){return!!t._typeGroups;})||{})._typeGroups||[];
+    var _pbGroups=(_rawTargets.find(function(t){return!!t._typeGroups;})||{})._typeGroups||[];
+    if(_pbGroups.length){
+      window.TARGET_TYPE_GROUPS=_pbGroups;
+      try{localStorage.setItem('_tgt_groups',JSON.stringify(_pbGroups));}catch(e){}
+    } else {
+      try{var _ls=localStorage.getItem('_tgt_groups');window.TARGET_TYPE_GROUPS=_ls?JSON.parse(_ls):[];}catch(e){window.TARGET_TYPE_GROUPS=[];}
+    }
     window.SETTINGS={
       allowance_weekday_normal:  Number(d.allowance_weekday_normal)  || 350,
       allowance_holiday_normal:  Number(d.allowance_holiday_normal)  || 650,
