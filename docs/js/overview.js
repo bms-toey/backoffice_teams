@@ -408,19 +408,46 @@ window.renderAnnualTarget = function(fProjs, yr) {
     '</div>';
 };
 
-// ── TYPE GROUP MODAL ──────────────────────────────────────────────────────────
+// ── TYPE GROUP MODAL (dynamic overlay — ไม่ต้องพึ่ง HTML) ─────────────────────
 window.openTypeGroupModal = function() {
+  // ลบ overlay เก่าถ้ามี
+  var old = document.getElementById('tg-overlay');
+  if (old) old.remove();
+
   window._editingGroups = (window.TARGET_TYPE_GROUPS||[]).map(function(g){
     return {id:g.id,label:g.label,typeIds:(g.typeIds||[]).slice()};
   });
-  function _refreshGroupList() {
+
+  // สร้าง overlay
+  var ov = document.createElement('div');
+  ov.id = 'tg-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  ov.innerHTML =
+    '<div style="background:var(--surface);border-radius:16px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:18px 20px 0;">' +
+        '<div style="font-size:15px;font-weight:800;color:var(--txt);">⚙️ จัดกลุ่มประเภทโครงการ</div>' +
+        '<button onclick="document.getElementById(\'tg-overlay\').remove()" style="width:30px;height:30px;border:none;background:var(--surface2);border-radius:50%;cursor:pointer;font-size:16px;color:var(--txt2);">✕</button>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--txt3);padding:6px 20px 14px;line-height:1.6;">นำประเภทโครงการหลายประเภทมาแสดงรวมเป็นแถวเดียวในตารางเป้าหมาย</div>' +
+      '<div style="padding:0 20px;" id="tg-groups-list"></div>' +
+      '<div style="padding:10px 20px;">' +
+        '<button onclick="window._grpAdd()" style="width:100%;padding:9px;border:1px dashed var(--border);border-radius:8px;background:transparent;color:var(--txt3);font-size:13px;cursor:pointer;">➕ เพิ่มกลุ่ม</button>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:flex-end;gap:10px;padding:12px 20px 20px;border-top:1px solid var(--border);margin-top:8px;">' +
+        '<button onclick="document.getElementById(\'tg-overlay\').remove()" style="padding:8px 18px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt2);font-size:13px;cursor:pointer;">ยกเลิก</button>' +
+        '<button onclick="window.saveTypeGroups()" style="padding:8px 20px;border:none;border-radius:8px;background:var(--violet);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">💾 บันทึกการจัดกลุ่ม</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(ov);
+
+  function _refresh() {
     var types = window.PTYPES||[];
     var html = '';
     window._editingGroups.forEach(function(g,gi){
       var pills = types.map(function(t){
         var on = g.typeIds.includes(t.id);
         return '<label style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border:1px solid '+(on?'var(--violet)':'var(--border)')+';border-radius:20px;cursor:pointer;font-size:11px;font-weight:600;background:'+(on?'var(--violet)':'var(--surface2)')+';color:'+(on?'#fff':'var(--txt2)')+';user-select:none;margin:2px;">' +
-          '<input type="checkbox" style="display:none;" '+(on?'checked':'')+' onchange="window._grpToggleType('+gi+',\''+t.id+'\')">' +
+          '<input type="checkbox" style="display:none;" '+(on?'checked':'')+' onchange="window._grpToggle('+gi+',\''+t.id+'\')">' +
           '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:'+(t.color||'#4361ee')+';">&nbsp;</span>' +
           esc(t.label)+'</label>';
       }).join('');
@@ -437,29 +464,18 @@ window.openTypeGroupModal = function() {
     var el = document.getElementById('tg-groups-list');
     if (el) el.innerHTML = html || '<div style="text-align:center;padding:20px;color:var(--txt3);font-size:12px;">— ยังไม่มีกลุ่ม กด ➕ เพื่อเพิ่ม —</div>';
   }
-  window._grpToggleType = function(gi, tid){
+
+  window._grpToggle = function(gi,tid){
     var g=window._editingGroups[gi]; var idx=g.typeIds.indexOf(tid);
     if(idx>=0)g.typeIds.splice(idx,1); else g.typeIds.push(tid);
-    _refreshGroupList();
+    _refresh();
   };
-  window._grpRemove = function(gi){ window._editingGroups.splice(gi,1); _refreshGroupList(); };
+  window._grpRemove = function(gi){ window._editingGroups.splice(gi,1); _refresh(); };
   window._grpAdd = function(){
     window._editingGroups.push({id:'grp_'+Date.now(),label:'',typeIds:[]});
-    _refreshGroupList();
+    _refresh();
   };
-  var html = '<div style="padding:20px;">' +
-    '<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:6px;">⚙️ จัดกลุ่มประเภทโครงการ</div>' +
-    '<div style="font-size:12px;color:var(--txt3);margin-bottom:16px;line-height:1.6;">นำประเภทโครงการหลายประเภทมาแสดงรวมเป็นแถวเดียวในตารางเป้าหมาย</div>' +
-    '<div id="tg-groups-list"></div>' +
-    '<button onclick="window._grpAdd()" style="width:100%;padding:9px;border:1px dashed var(--border);border-radius:8px;background:transparent;color:var(--txt3);font-size:13px;cursor:pointer;margin-top:4px;">➕ เพิ่มกลุ่ม</button>' +
-    '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;">' +
-      '<button onclick="window.closeM(\'m-typegroups\')" style="padding:8px 18px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt2);font-size:13px;cursor:pointer;">ยกเลิก</button>' +
-      '<button onclick="window.saveTypeGroups()" style="padding:8px 20px;border:none;border-radius:8px;background:var(--violet);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">💾 บันทึกการจัดกลุ่ม</button>' +
-    '</div>' +
-  '</div>';
-  document.getElementById('m-typegroups-body').innerHTML = html;
-  window.openM('m-typegroups');
-  _refreshGroupList();
+  _refresh();
 };
 
 window.saveTypeGroups = function() {
@@ -467,7 +483,7 @@ window.saveTypeGroups = function() {
   window.TARGET_TYPE_GROUPS = groups;
   window.setDoc(getDocRef('SETTINGS','app'),{target_type_groups:groups},{merge:true})
     .then(function(){
-      window.closeM('m-typegroups');
+      var ov=document.getElementById('tg-overlay'); if(ov)ov.remove();
       window.showAlert('บันทึกการจัดกลุ่มเรียบร้อย ✓','success');
       window.renderOverview();
       window.renderTargets&&window.renderTargets();
