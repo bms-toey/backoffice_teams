@@ -267,6 +267,46 @@ window.exportOvExcel = function() {
 };
 
 // ── ANNUAL TARGET TRACKER ──────────────────────────────────────────────────────
+// ── HELPER: build display rows (กลุ่ม + ประเภทเดี่ยว) ─────────────────────────
+function _buildAnnualTargetRows(fProjs, byType) {
+  var groups = window.TARGET_TYPE_GROUPS || [];
+  var groupedIds = new Set();
+  groups.forEach(function(g) { (g.typeIds||[]).forEach(function(tid) { groupedIds.add(tid); }); });
+  var allTypeIds = new Set(Object.keys(byType));
+  fProjs.forEach(function(p) { if (p.typeId) allTypeIds.add(p.typeId); });
+  var rows = [];
+  // Group rows
+  groups.forEach(function(g) {
+    var gTypeIds = g.typeIds || [];
+    if (!gTypeIds.some(function(tid){return allTypeIds.has(tid);}) && !byType[g.id]) return;
+    var tgt = Number(byType[g.id] || 0);
+    var projs = fProjs.filter(function(p){return gTypeIds.includes(p.typeId);});
+    var total = projs.reduce(function(s,p){return s+(p.cost||0);},0);
+    var closed = projs.filter(function(p){return p.stage==='close';}).reduce(function(s,p){return s+(p.cost||0);},0);
+    var pctT = tgt>0?Math.min(100,Math.round(total/tgt*100)):0;
+    var pctC = tgt>0?Math.min(100,Math.round(closed/tgt*100)):0;
+    var dots = gTypeIds.map(function(tid){
+      var t=(window.PTYPES||[]).find(function(x){return x.id===tid;});
+      return '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+(t?t.color:'#9ba3b8')+';margin-right:3px;vertical-align:middle;"></span>';
+    }).join('');
+    rows.push({id:g.id,isGroup:true,label:dots+'<b style="vertical-align:middle;">'+esc(g.label)+'</b>',
+      tgt,total,closed,pctT,pctC,needFind:Math.max(0,tgt-total),needClose:Math.max(0,tgt-closed)});
+  });
+  // Ungrouped type rows
+  (window.PTYPES||[]).filter(function(t){return allTypeIds.has(t.id)&&!groupedIds.has(t.id);}).forEach(function(t){
+    var tgt = Number(byType[t.id]||0);
+    var projs = fProjs.filter(function(p){return p.typeId===t.id;});
+    var total = projs.reduce(function(s,p){return s+(p.cost||0);},0);
+    var closed = projs.filter(function(p){return p.stage==='close';}).reduce(function(s,p){return s+(p.cost||0);},0);
+    var pctT = tgt>0?Math.min(100,Math.round(total/tgt*100)):0;
+    var pctC = tgt>0?Math.min(100,Math.round(closed/tgt*100)):0;
+    var c=t.color||'#4361ee';
+    rows.push({id:t.id,isGroup:false,label:'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+c+';margin-right:6px;vertical-align:middle;"></span><span style="vertical-align:middle;">'+esc(t.label)+'</span>',
+      tgt,total,closed,pctT,pctC,needFind:Math.max(0,tgt-total),needClose:Math.max(0,tgt-closed)});
+  });
+  return rows;
+}
+
 window.renderAnnualTarget = function(fProjs, yr) {
   var wrap = document.getElementById('annual-target-wrap');
   if (!wrap) return;
@@ -276,92 +316,71 @@ window.renderAnnualTarget = function(fProjs, yr) {
   var targets = window.YEAR_TARGETS || [];
   var entry = targets.find(function(t) { return String(t.year) === String(displayYr); });
   var byType = (entry && entry.byType) ? entry.byType : {};
+  var canEditTgt = window.isAdmin() || window.canEdit('targets');
 
-  // ประเภทที่มีเป้า หรือมีโครงการในปีนี้
-  var typeIds = new Set(Object.keys(byType));
-  fProjs.forEach(function(p) { if (p.typeId) typeIds.add(p.typeId); });
-  var types = (window.PTYPES || []).filter(function(t) { return typeIds.has(t.id); });
+  var rows = _buildAnnualTargetRows(fProjs, byType);
 
-  // ถ้าไม่มีเลย
-  if (!types.length) {
+  if (!rows.length) {
     wrap.innerHTML = '<div class="ov-card" style="padding:16px 20px;">' +
-      '<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">🎯</span>' +
-      '<span style="font-size:14px;font-weight:800;color:var(--txt);">เป้าหมายประจำปี พ.ศ. ' + displayYr + '</span>' +
-      '<span style="font-size:12px;color:var(--txt3);margin-left:4px;">— ยังไม่ได้ตั้งเป้าหมาย</span></div>' +
-      '</div>';
+      '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+        '<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">🎯</span>' +
+          '<span style="font-size:14px;font-weight:800;color:var(--txt);">เป้าหมายประจำปี พ.ศ. ' + displayYr + '</span>' +
+          '<span style="font-size:12px;color:var(--txt3);margin-left:4px;">— ยังไม่ได้ตั้งเป้าหมาย</span></div>' +
+        (canEditTgt ? '<button onclick="window.openTypeGroupModal()" style="padding:5px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt2);font-size:11px;cursor:pointer;">⚙️ จัดกลุ่ม</button>' : '') +
+      '</div>' +
+    '</div>';
     return;
   }
 
   function miniBar(pct, color) {
     return '<div style="width:100%;height:6px;background:var(--surface3);border-radius:3px;overflow:hidden;margin-top:3px;">' +
-      '<div style="width:' + Math.min(100, pct) + '%;height:100%;background:' + color + ';border-radius:3px;"></div></div>';
+      '<div style="width:' + Math.min(100,pct) + '%;height:100%;background:' + color + ';border-radius:3px;"></div></div>';
   }
   function gapChip(val, label, pos) {
     var ok = val <= 0;
     return '<div style="font-size:9px;color:var(--txt3);">' + label + '</div>' +
-      '<div style="font-size:12px;font-weight:800;color:' + (ok ? '#06d6a0' : (pos ? '#4361ee' : '#ff6b6b')) + ';">' +
+      '<div style="font-size:12px;font-weight:800;color:' + (ok?'#06d6a0':(pos?'#4361ee':'#ff6b6b')) + ';">' +
       (ok ? '✓ ถึงเป้า' : fc(val)) + '</div>';
   }
 
-  // คำนวณต่อ type
-  var rows = types.map(function(t) {
-    var tgt = Number(byType[t.id] || 0);
-    var projs = fProjs.filter(function(p) { return p.typeId === t.id; });
-    var total = projs.reduce(function(s, p) { return s + (p.cost || 0); }, 0);
-    var closed = projs.filter(function(p) { return p.stage === 'close'; })
-                      .reduce(function(s, p) { return s + (p.cost || 0); }, 0);
-    var pctTotal  = tgt > 0 ? Math.min(100, Math.round(total / tgt * 100))  : 0;
-    var pctClosed = tgt > 0 ? Math.min(100, Math.round(closed / tgt * 100)) : 0;
-    return { t: t, tgt: tgt, total: total, closed: closed,
-             pctTotal: pctTotal, pctClosed: pctClosed,
-             needFind: Math.max(0, tgt - total), needClose: Math.max(0, tgt - closed) };
-  });
-
-  // แถวรวม
-  var sumTgt    = rows.reduce(function(s, r) { return s + r.tgt; }, 0);
-  var sumTotal  = rows.reduce(function(s, r) { return s + r.total; }, 0);
-  var sumClosed = rows.reduce(function(s, r) { return s + r.closed; }, 0);
-  var sumPctTotal  = sumTgt > 0 ? Math.min(100, Math.round(sumTotal / sumTgt * 100))  : 0;
-  var sumPctClosed = sumTgt > 0 ? Math.min(100, Math.round(sumClosed / sumTgt * 100)) : 0;
+  var sumTgt    = rows.reduce(function(s,r){return s+r.tgt;},0);
+  var sumTotal  = rows.reduce(function(s,r){return s+r.total;},0);
+  var sumClosed = rows.reduce(function(s,r){return s+r.closed;},0);
+  var sumPctT   = sumTgt>0?Math.min(100,Math.round(sumTotal/sumTgt*100)):0;
+  var sumPctC   = sumTgt>0?Math.min(100,Math.round(sumClosed/sumTgt*100)):0;
 
   var colH = 'font-size:10px;font-weight:700;color:var(--txt3);padding:6px 10px;border-bottom:2px solid var(--border);white-space:nowrap;';
   var cell = 'font-size:12px;padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle;';
   var cellR = cell + 'text-align:right;';
 
-  function typeRow(r) {
-    var color = r.t.color || '#4361ee';
-    return '<tr>' +
-      '<td style="' + cell + 'font-weight:700;color:var(--txt);">' +
-        '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + color + ';margin-right:6px;"></span>' +
-        esc(r.t.label) + '</td>' +
-      '<td style="' + cellR + 'color:var(--violet);font-weight:700;">' + (r.tgt > 0 ? fc(r.tgt) : '<span style="color:var(--txt3);">—</span>') + '</td>' +
+  function displayRow(r) {
+    return '<tr' + (r.isGroup ? ' style="background:rgba(124,92,252,.04);"' : '') + '>' +
+      '<td style="' + cell + 'font-weight:700;color:var(--txt);">' + r.label + '</td>' +
+      '<td style="' + cellR + 'color:var(--violet);font-weight:700;">' + (r.tgt>0?fc(r.tgt):'<span style="color:var(--txt3);">—</span>') + '</td>' +
       '<td style="' + cell + '">' +
         '<div style="font-size:12px;font-weight:700;color:#4361ee;">' + fc(r.total) +
-          (r.tgt > 0 ? ' <span style="font-size:10px;color:var(--txt3);">(' + r.pctTotal + '%)</span>' : '') + '</div>' +
-        (r.tgt > 0 ? miniBar(r.pctTotal, '#4361ee') : '') + '</td>' +
+          (r.tgt>0?' <span style="font-size:10px;color:var(--txt3);">('+r.pctT+'%)</span>':'') + '</div>' +
+        (r.tgt>0?miniBar(r.pctT,'#4361ee'):'') + '</td>' +
       '<td style="' + cell + '">' +
         '<div style="font-size:12px;font-weight:700;color:#06d6a0;">' + fc(r.closed) +
-          (r.tgt > 0 ? ' <span style="font-size:10px;color:var(--txt3);">(' + r.pctClosed + '%)</span>' : '') + '</div>' +
-        (r.tgt > 0 ? miniBar(r.pctClosed, '#06d6a0') : '') + '</td>' +
-      '<td style="' + cellR + '">' + (r.tgt > 0 ? gapChip(r.needFind, 'ต้องหาเพิ่ม', true) : '<span style="color:var(--txt3);font-size:11px;">—</span>') + '</td>' +
-      '<td style="' + cellR + '">' + (r.tgt > 0 ? gapChip(r.needClose, 'ต้องปิดเพิ่ม', false) : '<span style="color:var(--txt3);font-size:11px;">—</span>') + '</td>' +
+          (r.tgt>0?' <span style="font-size:10px;color:var(--txt3);">('+r.pctC+'%)</span>':'') + '</div>' +
+        (r.tgt>0?miniBar(r.pctC,'#06d6a0'):'') + '</td>' +
+      '<td style="' + cellR + '">' + (r.tgt>0?gapChip(r.needFind,'ต้องหาเพิ่ม',true):'<span style="color:var(--txt3);font-size:11px;">—</span>') + '</td>' +
+      '<td style="' + cellR + '">' + (r.tgt>0?gapChip(r.needClose,'ต้องปิดเพิ่ม',false):'<span style="color:var(--txt3);font-size:11px;">—</span>') + '</td>' +
     '</tr>';
   }
 
-  var totalRowStyle = 'background:var(--surface2);font-weight:800;';
-  var sumRow = '<tr style="' + totalRowStyle + '">' +
+  var sumRow = '<tr style="background:var(--surface2);font-weight:800;">' +
     '<td style="' + cell + 'font-weight:800;color:var(--txt);">รวมทุกประเภท</td>' +
-    '<td style="' + cellR + 'color:var(--violet);font-weight:800;">' + (sumTgt > 0 ? fc(sumTgt) : '—') + '</td>' +
-    '<td style="' + cell + '">' +
-      '<div style="font-size:12px;font-weight:800;color:#4361ee;">' + fc(sumTotal) +
-        (sumTgt > 0 ? ' <span style="font-size:10px;color:var(--txt3);">(' + sumPctTotal + '%)</span>' : '') + '</div>' +
-      (sumTgt > 0 ? miniBar(sumPctTotal, '#4361ee') : '') + '</td>' +
-    '<td style="' + cell + '">' +
-      '<div style="font-size:12px;font-weight:800;color:#06d6a0;">' + fc(sumClosed) +
-        (sumTgt > 0 ? ' <span style="font-size:10px;color:var(--txt3);">(' + sumPctClosed + '%)</span>' : '') + '</div>' +
-      (sumTgt > 0 ? miniBar(sumPctClosed, '#06d6a0') : '') + '</td>' +
-    '<td style="' + cellR + '">' + (sumTgt > 0 ? gapChip(Math.max(0, sumTgt - sumTotal), 'ต้องหาเพิ่ม', true) : '—') + '</td>' +
-    '<td style="' + cellR + '">' + (sumTgt > 0 ? gapChip(Math.max(0, sumTgt - sumClosed), 'ต้องปิดเพิ่ม', false) : '—') + '</td>' +
+    '<td style="' + cellR + 'color:var(--violet);font-weight:800;">' + (sumTgt>0?fc(sumTgt):'—') + '</td>' +
+    '<td style="' + cell + '"><div style="font-size:12px;font-weight:800;color:#4361ee;">' + fc(sumTotal) +
+      (sumTgt>0?' <span style="font-size:10px;color:var(--txt3);">('+sumPctT+'%)</span>':'') + '</div>' +
+      (sumTgt>0?miniBar(sumPctT,'#4361ee'):'') + '</td>' +
+    '<td style="' + cell + '"><div style="font-size:12px;font-weight:800;color:#06d6a0;">' + fc(sumClosed) +
+      (sumTgt>0?' <span style="font-size:10px;color:var(--txt3);">('+sumPctC+'%)</span>':'') + '</div>' +
+      (sumTgt>0?miniBar(sumPctC,'#06d6a0'):'') + '</td>' +
+    '<td style="' + cellR + '">' + (sumTgt>0?gapChip(Math.max(0,sumTgt-sumTotal),'ต้องหาเพิ่ม',true):'—') + '</td>' +
+    '<td style="' + cellR + '">' + (sumTgt>0?gapChip(Math.max(0,sumTgt-sumClosed),'ต้องปิดเพิ่ม',false):'—') + '</td>' +
   '</tr>';
 
   wrap.innerHTML =
@@ -371,22 +390,88 @@ window.renderAnnualTarget = function(fProjs, yr) {
           '<span style="font-size:18px;">🎯</span>' +
           '<span style="font-size:14px;font-weight:800;color:var(--txt);">เป้าหมายประจำปี พ.ศ. ' + displayYr + '</span>' +
         '</div>' +
-        '' +
+        (canEditTgt ? '<button onclick="window.openTypeGroupModal()" style="padding:5px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt2);font-size:11px;cursor:pointer;">⚙️ จัดกลุ่ม</button>' : '') +
       '</div>' +
       '<div style="overflow-x:auto;">' +
         '<table style="width:100%;border-collapse:collapse;min-width:600px;">' +
           '<thead><tr>' +
-            '<th style="' + colH + 'text-align:left;">ประเภทโครงการ</th>' +
+            '<th style="' + colH + 'text-align:left;">ประเภท / กลุ่มโครงการ</th>' +
             '<th style="' + colH + 'text-align:right;">🎯 เป้าหมาย</th>' +
             '<th style="' + colH + '">📁 ยอดโครงการทั้งหมด</th>' +
             '<th style="' + colH + '">✅ ปิดโครงการแล้ว</th>' +
             '<th style="' + colH + 'text-align:right;">ต้องหาเพิ่ม</th>' +
             '<th style="' + colH + 'text-align:right;">ต้องปิดเพิ่ม</th>' +
           '</tr></thead>' +
-          '<tbody>' + rows.map(typeRow).join('') + sumRow + '</tbody>' +
+          '<tbody>' + rows.map(displayRow).join('') + sumRow + '</tbody>' +
         '</table>' +
       '</div>' +
     '</div>';
+};
+
+// ── TYPE GROUP MODAL ──────────────────────────────────────────────────────────
+window.openTypeGroupModal = function() {
+  window._editingGroups = (window.TARGET_TYPE_GROUPS||[]).map(function(g){
+    return {id:g.id,label:g.label,typeIds:(g.typeIds||[]).slice()};
+  });
+  function _refreshGroupList() {
+    var types = window.PTYPES||[];
+    var html = '';
+    window._editingGroups.forEach(function(g,gi){
+      var pills = types.map(function(t){
+        var on = g.typeIds.includes(t.id);
+        return '<label style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border:1px solid '+(on?'var(--violet)':'var(--border)')+';border-radius:20px;cursor:pointer;font-size:11px;font-weight:600;background:'+(on?'var(--violet)':'var(--surface2)')+';color:'+(on?'#fff':'var(--txt2)')+';user-select:none;margin:2px;">' +
+          '<input type="checkbox" style="display:none;" '+(on?'checked':'')+' onchange="window._grpToggleType('+gi+',\''+t.id+'\')">' +
+          '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:'+(t.color||'#4361ee')+';">&nbsp;</span>' +
+          esc(t.label)+'</label>';
+      }).join('');
+      html += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;background:var(--surface2);">' +
+        '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">' +
+          '<input type="text" value="'+esc(g.label)+'" placeholder="ชื่อกลุ่ม เช่น คลังสินค้า+ครุภัณฑ์" ' +
+            'oninput="window._editingGroups['+gi+'].label=this.value" ' +
+            'style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--txt);font-size:13px;">' +
+          '<button onclick="window._grpRemove('+gi+')" style="padding:6px 10px;border:1px solid var(--coral);border-radius:8px;background:rgba(255,107,107,.1);color:var(--coral);font-size:12px;cursor:pointer;flex-shrink:0;">🗑</button>' +
+        '</div>' +
+        '<div style="display:flex;flex-wrap:wrap;">'+pills+'</div>' +
+      '</div>';
+    });
+    var el = document.getElementById('tg-groups-list');
+    if (el) el.innerHTML = html || '<div style="text-align:center;padding:20px;color:var(--txt3);font-size:12px;">— ยังไม่มีกลุ่ม กด ➕ เพื่อเพิ่ม —</div>';
+  }
+  window._grpToggleType = function(gi, tid){
+    var g=window._editingGroups[gi]; var idx=g.typeIds.indexOf(tid);
+    if(idx>=0)g.typeIds.splice(idx,1); else g.typeIds.push(tid);
+    _refreshGroupList();
+  };
+  window._grpRemove = function(gi){ window._editingGroups.splice(gi,1); _refreshGroupList(); };
+  window._grpAdd = function(){
+    window._editingGroups.push({id:'grp_'+Date.now(),label:'',typeIds:[]});
+    _refreshGroupList();
+  };
+  var html = '<div style="padding:20px;">' +
+    '<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:6px;">⚙️ จัดกลุ่มประเภทโครงการ</div>' +
+    '<div style="font-size:12px;color:var(--txt3);margin-bottom:16px;line-height:1.6;">นำประเภทโครงการหลายประเภทมาแสดงรวมเป็นแถวเดียวในตารางเป้าหมาย</div>' +
+    '<div id="tg-groups-list"></div>' +
+    '<button onclick="window._grpAdd()" style="width:100%;padding:9px;border:1px dashed var(--border);border-radius:8px;background:transparent;color:var(--txt3);font-size:13px;cursor:pointer;margin-top:4px;">➕ เพิ่มกลุ่ม</button>' +
+    '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;">' +
+      '<button onclick="window.closeM(\'m-typegroups\')" style="padding:8px 18px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt2);font-size:13px;cursor:pointer;">ยกเลิก</button>' +
+      '<button onclick="window.saveTypeGroups()" style="padding:8px 20px;border:none;border-radius:8px;background:var(--violet);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">💾 บันทึกการจัดกลุ่ม</button>' +
+    '</div>' +
+  '</div>';
+  document.getElementById('m-typegroups-body').innerHTML = html;
+  window.openM('m-typegroups');
+  _refreshGroupList();
+};
+
+window.saveTypeGroups = function() {
+  var groups = (window._editingGroups||[]).filter(function(g){return g.label&&g.typeIds.length>0;});
+  window.TARGET_TYPE_GROUPS = groups;
+  window.setDoc(getDocRef('SETTINGS','app'),{target_type_groups:groups},{merge:true})
+    .then(function(){
+      window.closeM('m-typegroups');
+      window.showAlert('บันทึกการจัดกลุ่มเรียบร้อย ✓','success');
+      window.renderOverview();
+      window.renderTargets&&window.renderTargets();
+    }).catch(function(e){window.showDbError(e);});
 };
 
 // ── TARGET MODAL ──
@@ -487,15 +572,40 @@ window.renderTargets = function() {
   var entry = targets.find(function(t) { return String(t.year) === selYr; });
   var byType = (entry && entry.byType) ? entry.byType : {};
 
-  var typeRows = (window.PTYPES || []).map(function(t) {
-    var cur = byType[t.id] ? Number(byType[t.id]) : '';
-    var readOnly = !canEdit;
+  var groups = window.TARGET_TYPE_GROUPS || [];
+  var groupedIds = new Set();
+  groups.forEach(function(g){(g.typeIds||[]).forEach(function(tid){groupedIds.add(tid);});});
+
+  function _tgtInput(id, val, readOnly) {
+    return '<input type="number" id="tpg-'+id+'" value="'+(val||'')+'" min="0" placeholder="0" '+
+      (readOnly?'disabled ':'')+
+      'style="width:180px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:'+(readOnly?'var(--surface2)':'var(--surface)')+';color:var(--txt);font-size:13px;text-align:right;'+(readOnly?'opacity:.7;':'')+'">';
+  }
+
+  // Group rows
+  var groupRows = groups.map(function(g){
+    var dots = (g.typeIds||[]).map(function(tid){
+      var t=(window.PTYPES||[]).find(function(x){return x.id===tid;}); return '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+(t?t.color:'#9ba3b8')+';margin-right:3px;"></span>';
+    }).join('');
+    var typeNames = (g.typeIds||[]).map(function(tid){
+      var t=(window.PTYPES||[]).find(function(x){return x.id===tid;}); return t?esc(t.label):'';
+    }).filter(Boolean).join(' + ');
     return '<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">' +
-      '<span style="width:12px;height:12px;border-radius:50%;background:' + (t.color || '#4361ee') + ';flex-shrink:0;display:inline-block;"></span>' +
-      '<span style="flex:1;font-size:13px;font-weight:600;color:var(--txt);">' + esc(t.label) + '</span>' +
-      '<input type="number" id="tpg-inp-' + t.id + '" value="' + cur + '" min="0" placeholder="0" ' +
-        (readOnly ? 'disabled ' : '') +
-        'style="width:180px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:' + (readOnly ? 'var(--surface2)' : 'var(--surface)') + ';color:var(--txt);font-size:13px;text-align:right;' + (readOnly ? 'opacity:.7;' : '') + '">' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-size:13px;font-weight:700;color:var(--txt);">'+dots+esc(g.label)+'</div>' +
+        '<div style="font-size:11px;color:var(--txt3);margin-top:2px;">'+typeNames+'</div>' +
+      '</div>' +
+      _tgtInput('grp-'+g.id, byType[g.id]?Number(byType[g.id]):'', !canEdit) +
+      '<span style="font-size:12px;color:var(--txt3);width:30px;">บาท</span>' +
+    '</div>';
+  }).join('');
+
+  // Ungrouped type rows
+  var ungroupedRows = (window.PTYPES||[]).filter(function(t){return !groupedIds.has(t.id);}).map(function(t){
+    return '<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">' +
+      '<span style="width:12px;height:12px;border-radius:50%;background:'+(t.color||'#4361ee')+';flex-shrink:0;display:inline-block;"></span>' +
+      '<span style="flex:1;font-size:13px;font-weight:600;color:var(--txt);">'+esc(t.label)+'</span>' +
+      _tgtInput('inp-'+t.id, byType[t.id]?Number(byType[t.id]):'', !canEdit) +
       '<span style="font-size:12px;color:var(--txt3);width:30px;">บาท</span>' +
     '</div>';
   }).join('');
@@ -505,6 +615,7 @@ window.renderTargets = function() {
       '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">' +
         '<span style="font-size:15px;font-weight:800;color:var(--txt);">🎯 ตั้งเป้าหมายประจำปี</span>' +
         '<div style="display:flex;align-items:center;gap:8px;margin-left:auto;">' +
+          (canEdit?'<button onclick="window.openTypeGroupModal()" style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt2);font-size:12px;cursor:pointer;">⚙️ จัดกลุ่มประเภท</button>':'') +
           '<label style="font-size:12px;font-weight:600;color:var(--txt3);">ปี พ.ศ.:</label>' +
           '<select onchange="window._targetsPageYr=this.value;window.renderTargets()" ' +
             'style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt);font-size:13px;">' +
@@ -512,7 +623,10 @@ window.renderTargets = function() {
           '</select>' +
         '</div>' +
       '</div>' +
-      '<div>' + typeRows + '</div>' +
+      (groups.length?'<div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">กลุ่มประเภท</div>':'') +
+      '<div>' + groupRows + '</div>' +
+      (ungroupedRows?'<div style="font-size:11px;font-weight:700;color:var(--txt3);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.5px;">ประเภทอื่น ๆ</div>':'') +
+      '<div>' + ungroupedRows + '</div>' +
       (canEdit ?
         '<div style="display:flex;justify-content:flex-end;margin-top:18px;">' +
           '<button onclick="window.saveTargetsPage()" style="padding:9px 24px;border:none;border-radius:8px;background:var(--violet);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">💾 บันทึกเป้าหมาย</button>' +
@@ -525,18 +639,25 @@ window.saveTargetsPage = function() {
   var yr = window._targetsPageYr;
   if (!yr) return;
   var byType = {};
-  (window.PTYPES || []).forEach(function(t) {
-    var inp = document.getElementById('tpg-inp-' + t.id);
-    if (inp) { var v = parseFloat(inp.value); if (!isNaN(v) && v > 0) byType[t.id] = v; }
+  // Group targets
+  (window.TARGET_TYPE_GROUPS||[]).forEach(function(g){
+    var inp = document.getElementById('tpg-grp-'+g.id);
+    if (inp) { var v=parseFloat(inp.value); if(!isNaN(v)&&v>0) byType[g.id]=v; }
   });
-  var targets = (window.YEAR_TARGETS || []).filter(function(t) { return String(t.year) !== String(yr); });
-  if (Object.keys(byType).length > 0) targets.push({ year: Number(yr), byType: byType });
+  // Ungrouped type targets
+  var groupedIds = new Set();
+  (window.TARGET_TYPE_GROUPS||[]).forEach(function(g){(g.typeIds||[]).forEach(function(tid){groupedIds.add(tid);});});
+  (window.PTYPES||[]).filter(function(t){return !groupedIds.has(t.id);}).forEach(function(t){
+    var inp = document.getElementById('tpg-inp-'+t.id);
+    if (inp) { var v=parseFloat(inp.value); if(!isNaN(v)&&v>0) byType[t.id]=v; }
+  });
+  var targets = (window.YEAR_TARGETS||[]).filter(function(t){return String(t.year)!==String(yr);});
+  if (Object.keys(byType).length>0) targets.push({year:Number(yr),byType:byType});
   window.YEAR_TARGETS = targets;
-  window.setDoc(getDocRef('SETTINGS', 'app'), { year_targets: targets }, { merge: true })
-    .then(function() {
-      window.showAlert('บันทึกเป้าหมายปี ' + yr + ' เรียบร้อย ✓', 'success');
+  window.setDoc(getDocRef('SETTINGS','app'),{year_targets:targets},{merge:true})
+    .then(function(){
+      window.showAlert('บันทึกเป้าหมายปี '+yr+' เรียบร้อย ✓','success');
       window.renderOverview();
-    })
-    .catch(function(e) { window.showDbError(e); });
+    }).catch(function(e){window.showDbError(e);});
 };
 

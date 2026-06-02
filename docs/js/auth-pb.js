@@ -219,6 +219,7 @@ function setupRealtimeListeners() {
       window.checkDailyNotifications();
     }
     window.YEAR_TARGETS=d.year_targets||[];
+    window.TARGET_TYPE_GROUPS=d.target_type_groups||[];
     window.SETTINGS={
       allowance_weekday_normal:  Number(d.allowance_weekday_normal)  || 350,
       allowance_holiday_normal:  Number(d.allowance_holiday_normal)  || 650,
