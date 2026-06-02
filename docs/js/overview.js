@@ -48,7 +48,8 @@ window.renderOverview = function(){
       <div style="margin-top:4px;">${s.sub}</div>
     </div>`;
   }).join('');
-  window.renderAnnualTarget(fProjs, yr);
+  var annualProjs=window.PROJECTS.filter(function(p){return(!yr||getYearBE(p.start)==yr)&&(!grp||p.groupId===grp);});
+  window.renderAnnualTarget(annualProjs, yr);
   Chart.defaults.font.family='Plus Jakarta Sans';Chart.defaults.color='#9ba3b8';
   // ── Monthly Workload Trend ──
   if(window.cWLTrend)window.cWLTrend.destroy();
@@ -278,8 +279,8 @@ function _buildAnnualTargetRows(fProjs, byType) {
   // Group rows
   groups.forEach(function(g) {
     var gTypeIds = g.typeIds || [];
-    if (!gTypeIds.some(function(tid){return allTypeIds.has(tid);}) && !byType[g.id]) return;
-    var tgt = Number(byType[g.id] || 0);
+    if (!gTypeIds.some(function(tid){return allTypeIds.has(tid);})) return;
+    var tgt = gTypeIds.reduce(function(s,tid){return s+Number(byType[tid]||0);},0);
     var projs = fProjs.filter(function(p){return gTypeIds.includes(p.typeId);});
     var total = projs.reduce(function(s,p){return s+(p.cost||0);},0);
     var closed = projs.filter(function(p){return p.stage==='close';}).reduce(function(s,p){return s+(p.cost||0);},0);
@@ -598,21 +599,27 @@ window.renderTargets = function() {
       'style="width:180px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:'+(readOnly?'var(--surface2)':'var(--surface)')+';color:var(--txt);font-size:13px;text-align:right;'+(readOnly?'opacity:.7;':'')+'">';
   }
 
-  // Group rows
+  // Group rows — แสดง input ต่อประเภทภายในกลุ่ม
   var groupRows = groups.map(function(g){
     var dots = (g.typeIds||[]).map(function(tid){
       var t=(window.PTYPES||[]).find(function(x){return x.id===tid;}); return '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+(t?t.color:'#9ba3b8')+';margin-right:3px;"></span>';
     }).join('');
-    var typeNames = (g.typeIds||[]).map(function(tid){
-      var t=(window.PTYPES||[]).find(function(x){return x.id===tid;}); return t?esc(t.label):'';
-    }).filter(Boolean).join(' + ');
-    return '<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">' +
-      '<div style="flex:1;min-width:0;">' +
-        '<div style="font-size:13px;font-weight:700;color:var(--txt);">'+dots+esc(g.label)+'</div>' +
-        '<div style="font-size:11px;color:var(--txt3);margin-top:2px;">'+typeNames+'</div>' +
+    var typeInputRows = (g.typeIds||[]).map(function(tid){
+      var t=(window.PTYPES||[]).find(function(x){return x.id===tid;});
+      if(!t) return '';
+      return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0 8px 16px;border-bottom:1px solid var(--border);">' +
+        '<span style="width:8px;height:8px;border-radius:50%;background:'+(t.color||'#4361ee')+';flex-shrink:0;display:inline-block;"></span>' +
+        '<span style="flex:1;font-size:12px;color:var(--txt2);">'+esc(t.label)+'</span>' +
+        _tgtInput('inp-'+t.id, byType[t.id]?Number(byType[t.id]):'', !canEdit) +
+        '<span style="font-size:12px;color:var(--txt3);width:30px;">บาท</span>' +
+      '</div>';
+    }).join('');
+    return '<div style="border-bottom:1px solid var(--border);">' +
+      '<div style="display:flex;align-items:center;gap:8px;padding:10px 0 6px;">' +
+        '<span style="font-size:12px;font-weight:800;color:var(--violet);">'+dots+esc(g.label)+'</span>' +
+        '<span style="font-size:10px;color:var(--txt3);">(รวมกลุ่ม)</span>' +
       '</div>' +
-      _tgtInput('grp-'+g.id, byType[g.id]?Number(byType[g.id]):'', !canEdit) +
-      '<span style="font-size:12px;color:var(--txt3);width:30px;">บาท</span>' +
+      typeInputRows +
     '</div>';
   }).join('');
 
@@ -655,15 +662,8 @@ window.saveTargetsPage = function() {
   var yr = window._targetsPageYr;
   if (!yr) return;
   var byType = {};
-  // Group targets
-  (window.TARGET_TYPE_GROUPS||[]).forEach(function(g){
-    var inp = document.getElementById('tpg-grp-'+g.id);
-    if (inp) { var v=parseFloat(inp.value); if(!isNaN(v)&&v>0) byType[g.id]=v; }
-  });
-  // Ungrouped type targets
-  var groupedIds = new Set();
-  (window.TARGET_TYPE_GROUPS||[]).forEach(function(g){(g.typeIds||[]).forEach(function(tid){groupedIds.add(tid);});});
-  (window.PTYPES||[]).filter(function(t){return !groupedIds.has(t.id);}).forEach(function(t){
+  // ทุกประเภท (ทั้งในกลุ่มและไม่ในกลุ่ม) — save per-type
+  (window.PTYPES||[]).forEach(function(t){
     var inp = document.getElementById('tpg-inp-'+t.id);
     if (inp) { var v=parseFloat(inp.value); if(!isNaN(v)&&v>0) byType[t.id]=v; }
   });
