@@ -479,10 +479,18 @@ window.openTypeGroupModal = function() {
   _refresh();
 };
 
+// รวม YEAR_TARGETS + TARGET_TYPE_GROUPS เป็น payload เดียวสำหรับ save
+function _yearTargetsPayload(yearEntries, groups) {
+  var entries = (yearEntries||window.YEAR_TARGETS||[]).filter(function(t){return t.year&&!t._typeGroups;});
+  var grps = groups||window.TARGET_TYPE_GROUPS||[];
+  if (grps.length > 0) entries = entries.concat([{_typeGroups: grps}]);
+  return entries;
+}
+
 window.saveTypeGroups = function() {
   var groups = (window._editingGroups||[]).filter(function(g){return g.label&&g.typeIds.length>0;});
   window.TARGET_TYPE_GROUPS = groups;
-  window.setDoc(getDocRef('SETTINGS','app'),{target_type_groups:groups},{merge:true})
+  window.setDoc(getDocRef('SETTINGS','app'),{year_targets:_yearTargetsPayload(null,groups)},{merge:true})
     .then(function(){
       var ov=document.getElementById('tg-overlay'); if(ov)ov.remove();
       window.showAlert('บันทึกการจัดกลุ่มเรียบร้อย ✓','success');
@@ -556,7 +564,7 @@ window.saveAnnualTargets = function() {
   var targets = (window.YEAR_TARGETS || []).filter(function(t) { return String(t.year) !== String(yr); });
   if (Object.keys(byType).length > 0) targets.push({ year: Number(yr), byType: byType });
   window.YEAR_TARGETS = targets;
-  window.setDoc(getDocRef('SETTINGS', 'app'), { year_targets: targets }, { merge: true })
+  window.setDoc(getDocRef('SETTINGS', 'app'), { year_targets: _yearTargetsPayload(targets) }, { merge: true })
     .then(function() {
       window.closeM('m-target');
       window.showAlert('บันทึกเป้าหมายปี ' + yr + ' เรียบร้อย ✓', 'success');
@@ -670,7 +678,7 @@ window.saveTargetsPage = function() {
   var targets = (window.YEAR_TARGETS||[]).filter(function(t){return String(t.year)!==String(yr);});
   if (Object.keys(byType).length>0) targets.push({year:Number(yr),byType:byType});
   window.YEAR_TARGETS = targets;
-  window.setDoc(getDocRef('SETTINGS','app'),{year_targets:targets},{merge:true})
+  window.setDoc(getDocRef('SETTINGS','app'),{year_targets:_yearTargetsPayload(targets)},{merge:true})
     .then(function(){
       window.showAlert('บันทึกเป้าหมายปี '+yr+' เรียบร้อย ✓','success');
       window.renderOverview();

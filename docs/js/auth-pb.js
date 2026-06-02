@@ -218,8 +218,9 @@ function setupRealtimeListeners() {
       window._pendingDailyCheck = false;
       window.checkDailyNotifications();
     }
-    window.YEAR_TARGETS=d.year_targets||[];
-    window.TARGET_TYPE_GROUPS=d.target_type_groups||[];
+    var _rawTargets=d.year_targets||[];
+    window.YEAR_TARGETS=_rawTargets.filter(function(t){return t.year&&!t._typeGroups;});
+    window.TARGET_TYPE_GROUPS=(_rawTargets.find(function(t){return!!t._typeGroups;})||{})._typeGroups||[];
     window.SETTINGS={
       allowance_weekday_normal:  Number(d.allowance_weekday_normal)  || 350,
       allowance_holiday_normal:  Number(d.allowance_holiday_normal)  || 650,
