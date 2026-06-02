@@ -276,10 +276,10 @@ function _buildAnnualTargetRows(fProjs, byType, useGroups) {
   var allTypeIds = new Set(Object.keys(byType));
   fProjs.forEach(function(p) { if (p.typeId) allTypeIds.add(p.typeId); });
   var rows = [];
-  // Group rows
+  // Group rows — แสดงเสมอถ้ามีการตั้งกลุ่มไว้ (แม้ยังไม่มีโครงการ/target ในปีนั้น)
   groups.forEach(function(g) {
     var gTypeIds = g.typeIds || [];
-    if (!gTypeIds.some(function(tid){return allTypeIds.has(tid);})) return;
+    if (!gTypeIds.length) return;
     var tgt = gTypeIds.reduce(function(s,tid){return s+Number(byType[tid]||0);},0);
     var projs = fProjs.filter(function(p){return gTypeIds.includes(p.typeId);});
     var total = projs.reduce(function(s,p){return s+(p.cost||0);},0);
@@ -293,8 +293,9 @@ function _buildAnnualTargetRows(fProjs, byType, useGroups) {
     rows.push({id:g.id,isGroup:true,label:dots+'<b style="vertical-align:middle;">'+esc(g.label)+'</b>',
       tgt,total,closed,pctT,pctC,needFind:Math.max(0,tgt-total),needClose:Math.max(0,tgt-closed)});
   });
-  // Ungrouped type rows
-  (window.PTYPES||[]).filter(function(t){return allTypeIds.has(t.id)&&!groupedIds.has(t.id);}).forEach(function(t){
+  // Ungrouped type rows — แสดงทุกประเภทที่ไม่อยู่ในกลุ่ม ถ้ามีกลุ่มอยู่ หรือมีข้อมูล
+  var showAllTypes = groups.length > 0;
+  (window.PTYPES||[]).filter(function(t){return !groupedIds.has(t.id)&&(showAllTypes||allTypeIds.has(t.id));}).forEach(function(t){
     var tgt = Number(byType[t.id]||0);
     var projs = fProjs.filter(function(p){return p.typeId===t.id;});
     var total = projs.reduce(function(s,p){return s+(p.cost||0);},0);
@@ -326,6 +327,7 @@ window.renderAnnualTarget = function(fProjs, yr) {
   // toggle handler
   window._setTgtGrouped = function(val) {
     localStorage.setItem('tgt_grouped', val ? '1' : '0');
+    window.setDoc(getDocRef('SETTINGS','app'), {tgt_grouped: val ? 1 : 0}, {merge:true}).catch(function(){});
     window.renderOverview();
   };
 
@@ -338,7 +340,7 @@ window.renderAnnualTarget = function(fProjs, yr) {
 
   var actionBtns = '<div style="display:flex;gap:8px;align-items:center;">' +
     toggleHtml +
-    (canEditTgt ? '<button onclick="window.openTypeGroupModal()" style="padding:5px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt2);font-size:11px;cursor:pointer;font-family:inherit;">⚙️ จัดกลุ่ม</button>' : '') +
+    (window.isAdmin() ? '<button onclick="window.openTypeGroupModal()" style="padding:5px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt2);font-size:11px;cursor:pointer;font-family:inherit;">⚙️ จัดกลุ่ม</button>' : '') +
     '</div>';
 
   if (!rows.length) {
@@ -667,7 +669,7 @@ window.renderTargets = function() {
       '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">' +
         '<span style="font-size:15px;font-weight:800;color:var(--txt);">🎯 ตั้งเป้าหมายประจำปี</span>' +
         '<div style="display:flex;align-items:center;gap:8px;margin-left:auto;">' +
-          (canEdit?'<button onclick="window.openTypeGroupModal()" style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt2);font-size:12px;cursor:pointer;">⚙️ จัดกลุ่มประเภท</button>':'') +
+          (window.isAdmin()?'<button onclick="window.openTypeGroupModal()" style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt2);font-size:12px;cursor:pointer;">⚙️ จัดกลุ่มประเภท</button>':'') +
           '<label style="font-size:12px;font-weight:600;color:var(--txt3);">ปี พ.ศ.:</label>' +
           '<select onchange="window._targetsPageYr=this.value;window.renderTargets()" ' +
             'style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt);font-size:13px;">' +

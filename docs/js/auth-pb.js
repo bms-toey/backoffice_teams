@@ -227,6 +227,14 @@ function setupRealtimeListeners() {
     } else {
       try{var _ls=localStorage.getItem('_tgt_groups');window.TARGET_TYPE_GROUPS=_ls?JSON.parse(_ls):[];}catch(e){window.TARGET_TYPE_GROUPS=[];}
     }
+    if(d.tgt_grouped!==undefined){
+      try{localStorage.setItem('tgt_grouped',d.tgt_grouped?'1':'0');}catch(e){}
+    }
+    if(window.cu&&window.isDbLoaded){
+      var _von2=function(id){var el=document.getElementById(id);return el&&el.classList.contains('on');};
+      if(_von2('view-overview')) window.renderOverview&&window.renderOverview();
+      if(_von2('view-targets')) window.renderTargets&&window.renderTargets();
+    }
     window.SETTINGS={
       allowance_weekday_normal:  Number(d.allowance_weekday_normal)  || 350,
       allowance_holiday_normal:  Number(d.allowance_holiday_normal)  || 650,
