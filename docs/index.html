@@ -590,13 +590,13 @@
           <select class="t-sel" id="hsp-dist" onchange="window._hspDistChanged()"><option value="">ทุกอำเภอ</option></select>
           <select class="t-sel" id="hsp-type" onchange="window._hspPage=1;window.renderHospital();if(window._hspViewMode==='analysis')window.renderHspAnalysis&&window.renderHspAnalysis();">
             <option value="">ทุกระดับ</option>
-            <option value="A">A – ระดับสูงสุด</option>
-            <option value="S">S – ศูนย์/ทั่วไปใหญ่</option>
-            <option value="M1">M1 – ทั่วไปกลาง</option>
-            <option value="M2">M2 – ทั่วไปเล็ก</option>
-            <option value="F1">F1 – ชุมชนใหญ่</option>
-            <option value="F2">F2 – ชุมชนกลาง</option>
-            <option value="F3">F3 – ชุมชนเล็ก</option>
+            <option value="A">A – ระดับสูงสุด (500+ เตียง)</option>
+            <option value="S">S – ศูนย์/ทั่วไปใหญ่ (300–499 เตียง)</option>
+            <option value="M1">M1 – ทั่วไปกลาง (150–299 เตียง)</option>
+            <option value="M2">M2 – ทั่วไปเล็ก (90–149 เตียง)</option>
+            <option value="F1">F1 – ชุมชนใหญ่ (60–89 เตียง)</option>
+            <option value="F2">F2 – ชุมชนกลาง (30–59 เตียง)</option>
+            <option value="F3">F3 – ชุมชนเล็ก (&lt;30 เตียง)</option>
             <option value="P">P – เอกชน</option>
             <option value="other">อื่นๆ</option>
           </select>
