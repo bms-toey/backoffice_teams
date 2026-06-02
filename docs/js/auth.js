@@ -226,6 +226,7 @@ function setupRealtimeListeners(){
     if(window.cu&&document.getElementById('view-hospital')&&document.getElementById('view-hospital').classList.contains('on')){
       window.renderHspProductMgmt&&window.renderHspProductMgmt();
       if(window._hspViewMode==='analysis')window.renderHspAnalysis&&window.renderHspAnalysis();
+      if(window._hspViewMode==='list')window._hspBuildProdMulti&&window._hspBuildProdMulti();
     }
     if(window.cu&&window.admCur==='hsp_products')window.admTab&&window.admTab('hsp_products');
   }, e=>window.showDbError(e));

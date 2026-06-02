@@ -602,7 +602,10 @@
           </select>
           <span id="hsp-count" style="color:var(--txt-muted);font-size:12px;white-space:nowrap;align-self:center;"></span>
           <div style="flex:1"></div>
-          <select class="t-sel" id="hsp-product-filter" onchange="window._hspPage=1;window.renderHospital();if(window._hspViewMode==='analysis')window.renderHspAnalysis&&window.renderHspAnalysis();" style="display:none;">
+          <!-- multi-checkbox dropdown (list view) -->
+          <div id="hsp-prod-multi-wrap" style="display:none;position:relative;z-index:30;"></div>
+          <!-- single select (analysis view — whitespace filter) -->
+          <select class="t-sel" id="hsp-product-filter" onchange="window._hspAnalysisPage=1;window._hspAnalysisLastFilter='';window.renderHspAnalysis&&window.renderHspAnalysis();" style="display:none;">
             <option value="">ทุก Product</option>
           </select>
           <select class="t-sel" id="hsp-prod-usage-filter" onchange="window._hspAnalysisPage=1;window._hspAnalysisLastFilter='';window._hspPage=1;if(window._hspViewMode==='analysis'){window.renderHspAnalysis&&window.renderHspAnalysis();}else{window.renderHospital&&window.renderHospital();}" style="display:none;">
